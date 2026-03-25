@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "SIMPLE-002",
+  "slug": "add-annotation",
+  "developerTask": "Add @Override annotation to the toString method in the Person class",
+  "taskType": "add-annotation",
+  "bucket": "A",
+  "noChange": false,
+  "knowledgeRefs": ["coding-standards.md", "naming-conventions.md"],
+  "tags": ["annotation", "simple"],
+  "status": "active"
+}

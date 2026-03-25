@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "SIMPLE-005",
+  "slug": "deprecated-item",
+  "developerTask": "This item is deprecated and should be excluded from active items",
+  "taskType": "no-op",
+  "bucket": "B",
+  "noChange": true,
+  "knowledgeRefs": [],
+  "tags": ["deprecated-test"],
+  "status": "deprecated"
+}

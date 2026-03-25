@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "developerTask": "Migrate database layer from Hibernate 5 to Hibernate 6",
+  "noChange": false,
+  "tags": ["upgrade", "hibernate"],
+  "beforeRef": {
+    "repoPath": "/home/user/projects/openws",
+    "commitHash": "1111111111111111111111111111111111111111"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "developerTask": "Add pagination to REST endpoints",
+  "noChange": false,
+  "tags": ["feature", "rest"],
+  "referenceRef": {
+    "repoPath": "/home/user/projects/openws",
+    "commitHash": "2222222222222222222222222222222222222222",
+    "subDirectory": "api-module"
+  }
+}

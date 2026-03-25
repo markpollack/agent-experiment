@@ -1,0 +1,83 @@
+{
+  "name": "test-dataset",
+  "description": "Minimal test dataset for unit testing DatasetManager and ExperimentRunner",
+  "schemaVersion": 1,
+  "version": "1.0.0",
+  "metadata": {
+    "source": "test-fixtures",
+    "purpose": "unit-testing"
+  },
+  "stats": {
+    "total": 8,
+    "byBucket": {
+      "A": 3,
+      "B": 5
+    }
+  },
+  "items": [
+    {
+      "id": "SIMPLE-001",
+      "slug": "rename-field",
+      "path": "items/SIMPLE-001",
+      "bucket": "A",
+      "taskType": "rename-field",
+      "status": "active"
+    },
+    {
+      "id": "SIMPLE-002",
+      "slug": "add-annotation",
+      "path": "items/SIMPLE-002",
+      "bucket": "A",
+      "taskType": "add-annotation",
+      "status": "active"
+    },
+    {
+      "id": "SIMPLE-003",
+      "slug": "no-change-expected",
+      "path": "items/SIMPLE-003",
+      "bucket": "B",
+      "taskType": "no-op",
+      "status": "active"
+    },
+    {
+      "id": "SIMPLE-004",
+      "slug": "disabled-item",
+      "path": "items/SIMPLE-004",
+      "bucket": "A",
+      "taskType": "rename-field",
+      "status": "disabled"
+    },
+    {
+      "id": "SIMPLE-005",
+      "slug": "deprecated-item",
+      "path": "items/SIMPLE-005",
+      "bucket": "B",
+      "taskType": "no-op",
+      "status": "deprecated"
+    },
+    {
+      "id": "GITREF-001",
+      "slug": "spring-boot-upgrade",
+      "path": "items/GITREF-001",
+      "bucket": "B",
+      "taskType": "spring-boot-3-upgrade",
+      "status": "active"
+    },
+    {
+      "id": "GITREF-002",
+      "slug": "hibernate-upgrade",
+      "path": "items/GITREF-002",
+      "bucket": "B",
+      "taskType": "hibernate-6-upgrade",
+      "status": "active"
+    },
+    {
+      "id": "GITREF-003",
+      "slug": "add-pagination",
+      "path": "items/GITREF-003",
+      "bucket": "B",
+      "taskType": "add-pagination",
+      "status": "active"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "SIMPLE-004",
+  "slug": "disabled-item",
+  "developerTask": "This item is disabled and should be excluded from active items",
+  "taskType": "rename-field",
+  "bucket": "A",
+  "noChange": false,
+  "knowledgeRefs": [],
+  "tags": ["disabled-test"],
+  "status": "disabled"
+}

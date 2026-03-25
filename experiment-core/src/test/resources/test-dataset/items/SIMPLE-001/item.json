@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "SIMPLE-001",
+  "slug": "rename-field",
+  "developerTask": "Rename the field 'name' to 'fullName' in the Person class",
+  "taskType": "rename-field",
+  "bucket": "A",
+  "noChange": false,
+  "knowledgeRefs": [],
+  "tags": ["rename", "simple"],
+  "status": "active"
+}

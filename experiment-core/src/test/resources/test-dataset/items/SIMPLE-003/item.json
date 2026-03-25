@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "SIMPLE-003",
+  "slug": "no-change-expected",
+  "developerTask": "Verify that the Person class needs no changes for the no-op taskType",
+  "taskType": "no-op",
+  "bucket": "B",
+  "noChange": true,
+  "knowledgeRefs": [],
+  "tags": ["no-change"],
+  "status": "active"
+}
