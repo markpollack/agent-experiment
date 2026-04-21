@@ -1,5 +1,5 @@
-# Plans - cloned repos are large and can be re-cloned from manifest
-plans/supporting_repos/
+# Plans
+plans/
 
 # Maven
 target/
