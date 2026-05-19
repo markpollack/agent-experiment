@@ -195,11 +195,11 @@ Adds post-hoc re-scoring of stored experiment results without re-invoking the sy
 ### Step 2.2: ReEvaluator
 
 **Entry criteria**:
-- [ ] Step 2.1 complete
-- [ ] Read: `plans/learnings/step-2.1-context-factory.md`
+- [x] Step 2.1 complete
+- [x] Read: `plans/learnings/step-2.1-context-factory.md`
 
 **Work items**:
-- [ ] CREATE `ReEvaluator` in `experiment-core` reeval package
+- [x] CREATE `ReEvaluator` in `experiment-core` reeval package
   - Builder pattern with `resultStore` and `contextFactory`
   - `agentDefaults(ResultStore)` convenience factory
   - `reEvaluate(ExperimentResult, Jury)` — iterates items, delegates to context factory, applies jury, builds new `ExperimentResult`
@@ -207,22 +207,22 @@ Adds post-hoc re-scoring of stored experiment results without re-invoking the sy
   - Skipped items carry `reEvaluationSkipped=true` metadata with reason
   - Re-evaluated items carry `reEvaluated=true`, `systemReinvoked=false`, `reEvaluationJury` metadata
   - Preserves original `costUsd` (re-evaluation judge cost not tracked in v1)
-- [ ] WRITE unit tests:
+- [x] WRITE unit tests:
   - Re-evaluate a stored result with a new jury — scores change
   - Skipped items preserved correctly (failed items, missing detail)
   - Metadata records re-evaluation provenance (`reEvaluatedFrom`, `systemReinvoked=false`)
   - Load-by-ID convenience works
   - Custom `ReEvaluationContextFactory` via lambda
-- [ ] VERIFY: `./mvnw test` passes
+- [x] VERIFY: `./mvnw test` passes
 
 **Exit criteria**:
-- [ ] `ReEvaluator` passes all unit tests
-- [ ] Re-evaluated results persist via `ResultStore`
-- [ ] All tests pass: `./mvnw test`
-- [ ] Create: `plans/learnings/step-2.2-re-evaluator.md`
-- [ ] Update `CLAUDE.md` with distilled learnings
-- [ ] Update `ROADMAP.md` checkboxes
-- [ ] COMMIT
+- [x] `ReEvaluator` passes all unit tests
+- [x] Re-evaluated results persist via `ResultStore`
+- [x] All tests pass: `./mvnw test`
+- [x] Create: `plans/learnings/step-2.2-re-evaluator.md`
+- [x] Update `CLAUDE.md` with distilled learnings
+- [x] Update `ROADMAP.md` checkboxes
+- [x] COMMIT
 
 **Deliverables**: Working `ReEvaluator` with agent defaults and custom context factory support
 
