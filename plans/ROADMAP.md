@@ -257,20 +257,20 @@ Adds `JudgeExperiment` as a sibling typed experiment API alongside `AgentExperim
 ### Step 3.0: Stage 3 Entry — Context Load
 
 **Entry criteria** *(inter-stage gate)*:
-- [ ] Stage 2 consolidation complete — Read: `plans/learnings/step-2.3-stage2-summary.md`
-- [ ] Read: `plans/learnings/LEARNINGS.md`
-- [ ] Read: `plans/inbox/judge-experiment.md`
+- [x] Stage 2 consolidation complete — Read: `plans/learnings/step-2.3-stage2-summary.md`
+- [x] Read: `plans/learnings/LEARNINGS.md`
+- [x] Read: `plans/inbox/judge-experiment.md`
 
 **Work items**:
-- [ ] REVIEW Stage 2 learnings for anything that affects JudgeExperiment
-- [ ] VERIFY `ExecutionDetail` marker interface supports `JudgeExecutionDetail` (implements, not extends)
-- [ ] VERIFY `ExperimentResult` and `ResultStore` work with judge-typed results
-- [ ] DOCUMENT any scope changes
+- [x] REVIEW Stage 2 learnings for anything that affects JudgeExperiment
+- [x] VERIFY `ExecutionDetail` marker interface supports `JudgeExecutionDetail` (implements, not extends)
+- [x] VERIFY `ExperimentResult` and `ResultStore` work with judge-typed results
+- [x] DOCUMENT any scope changes
 
 **Exit criteria**:
-- [ ] Stage 2 context loaded; no blocking issues
-- [ ] Create: `plans/learnings/step-3.0-stage3-entry.md`
-- [ ] Update `ROADMAP.md` checkboxes
+- [x] Stage 2 context loaded; no blocking issues
+- [x] Create: `plans/learnings/step-3.0-stage3-entry.md`
+- [x] Update `ROADMAP.md` checkboxes
 
 **Deliverables**: Verified entry into Stage 3
 
