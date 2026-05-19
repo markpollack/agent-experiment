@@ -279,35 +279,26 @@ Adds `JudgeExperiment` as a sibling typed experiment API alongside `AgentExperim
 ### Step 3.1: JudgeScorer and Supporting Types
 
 **Entry criteria**:
-- [ ] Step 3.0 complete
-- [ ] Read: `plans/learnings/step-3.0-stage3-entry.md`
+- [x] Step 3.0 complete
+- [x] Read: `plans/learnings/step-3.0-stage3-entry.md`
 
 **Work items**:
-- [ ] CREATE `JudgeScorer` `@FunctionalInterface` in judge package
-  - `JudgeScorerResult score(JudgeScoringInput input)`
-- [ ] CREATE `JudgeScoringInput` record: `(DatasetItem item, Judgment actual, String expectedLabel)`
-- [ ] CREATE `JudgeScorerResult` record: `(boolean match, double score, String reasoning)`
-- [ ] CREATE `JudgeScorers` factory with built-in implementations:
-  - `exactVerdictMatch()` — PASS/FAIL status match
-  - `exactCategoryMatch()` — CategoricalScore value match
-  - `numericalTolerance(double tolerance)` — NumericalScore within tolerance
-- [ ] CREATE `JudgeExecutionDetail` record implementing `ExecutionDetail`:
-  - `(Judgment candidateJudgment, String expectedLabel, JudgeScorerResult scorerResult)`
-- [ ] WRITE unit tests for all built-in scorers:
-  - Exact verdict match/mismatch
-  - Category match/mismatch
-  - Numerical within/outside tolerance
-  - Non-numeric expected label handling
-- [ ] VERIFY: `./mvnw test` passes
+- [x] CREATE `JudgeScorer` `@FunctionalInterface` in judge package
+- [x] CREATE `JudgeScoringInput` record
+- [x] CREATE `JudgeScorerResult` record
+- [x] CREATE `JudgeScorers` factory with built-in implementations
+- [x] CREATE `JudgeExecutionDetail` record implementing `ExecutionDetail`
+- [x] WRITE unit tests for all built-in scorers (10 tests)
+- [x] VERIFY: `./mvnw test` passes
 
 **Exit criteria**:
-- [ ] All scorer types compile and pass tests
-- [ ] `JudgeExecutionDetail` implements `ExecutionDetail`
-- [ ] All tests pass: `./mvnw test`
-- [ ] Create: `plans/learnings/step-3.1-judge-scorer.md`
-- [ ] Update `CLAUDE.md` with distilled learnings
-- [ ] Update `ROADMAP.md` checkboxes
-- [ ] COMMIT
+- [x] All scorer types compile and pass tests
+- [x] `JudgeExecutionDetail` implements `ExecutionDetail`
+- [x] All tests pass: `./mvnw test`
+- [x] Create: `plans/learnings/step-3.1-judge-scorer.md`
+- [x] Update `CLAUDE.md` with distilled learnings
+- [x] Update `ROADMAP.md` checkboxes
+- [x] COMMIT
 
 **Deliverables**: Judge scoring SPI, built-in scorers, execution detail type
 

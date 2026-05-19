@@ -35,3 +35,4 @@
 - `io.github.markpollack.experiment.scoring` — VerdictExtractor, JudgmentContextFactory
 - `io.github.markpollack.experiment.diagnostic` — EfficiencyEvaluator, DefaultEfficiencyEvaluator
 - `io.github.markpollack.experiment.reeval` — ReEvaluationContextFactory, AgentReEvaluationContextFactory, ReEvaluator
+- `io.github.markpollack.experiment.judge` — JudgeExperiment, JudgeScorer, JudgeScorers, JudgeExecutionDetail
