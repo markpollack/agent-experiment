@@ -36,11 +36,11 @@
 
         <!-- Judging -->
         <dependency>
-            <groupId>org.springaicommunity</groupId>
+            <groupId>io.github.markpollack</groupId>
             <artifactId>agent-judge-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springaicommunity</groupId>
+            <groupId>io.github.markpollack</groupId>
             <artifactId>agent-judge-exec</artifactId>
         </dependency>
 

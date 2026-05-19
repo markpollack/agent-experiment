@@ -1,7 +1,7 @@
 package io.github.markpollack.experiment.agent.claude;
 
 import org.jspecify.annotations.Nullable;
-import org.springaicommunity.claude.agent.sdk.config.PermissionMode;
+import io.github.markpollack.claude.agent.sdk.config.PermissionMode;
 
 /**
  * Configuration for {@link ClaudeSdkInvoker}. Captures Claude-specific settings that are

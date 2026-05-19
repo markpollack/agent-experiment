@@ -21,10 +21,10 @@ import io.github.markpollack.journal.claude.ToolUseRecord;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springaicommunity.claude.agent.sdk.ClaudeClient;
-import org.springaicommunity.claude.agent.sdk.ClaudeSyncClient;
-import org.springaicommunity.claude.agent.sdk.config.PermissionMode;
-import org.springaicommunity.claude.agent.sdk.transport.CLIOptions;
+import io.github.markpollack.claude.agent.sdk.ClaudeClient;
+import io.github.markpollack.claude.agent.sdk.ClaudeSyncClient;
+import io.github.markpollack.claude.agent.sdk.config.PermissionMode;
+import io.github.markpollack.claude.agent.sdk.transport.CLIOptions;
 
 /**
  * {@link PlanGenerator} implementation using Claude SDK for 2-phase planning.

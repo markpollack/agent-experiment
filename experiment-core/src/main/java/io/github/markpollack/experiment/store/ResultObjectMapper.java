@@ -18,10 +18,10 @@ import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.github.markpollack.experiment.agent.InvocationResult;
 import io.github.markpollack.experiment.result.ExecutionDetail;
-import org.springaicommunity.judge.score.BooleanScore;
-import org.springaicommunity.judge.score.CategoricalScore;
-import org.springaicommunity.judge.score.NumericalScore;
-import org.springaicommunity.judge.score.Score;
+import io.github.markpollack.judge.score.BooleanScore;
+import io.github.markpollack.judge.score.CategoricalScore;
+import io.github.markpollack.judge.score.NumericalScore;
+import io.github.markpollack.judge.score.Score;
 
 /**
  * Creates a pre-configured {@link ObjectMapper} for serializing experiment results.

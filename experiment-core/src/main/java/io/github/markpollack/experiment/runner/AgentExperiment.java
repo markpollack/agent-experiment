@@ -49,9 +49,9 @@ import io.github.markpollack.experiment.store.SessionStore;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springaicommunity.judge.context.JudgmentContext;
-import org.springaicommunity.judge.jury.Jury;
-import org.springaicommunity.judge.jury.Verdict;
+import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.jury.Jury;
+import io.github.markpollack.judge.jury.Verdict;
 
 /**
  * Orchestrates a full agent experiment: load dataset, iterate items, invoke agent, judge

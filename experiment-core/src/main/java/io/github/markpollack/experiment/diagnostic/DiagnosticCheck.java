@@ -1,7 +1,7 @@
 package io.github.markpollack.experiment.diagnostic;
 
 import org.jspecify.annotations.Nullable;
-import org.springaicommunity.judge.result.Check;
+import io.github.markpollack.judge.result.Check;
 
 /**
  * A judge {@link Check} enriched with gap classification.

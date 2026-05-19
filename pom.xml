@@ -42,11 +42,9 @@
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
         <!-- Dependency versions -->
-        <claude-code-capture.version>0.9.0</claude-code-capture.version>
-
-        <!-- Community dependency versions -->
-        <agent-judge.version>0.9.1</agent-judge.version>
-        <claude-code-sdk.version>1.0.0</claude-code-sdk.version>
+        <claude-code-capture.version>1.1.0-SNAPSHOT</claude-code-capture.version>
+        <agent-judge.version>0.10.0-SNAPSHOT</agent-judge.version>
+        <claude-code-sdk.version>1.1.0-SNAPSHOT</claude-code-sdk.version>
 
         <!-- Third-party dependency versions -->
         <jackson.version>2.18.2</jackson.version>
@@ -85,19 +83,18 @@
                 <version>${project.version}</version>
             </dependency>
 
-            <!-- Community dependencies -->
             <dependency>
-                <groupId>org.springaicommunity</groupId>
+                <groupId>io.github.markpollack</groupId>
                 <artifactId>agent-judge-core</artifactId>
                 <version>${agent-judge.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.springaicommunity</groupId>
+                <groupId>io.github.markpollack</groupId>
                 <artifactId>agent-judge-exec</artifactId>
                 <version>${agent-judge.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.springaicommunity</groupId>
+                <groupId>io.github.markpollack</groupId>
                 <artifactId>claude-code-sdk</artifactId>
                 <version>${claude-code-sdk.version}</version>
             </dependency>

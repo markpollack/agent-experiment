@@ -21,13 +21,13 @@ import io.github.markpollack.experiment.store.InMemorySessionStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springaicommunity.judge.Judge;
-import org.springaicommunity.judge.context.JudgmentContext;
-import org.springaicommunity.judge.jury.SimpleJury;
-import org.springaicommunity.judge.jury.Jury;
-import org.springaicommunity.judge.result.Judgment;
-import org.springaicommunity.judge.result.JudgmentStatus;
-import org.springaicommunity.judge.score.BooleanScore;
+import io.github.markpollack.judge.Judge;
+import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.jury.SimpleJury;
+import io.github.markpollack.judge.jury.Jury;
+import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.score.BooleanScore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -362,7 +362,7 @@ class AgentExperimentTest {
 	private static Jury juryWith(Judge judge) {
 		return SimpleJury.builder()
 			.judge(judge, 1.0)
-			.votingStrategy(new org.springaicommunity.judge.jury.MajorityVotingStrategy())
+			.votingStrategy(new io.github.markpollack.judge.jury.MajorityVotingStrategy())
 			.build();
 	}
 
@@ -377,15 +377,15 @@ class AgentExperimentTest {
 	/**
 	 * Simple named judge for testing that always passes or always fails.
 	 */
-	private static class NamedJudge implements Judge, org.springaicommunity.judge.JudgeWithMetadata {
+	private static class NamedJudge implements Judge, io.github.markpollack.judge.JudgeWithMetadata {
 
-		private final org.springaicommunity.judge.JudgeMetadata metadata;
+		private final io.github.markpollack.judge.JudgeMetadata metadata;
 
 		private final boolean pass;
 
 		NamedJudge(String name, boolean pass) {
-			this.metadata = new org.springaicommunity.judge.JudgeMetadata(name, "Test judge: " + name,
-					org.springaicommunity.judge.JudgeType.DETERMINISTIC);
+			this.metadata = new io.github.markpollack.judge.JudgeMetadata(name, "Test judge: " + name,
+					io.github.markpollack.judge.JudgeType.DETERMINISTIC);
 			this.pass = pass;
 		}
 
@@ -399,7 +399,7 @@ class AgentExperimentTest {
 		}
 
 		@Override
-		public org.springaicommunity.judge.JudgeMetadata metadata() {
+		public io.github.markpollack.judge.JudgeMetadata metadata() {
 			return metadata;
 		}
 

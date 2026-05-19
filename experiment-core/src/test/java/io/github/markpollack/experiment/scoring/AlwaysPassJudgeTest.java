@@ -6,11 +6,11 @@ import java.time.Instant;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.springaicommunity.judge.context.ExecutionStatus;
-import org.springaicommunity.judge.context.JudgmentContext;
-import org.springaicommunity.judge.result.Judgment;
-import org.springaicommunity.judge.result.JudgmentStatus;
-import org.springaicommunity.judge.score.BooleanScore;
+import io.github.markpollack.judge.context.ExecutionStatus;
+import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.score.BooleanScore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

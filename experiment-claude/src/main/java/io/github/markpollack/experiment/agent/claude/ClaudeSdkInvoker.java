@@ -7,9 +7,9 @@ import io.github.markpollack.journal.claude.PhaseCapture;
 import io.github.markpollack.journal.claude.SessionLogParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springaicommunity.claude.agent.sdk.ClaudeClient;
-import org.springaicommunity.claude.agent.sdk.ClaudeSyncClient;
-import org.springaicommunity.claude.agent.sdk.transport.CLIOptions;
+import io.github.markpollack.claude.agent.sdk.ClaudeClient;
+import io.github.markpollack.claude.agent.sdk.ClaudeSyncClient;
+import io.github.markpollack.claude.agent.sdk.transport.CLIOptions;
 
 import io.github.markpollack.experiment.agent.AgentInvocationException;
 import io.github.markpollack.experiment.agent.AgentInvoker;

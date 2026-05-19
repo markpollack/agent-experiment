@@ -26,7 +26,7 @@
 
         <!-- Claude SDK -->
         <dependency>
-            <groupId>org.springaicommunity</groupId>
+            <groupId>io.github.markpollack</groupId>
             <artifactId>claude-code-sdk</artifactId>
         </dependency>
         <dependency>

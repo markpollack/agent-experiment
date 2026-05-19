@@ -1,19 +1,19 @@
 package io.github.markpollack.experiment.scoring;
 
-import org.springaicommunity.judge.DeterministicJudge;
-import org.springaicommunity.judge.context.JudgmentContext;
-import org.springaicommunity.judge.result.Judgment;
-import org.springaicommunity.judge.result.JudgmentStatus;
-import org.springaicommunity.judge.score.BooleanScore;
+import io.github.markpollack.judge.DeterministicJudge;
+import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.score.BooleanScore;
 
 /**
  * Placeholder judge that always returns PASS with a {@link BooleanScore}. Used as the
- * final tier in a {@link org.springaicommunity.judge.jury.CascadedJury} until real Tier
+ * final tier in a {@link io.github.markpollack.judge.jury.CascadedJury} until real Tier
  * 2/3 judges are implemented.
  *
  * <p>
  * Important: the score must be set (not null) because
- * {@link org.springaicommunity.judge.jury.ConsensusStrategy} uses the score field, not
+ * {@link io.github.markpollack.judge.jury.ConsensusStrategy} uses the score field, not
  * the status field, to determine pass/fail.
  */
 class AlwaysPassJudge extends DeterministicJudge {

@@ -5,11 +5,11 @@ import java.util.Map;
 
 import io.github.markpollack.experiment.pipeline.ExecutionPlan;
 import org.junit.jupiter.api.Test;
-import org.springaicommunity.judge.jury.Verdict;
-import org.springaicommunity.judge.result.Check;
-import org.springaicommunity.judge.result.Judgment;
-import org.springaicommunity.judge.result.JudgmentStatus;
-import org.springaicommunity.judge.score.BooleanScore;
+import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.result.Check;
+import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.score.BooleanScore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -5,7 +5,7 @@ import java.util.List;
 import io.github.markpollack.experiment.pipeline.AnalysisEnvelope;
 import io.github.markpollack.experiment.pipeline.ExecutionPlan;
 import org.jspecify.annotations.Nullable;
-import org.springaicommunity.judge.jury.Verdict;
+import io.github.markpollack.judge.jury.Verdict;
 
 /**
  * Classifies judge failures into structured {@link GapCategory} values.

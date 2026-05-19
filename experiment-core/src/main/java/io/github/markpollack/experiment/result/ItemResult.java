@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
-import org.springaicommunity.judge.jury.Verdict;
+import io.github.markpollack.judge.jury.Verdict;
 
 /**
  * Result of evaluating a single dataset item within an experiment.

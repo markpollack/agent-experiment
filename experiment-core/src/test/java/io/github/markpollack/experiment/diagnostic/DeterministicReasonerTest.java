@@ -10,7 +10,7 @@ import io.github.markpollack.journal.claude.ToolResultRecord;
 import io.github.markpollack.experiment.pipeline.AnalysisEnvelope;
 import io.github.markpollack.experiment.pipeline.ExecutionPlan;
 import org.junit.jupiter.api.Test;
-import org.springaicommunity.judge.result.Check;
+import io.github.markpollack.judge.result.Check;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

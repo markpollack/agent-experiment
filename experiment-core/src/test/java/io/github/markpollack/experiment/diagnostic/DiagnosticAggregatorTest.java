@@ -3,7 +3,7 @@ package io.github.markpollack.experiment.diagnostic;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
-import org.springaicommunity.judge.result.Check;
+import io.github.markpollack.judge.result.Check;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

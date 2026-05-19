@@ -5,12 +5,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.springaicommunity.judge.jury.Verdict;
-import org.springaicommunity.judge.result.Judgment;
-import org.springaicommunity.judge.result.JudgmentStatus;
-import org.springaicommunity.judge.score.BooleanScore;
-import org.springaicommunity.judge.score.CategoricalScore;
-import org.springaicommunity.judge.score.NumericalScore;
+import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.score.BooleanScore;
+import io.github.markpollack.judge.score.CategoricalScore;
+import io.github.markpollack.judge.score.NumericalScore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -82,7 +82,7 @@ class VerdictExtractorTest {
 		return Verdict.builder().aggregated(judgment).individualByName(Map.of(name, judgment)).build();
 	}
 
-	private static Judgment judgmentWith(org.springaicommunity.judge.score.Score score) {
+	private static Judgment judgmentWith(io.github.markpollack.judge.score.Score score) {
 		boolean pass = score instanceof BooleanScore bs ? bs.value() : true;
 		return Judgment.builder()
 			.score(score)

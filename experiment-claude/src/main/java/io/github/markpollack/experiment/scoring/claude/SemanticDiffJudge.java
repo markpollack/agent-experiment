@@ -10,23 +10,23 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springaicommunity.claude.agent.sdk.ClaudeClient;
-import org.springaicommunity.claude.agent.sdk.ClaudeSyncClient;
-import org.springaicommunity.claude.agent.sdk.config.PermissionMode;
-import org.springaicommunity.claude.agent.sdk.transport.CLIOptions;
-import org.springaicommunity.claude.agent.sdk.types.Message;
-import org.springaicommunity.claude.agent.sdk.types.ResultMessage;
-import org.springaicommunity.judge.JudgeMetadata;
-import org.springaicommunity.judge.JudgeType;
-import org.springaicommunity.judge.JudgeWithMetadata;
-import org.springaicommunity.judge.context.JudgmentContext;
-import org.springaicommunity.judge.result.Check;
-import org.springaicommunity.judge.result.Judgment;
-import org.springaicommunity.judge.result.JudgmentStatus;
-import org.springaicommunity.judge.score.NumericalScore;
+import io.github.markpollack.claude.agent.sdk.ClaudeClient;
+import io.github.markpollack.claude.agent.sdk.ClaudeSyncClient;
+import io.github.markpollack.claude.agent.sdk.config.PermissionMode;
+import io.github.markpollack.claude.agent.sdk.transport.CLIOptions;
+import io.github.markpollack.claude.agent.sdk.types.Message;
+import io.github.markpollack.claude.agent.sdk.types.ResultMessage;
+import io.github.markpollack.judge.JudgeMetadata;
+import io.github.markpollack.judge.JudgeType;
+import io.github.markpollack.judge.JudgeWithMetadata;
+import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.result.Check;
+import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.score.NumericalScore;
 
 /**
- * LLM-powered Tier 3 judge for the {@link org.springaicommunity.judge.jury.CascadedJury}.
+ * LLM-powered Tier 3 judge for the {@link io.github.markpollack.judge.jury.CascadedJury}.
  *
  * <p>
  * Extracts VERIFY checkpoints from the execution plan's roadmap and asks Claude to
@@ -157,7 +157,7 @@ public class SemanticDiffJudge implements JudgeWithMetadata {
 						structuredJson = OBJECT_MAPPER.writeValueAsString(output);
 					}
 				}
-				else if (msg instanceof org.springaicommunity.claude.agent.sdk.types.AssistantMessage am) {
+				else if (msg instanceof io.github.markpollack.claude.agent.sdk.types.AssistantMessage am) {
 					textBuilder.append(am.text());
 				}
 			}

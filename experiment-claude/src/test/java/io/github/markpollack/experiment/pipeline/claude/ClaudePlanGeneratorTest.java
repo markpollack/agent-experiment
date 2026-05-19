@@ -11,8 +11,8 @@ import io.github.markpollack.experiment.pipeline.PlanConfig;
 import io.github.markpollack.journal.claude.PhaseCapture;
 import io.github.markpollack.journal.claude.ToolUseRecord;
 import org.junit.jupiter.api.Test;
-import org.springaicommunity.claude.agent.sdk.config.PermissionMode;
-import org.springaicommunity.claude.agent.sdk.transport.CLIOptions;
+import io.github.markpollack.claude.agent.sdk.config.PermissionMode;
+import io.github.markpollack.claude.agent.sdk.transport.CLIOptions;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

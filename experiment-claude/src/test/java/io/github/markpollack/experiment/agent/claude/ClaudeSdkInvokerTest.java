@@ -5,8 +5,8 @@ import java.time.Duration;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.springaicommunity.claude.agent.sdk.config.PermissionMode;
-import org.springaicommunity.claude.agent.sdk.transport.CLIOptions;
+import io.github.markpollack.claude.agent.sdk.config.PermissionMode;
+import io.github.markpollack.claude.agent.sdk.transport.CLIOptions;
 
 import io.github.markpollack.experiment.agent.InvocationContext;
 

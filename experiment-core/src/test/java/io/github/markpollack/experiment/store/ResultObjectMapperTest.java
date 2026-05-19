@@ -14,14 +14,14 @@ import io.github.markpollack.experiment.result.KnowledgeManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import org.springaicommunity.judge.jury.Verdict;
-import org.springaicommunity.judge.result.Check;
-import org.springaicommunity.judge.result.Judgment;
-import org.springaicommunity.judge.result.JudgmentStatus;
-import org.springaicommunity.judge.score.BooleanScore;
-import org.springaicommunity.judge.score.CategoricalScore;
-import org.springaicommunity.judge.score.NumericalScore;
-import org.springaicommunity.judge.score.Score;
+import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.result.Check;
+import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.score.BooleanScore;
+import io.github.markpollack.judge.score.CategoricalScore;
+import io.github.markpollack.judge.score.NumericalScore;
+import io.github.markpollack.judge.score.Score;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

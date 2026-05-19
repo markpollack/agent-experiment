@@ -6,10 +6,10 @@ import java.util.List;
 import io.github.markpollack.experiment.pipeline.AnalysisEnvelope;
 import io.github.markpollack.experiment.pipeline.ExecutionPlan;
 import org.jspecify.annotations.Nullable;
-import org.springaicommunity.judge.jury.Verdict;
-import org.springaicommunity.judge.result.Check;
-import org.springaicommunity.judge.result.Judgment;
-import org.springaicommunity.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.result.Check;
+import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
 
 /**
  * Heuristic-based gap classifier that maps judge name + failure type to gap categories.

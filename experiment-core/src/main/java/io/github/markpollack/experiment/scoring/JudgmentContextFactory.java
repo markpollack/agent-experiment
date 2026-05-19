@@ -10,8 +10,8 @@ import io.github.markpollack.experiment.pipeline.AnalysisEnvelope;
 import io.github.markpollack.experiment.pipeline.ExecutionPlan;
 import io.github.markpollack.experiment.runner.ExperimentConfig;
 import org.jspecify.annotations.Nullable;
-import org.springaicommunity.judge.context.ExecutionStatus;
-import org.springaicommunity.judge.context.JudgmentContext;
+import io.github.markpollack.judge.context.ExecutionStatus;
+import io.github.markpollack.judge.context.JudgmentContext;
 
 /**
  * Factory for creating {@link JudgmentContext} instances from experiment-driver types.

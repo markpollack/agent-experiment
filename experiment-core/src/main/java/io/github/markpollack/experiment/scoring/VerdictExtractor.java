@@ -3,11 +3,11 @@ package io.github.markpollack.experiment.scoring;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.springaicommunity.judge.jury.Verdict;
-import org.springaicommunity.judge.result.Judgment;
-import org.springaicommunity.judge.score.BooleanScore;
-import org.springaicommunity.judge.score.NumericalScore;
-import org.springaicommunity.judge.score.Score;
+import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.score.BooleanScore;
+import io.github.markpollack.judge.score.NumericalScore;
+import io.github.markpollack.judge.score.Score;
 
 /**
  * Extracts per-judge normalized scores from a {@link Verdict}.
