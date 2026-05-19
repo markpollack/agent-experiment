@@ -141,20 +141,20 @@ Adds post-hoc re-scoring of stored experiment results without re-invoking the sy
 ### Step 2.0: Stage 2 Entry — Context Load
 
 **Entry criteria** *(inter-stage gate)*:
-- [ ] Stage 1 consolidation complete — Read: `plans/learnings/step-1.3-stage1-summary.md`
-- [ ] Read: `plans/learnings/LEARNINGS.md`
-- [ ] Read: `plans/inbox/re-evaluator.md`
+- [x] Stage 1 consolidation complete — Read: `plans/learnings/step-1.3-stage1-summary.md`
+- [x] Read: `plans/learnings/LEARNINGS.md`
+- [x] Read: `plans/inbox/re-evaluator.md`
 
 **Work items**:
-- [ ] REVIEW Stage 1 learnings for anything that affects ReEvaluator design
-- [ ] VERIFY `ItemResult.toBuilder()` exists (prerequisite from Step 1.1)
-- [ ] VERIFY `ResultStore` load/save contract supports re-evaluated results
-- [ ] DOCUMENT any scope changes
+- [x] REVIEW Stage 1 learnings for anything that affects ReEvaluator design
+- [x] VERIFY `ItemResult.toBuilder()` exists (prerequisite from Step 1.1)
+- [x] VERIFY `ResultStore` load/save contract supports re-evaluated results
+- [x] DOCUMENT any scope changes
 
 **Exit criteria**:
-- [ ] Stage 1 context loaded; no blocking issues
-- [ ] Create: `plans/learnings/step-2.0-stage2-entry.md`
-- [ ] Update `ROADMAP.md` checkboxes
+- [x] Stage 1 context loaded; no blocking issues
+- [x] Create: `plans/learnings/step-2.0-stage2-entry.md`
+- [x] Update `ROADMAP.md` checkboxes
 
 **Deliverables**: Verified entry into Stage 2
 
