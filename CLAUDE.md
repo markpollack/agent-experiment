@@ -20,6 +20,12 @@
 - Factory methods on records (e.g. `InvocationResult.completed()`, `.error()`, `.timeout()`)
 - Atomic file writes in ResultStore (temp + move)
 
+## Dependencies
+- All dependencies use `io.github.markpollack` groupId (migrated from org.springaicommunity)
+- agent-judge-core/exec: 0.10.0-SNAPSHOT, package `io.github.markpollack.judge.*`
+- claude-code-sdk: 1.1.0-SNAPSHOT, package `io.github.markpollack.claude.agent.sdk.*`
+- claude-code-capture: 1.1.0-SNAPSHOT, package `io.github.markpollack.journal.*`
+
 ## Key Packages
 - `io.github.markpollack.experiment.result` — ExperimentResult, ItemResult, ExecutionDetail
 - `io.github.markpollack.experiment.agent` — AgentInvoker, InvocationResult, InvocationContext
@@ -28,3 +34,4 @@
 - `io.github.markpollack.experiment.comparison` — ComparisonEngine
 - `io.github.markpollack.experiment.scoring` — VerdictExtractor, JudgmentContextFactory
 - `io.github.markpollack.experiment.diagnostic` — EfficiencyEvaluator, DefaultEfficiencyEvaluator
+- `io.github.markpollack.experiment.reeval` — ReEvaluationContextFactory, AgentReEvaluationContextFactory, ReEvaluator

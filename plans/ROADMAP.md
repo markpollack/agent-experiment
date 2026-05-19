@@ -163,30 +163,30 @@ Adds post-hoc re-scoring of stored experiment results without re-invoking the sy
 ### Step 2.1: ReEvaluationContextFactory Interface
 
 **Entry criteria**:
-- [ ] Step 2.0 complete
-- [ ] Read: `plans/learnings/step-2.0-stage2-entry.md`
+- [x] Step 2.0 complete
+- [x] Read: `plans/learnings/step-2.0-stage2-entry.md`
 
 **Work items**:
-- [ ] CREATE `ReEvaluationContextFactory` `@FunctionalInterface` in `experiment-core` reeval package
+- [x] CREATE `ReEvaluationContextFactory` `@FunctionalInterface` in `experiment-core` reeval package
   - `Optional<JudgmentContext> create(ItemResult item)`
-- [ ] CREATE `AgentReEvaluationContextFactory` in agent package
+- [x] CREATE `AgentReEvaluationContextFactory` in reeval package
   - Default implementation for agent experiment results
   - Returns `Optional.empty()` for failed items or missing `ExecutionDetail`
-  - Delegates to existing `JudgmentContextFactory` for context reconstruction
-- [ ] WRITE unit tests for `AgentReEvaluationContextFactory`:
-  - Successful reconstruction from stored `AgentExecutionDetail`
+  - Builds context directly from InvocationResult and ItemResult fields
+- [x] WRITE unit tests for `AgentReEvaluationContextFactory`:
+  - Successful reconstruction from stored `InvocationResult`
   - `Optional.empty()` for failed items
   - `Optional.empty()` for null `executionDetail`
-- [ ] VERIFY: `./mvnw test` passes
+- [x] VERIFY: `./mvnw test` passes
 
 **Exit criteria**:
-- [ ] `ReEvaluationContextFactory` interface exists as `@FunctionalInterface`
-- [ ] `AgentReEvaluationContextFactory` passes all unit tests
-- [ ] All tests pass: `./mvnw test`
-- [ ] Create: `plans/learnings/step-2.1-context-factory.md`
-- [ ] Update `CLAUDE.md` with distilled learnings
-- [ ] Update `ROADMAP.md` checkboxes
-- [ ] COMMIT
+- [x] `ReEvaluationContextFactory` interface exists as `@FunctionalInterface`
+- [x] `AgentReEvaluationContextFactory` passes all unit tests
+- [x] All tests pass: `./mvnw test`
+- [x] Create: `plans/learnings/step-2.1-context-factory.md`
+- [x] Update `CLAUDE.md` with distilled learnings
+- [x] Update `ROADMAP.md` checkboxes
+- [x] COMMIT
 
 **Deliverables**: Context reconstruction SPI and default agent implementation
 
