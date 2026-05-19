@@ -151,6 +151,24 @@ class ReEvaluatorTest {
 		assertThat(reEvaluated.totalCostUsd()).isEqualTo(original.totalCostUsd());
 	}
 
+	@Test
+	void reEvaluationToComparisonPipeline() {
+		ExperimentResult original = createOriginalResult(false);
+		resultStore.save(original);
+
+		// Re-evaluate with a passing jury
+		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(passingJudge()));
+
+		// Compare original vs re-evaluated via ComparisonEngine
+		var engine = new io.github.markpollack.experiment.comparison.DefaultComparisonEngine(resultStore);
+		var comparison = engine.compare(reEvaluated, original);
+
+		assertThat(comparison).isNotNull();
+		assertThat(comparison.currentExperimentId()).isEqualTo(reEvaluated.experimentId());
+		assertThat(comparison.baselineExperimentId()).isEqualTo(original.experimentId());
+	}
+
 	// --- Helpers ---
 
 	private ExperimentResult createOriginalResult(boolean passing) {

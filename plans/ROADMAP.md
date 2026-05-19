@@ -231,20 +231,20 @@ Adds post-hoc re-scoring of stored experiment results without re-invoking the sy
 ### Step 2.3: Stage 2 Consolidation
 
 **Entry criteria**:
-- [ ] All Stage 2 steps complete
-- [ ] Read: all `plans/learnings/step-2.*` files
+- [x] All Stage 2 steps complete
+- [x] Read: all `plans/learnings/step-2.*` files
 
 **Work items**:
-- [ ] COMPACT learnings into `plans/learnings/LEARNINGS.md`
-- [ ] UPDATE `CLAUDE.md` with distilled learnings
-- [ ] VERIFY re-evaluation → comparison pipeline works end-to-end (unit test)
+- [x] COMPACT learnings into `plans/learnings/LEARNINGS.md`
+- [x] UPDATE `CLAUDE.md` with distilled learnings
+- [x] VERIFY re-evaluation → comparison pipeline works end-to-end (unit test)
 
 **Exit criteria**:
-- [ ] `LEARNINGS.md` updated with Stage 2 summary
-- [ ] Create: `plans/learnings/step-2.3-stage2-summary.md`
-- [ ] Update `CLAUDE.md` with distilled learnings
-- [ ] Update `ROADMAP.md` checkboxes
-- [ ] COMMIT
+- [x] `LEARNINGS.md` updated with Stage 2 summary
+- [x] Create: `plans/learnings/step-2.3-stage2-summary.md`
+- [x] Update `CLAUDE.md` with distilled learnings
+- [x] Update `ROADMAP.md` checkboxes
+- [x] COMMIT
 
 ---
 
