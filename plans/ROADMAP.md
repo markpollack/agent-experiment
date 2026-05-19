@@ -307,37 +307,24 @@ Adds `JudgeExperiment` as a sibling typed experiment API alongside `AgentExperim
 ### Step 3.2: JudgeExperiment and JudgeExperimentResult
 
 **Entry criteria**:
-- [ ] Step 3.1 complete
-- [ ] Read: `plans/learnings/step-3.1-judge-scorer.md`
+- [x] Step 3.1 complete
+- [x] Read: `plans/learnings/step-3.1-judge-scorer.md`
 
 **Work items**:
-- [ ] CREATE `JudgeExperiment` in judge package
-  - Builder: `name`, `candidate(Judge)`, `dataset`, `input(Function<DatasetItem, JudgmentContext>)`, `expected(Function<DatasetItem, String>)`, `scorer(JudgeScorer)`, `resultStore`
-  - `run()` → iterates dataset, invokes candidate judge, scores against expected, builds `ExperimentResult` with `JudgeExecutionDetail`, saves via `ResultStore`, returns `JudgeExperimentResult`
-  - Metadata: `experimentType=judge`, `candidateJudge`, `scorer`
-- [ ] CREATE `JudgeExperimentResult` record wrapping `ExperimentResult`
-  - `agreementRate` — fraction of items where judge agreed with expected
-  - `disagreements` — list of `JudgeDisagreement(itemId, JudgeExecutionDetail)`
-  - `from(ExperimentResult)` factory method
-  - `asExperimentResult()` for `ComparisonEngine` / `ResultStore` compatibility
-- [ ] CREATE `JudgeDisagreement` record
-- [ ] WRITE unit tests:
-  - Run judge experiment with mock judge — verify agreement rate
-  - Disagreements list populated for mismatched items
-  - `ExperimentResult` metadata contains judge experiment type
-  - `JudgeExecutionDetail` stored in each `ItemResult`
-  - Result persists via `ResultStore`
-  - `ComparisonEngine.compare()` works across two `JudgeExperimentResult`s
-- [ ] VERIFY: `./mvnw test` passes
+- [x] CREATE `JudgeExperiment` in judge package
+- [x] CREATE `JudgeExperimentResult` record wrapping `ExperimentResult`
+- [x] CREATE `JudgeDisagreement` record
+- [x] WRITE unit tests (6 tests covering all scenarios)
+- [x] VERIFY: `./mvnw test` passes
 
 **Exit criteria**:
-- [ ] `JudgeExperiment.run()` produces correct `JudgeExperimentResult`
-- [ ] Results persist and compare via shared infrastructure
-- [ ] All tests pass: `./mvnw test`
-- [ ] Create: `plans/learnings/step-3.2-judge-experiment.md`
-- [ ] Update `CLAUDE.md` with distilled learnings
-- [ ] Update `ROADMAP.md` checkboxes
-- [ ] COMMIT
+- [x] `JudgeExperiment.run()` produces correct `JudgeExperimentResult`
+- [x] Results persist and compare via shared infrastructure
+- [x] All tests pass: `./mvnw test`
+- [x] Create: `plans/learnings/step-3.2-judge-experiment.md`
+- [x] Update `CLAUDE.md` with distilled learnings
+- [x] Update `ROADMAP.md` checkboxes
+- [x] COMMIT
 
 **Deliverables**: Working `JudgeExperiment` with typed result and shared infrastructure integration
 
