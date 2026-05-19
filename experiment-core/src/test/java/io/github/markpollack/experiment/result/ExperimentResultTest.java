@@ -24,7 +24,7 @@ class ExperimentResultTest {
 			.durationMs(3000)
 			.scores(Map.of("build_success", 1.0, "file_comparison", 0.9))
 			.metrics(Map.of("input_tokens", 1000, "output_tokens", 500, "thinking_tokens", 200))
-			.invocationResult(InvocationResult.completed(List.of(), 1000, 500, 200, 0.05, 3000, "sess-1", Map.of()))
+			.executionDetail(InvocationResult.completed(List.of(), 1000, 500, 200, 0.05, 3000, "sess-1", Map.of()))
 			.build();
 
 		ExperimentResult result = ExperimentResult.builder()

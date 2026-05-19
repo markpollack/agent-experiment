@@ -132,7 +132,7 @@ class DiagnosticAnalyzerTest {
 			.itemSlug("test-item")
 			.success(true)
 			.passed(false)
-			.invocationResult(invocation)
+			.executionDetail(invocation)
 			.verdict(verdict)
 			.build();
 

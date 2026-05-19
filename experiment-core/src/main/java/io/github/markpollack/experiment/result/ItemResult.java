@@ -3,7 +3,6 @@ package io.github.markpollack.experiment.result;
 import java.nio.file.Path;
 import java.util.Map;
 
-import io.github.markpollack.experiment.agent.InvocationResult;
 import org.jspecify.annotations.Nullable;
 import org.springaicommunity.judge.jury.Verdict;
 
@@ -20,7 +19,8 @@ import org.springaicommunity.judge.jury.Verdict;
  * @param scores per-judge normalized scores (0.0-1.0) for cross-run comparison
  * @param metrics additional operational metrics (input_tokens, output_tokens,
  * thinking_tokens, etc.)
- * @param invocationResult full agent invocation result
+ * @param executionDetail domain-specific execution detail (e.g. InvocationResult for
+ * agent experiments)
  * @param verdict full agent-judge-core Verdict (nullable if invocation failed before
  * judging)
  * @param metadata item-level metadata
@@ -28,7 +28,7 @@ import org.springaicommunity.judge.jury.Verdict;
  */
 public record ItemResult(String itemId, String itemSlug, boolean success, boolean passed, double costUsd,
 		int totalTokens, long durationMs, Map<String, Double> scores, Map<String, Object> metrics,
-		@Nullable InvocationResult invocationResult, @Nullable Verdict verdict, Map<String, Object> metadata,
+		@Nullable ExecutionDetail executionDetail, @Nullable Verdict verdict, Map<String, Object> metadata,
 		@Nullable Path workspacePath) {
 
 	public ItemResult {
@@ -41,6 +41,26 @@ public record ItemResult(String itemId, String itemSlug, boolean success, boolea
 
 	public static Builder builder() {
 		return new Builder();
+	}
+
+	/**
+	 * Create a builder pre-populated with this result's values for modification.
+	 * @return a new builder initialized from this instance
+	 */
+	public Builder toBuilder() {
+		return new Builder().itemId(itemId)
+			.itemSlug(itemSlug)
+			.success(success)
+			.passed(passed)
+			.costUsd(costUsd)
+			.totalTokens(totalTokens)
+			.durationMs(durationMs)
+			.scores(scores)
+			.metrics(metrics)
+			.executionDetail(executionDetail)
+			.verdict(verdict)
+			.metadata(metadata)
+			.workspacePath(workspacePath);
 	}
 
 	public static final class Builder {
@@ -63,7 +83,7 @@ public record ItemResult(String itemId, String itemSlug, boolean success, boolea
 
 		private Map<String, Object> metrics = Map.of();
 
-		private @Nullable InvocationResult invocationResult;
+		private @Nullable ExecutionDetail executionDetail;
 
 		private @Nullable Verdict verdict;
 
@@ -119,8 +139,8 @@ public record ItemResult(String itemId, String itemSlug, boolean success, boolea
 			return this;
 		}
 
-		public Builder invocationResult(@Nullable InvocationResult invocationResult) {
-			this.invocationResult = invocationResult;
+		public Builder executionDetail(@Nullable ExecutionDetail executionDetail) {
+			this.executionDetail = executionDetail;
 			return this;
 		}
 
@@ -141,7 +161,7 @@ public record ItemResult(String itemId, String itemSlug, boolean success, boolea
 
 		public ItemResult build() {
 			return new ItemResult(itemId, itemSlug, success, passed, costUsd, totalTokens, durationMs, scores, metrics,
-					invocationResult, verdict, metadata, workspacePath);
+					executionDetail, verdict, metadata, workspacePath);
 		}
 
 	}

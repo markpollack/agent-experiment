@@ -5,6 +5,7 @@ import java.util.Map;
 
 import io.github.markpollack.experiment.pipeline.AnalysisEnvelope;
 import io.github.markpollack.experiment.pipeline.ExecutionPlan;
+import io.github.markpollack.experiment.result.ExecutionDetail;
 import io.github.markpollack.journal.claude.PhaseCapture;
 import org.jspecify.annotations.Nullable;
 
@@ -32,7 +33,8 @@ import org.jspecify.annotations.Nullable;
 public record InvocationResult(boolean success, TerminalStatus status, List<PhaseCapture> phases, int inputTokens,
 		int outputTokens, int thinkingTokens, int cacheCreationInputTokens, int cacheReadInputTokens,
 		double totalCostUsd, long durationMs, @Nullable String sessionId, Map<String, String> metadata,
-		@Nullable String errorMessage, @Nullable AnalysisEnvelope analysis, @Nullable ExecutionPlan executionPlan) {
+		@Nullable String errorMessage, @Nullable AnalysisEnvelope analysis,
+		@Nullable ExecutionPlan executionPlan) implements ExecutionDetail {
 
 	public InvocationResult {
 		java.util.Objects.requireNonNull(status, "status must not be null");

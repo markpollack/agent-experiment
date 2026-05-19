@@ -198,7 +198,7 @@ class ResultObjectMapperTest {
 			.durationMs(5000)
 			.scores(Map.of("build", 1.0))
 			.metrics(Map.of("input_tokens", 100, "output_tokens", 200))
-			.invocationResult(invocation)
+			.executionDetail(invocation)
 			.verdict(verdict)
 			.metadata(Map.of())
 			.build();
@@ -208,8 +208,9 @@ class ResultObjectMapperTest {
 
 		assertThat(restored.itemId()).isEqualTo("ITEM-001");
 		assertThat(restored.passed()).isTrue();
-		assertThat(restored.invocationResult()).isNotNull();
-		assertThat(restored.invocationResult().totalTokens()).isEqualTo(350);
+		assertThat(restored.executionDetail()).isNotNull();
+		assertThat(restored.executionDetail()).isInstanceOf(InvocationResult.class);
+		assertThat(((InvocationResult) restored.executionDetail()).totalTokens()).isEqualTo(350);
 		assertThat(restored.verdict()).isNotNull();
 		assertThat(restored.verdict().aggregated().pass()).isTrue();
 	}

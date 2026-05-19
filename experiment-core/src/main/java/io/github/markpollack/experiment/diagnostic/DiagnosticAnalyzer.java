@@ -5,6 +5,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
+import io.github.markpollack.experiment.agent.InvocationResult;
 import io.github.markpollack.experiment.pipeline.AnalysisEnvelope;
 import io.github.markpollack.experiment.pipeline.ExecutionPlan;
 import io.github.markpollack.experiment.result.ExperimentResult;
@@ -47,9 +48,9 @@ public class DiagnosticAnalyzer {
 			// Extract analysis and plan from invocation result if available
 			AnalysisEnvelope analysis = null;
 			ExecutionPlan plan = null;
-			if (item.invocationResult() != null) {
-				analysis = item.invocationResult().analysis();
-				plan = item.invocationResult().executionPlan();
+			if (item.executionDetail() instanceof InvocationResult invocationResult) {
+				analysis = invocationResult.analysis();
+				plan = invocationResult.executionPlan();
 			}
 
 			List<DiagnosticCheck> checks = classifier.classify(item.verdict(), analysis, plan);

@@ -267,7 +267,7 @@ public class ExperimentRunner {
 					.durationMs(durationMs)
 					.scores(efficiencyScores)
 					.metrics(buildMetrics(invocationResult))
-					.invocationResult(invocationResult)
+					.executionDetail(invocationResult)
 					.workspacePath(preservedPath)
 					.metadata(Map.of())
 					.build();
@@ -297,7 +297,7 @@ public class ExperimentRunner {
 				.durationMs(durationMs)
 				.scores(scores)
 				.metrics(buildMetrics(invocationResult))
-				.invocationResult(invocationResult)
+				.executionDetail(invocationResult)
 				.verdict(verdict)
 				.workspacePath(preservedPath)
 				.metadata(Map.of())

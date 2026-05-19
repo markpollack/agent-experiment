@@ -26,7 +26,7 @@ class ItemResultTest {
 			.durationMs(3000)
 			.scores(Map.of("build_success", 1.0, "file_comparison", 0.9))
 			.metrics(Map.of("input_tokens", 1000, "output_tokens", 500))
-			.invocationResult(invocation)
+			.executionDetail(invocation)
 			.metadata(Map.of("phase_count", 3))
 			.build();
 
@@ -36,7 +36,7 @@ class ItemResultTest {
 		assertThat(result.passed()).isTrue();
 		assertThat(result.costUsd()).isEqualTo(0.05);
 		assertThat(result.scores()).containsEntry("build_success", 1.0);
-		assertThat(result.invocationResult()).isEqualTo(invocation);
+		assertThat(result.executionDetail()).isEqualTo(invocation);
 		assertThat(result.verdict()).isNull();
 	}
 
@@ -56,7 +56,7 @@ class ItemResultTest {
 			.costUsd(0.01)
 			.totalTokens(100)
 			.durationMs(500)
-			.invocationResult(InvocationResult.error("Agent crashed", Map.of()))
+			.executionDetail(InvocationResult.error("Agent crashed", Map.of()))
 			.build();
 
 		assertThat(result.success()).isFalse();

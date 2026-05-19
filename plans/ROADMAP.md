@@ -55,32 +55,32 @@ Extracts shared experiment infrastructure from agent-specific execution. The sin
 ### Step 1.1: ExecutionDetail Marker Interface
 
 **Entry criteria**:
-- [ ] Step 1.0 complete
-- [ ] Read: `plans/learnings/step-1.0-design-review.md`
+- [x] Step 1.0 complete
+- [x] Read: `plans/learnings/step-1.0-design-review.md`
 
 **Work items**:
-- [ ] CREATE `ExecutionDetail` marker interface in `experiment-core` result package
-- [ ] REFACTOR `ItemResult`: replace `@Nullable InvocationResult invocationResult` field with `@Nullable ExecutionDetail executionDetail`
-- [ ] UPDATE `ItemResult.Builder` accordingly
-- [ ] ADD `ItemResult.toBuilder()` method (needed by `ReEvaluator` in Stage 2)
-- [ ] UPDATE all `InvocationResult` references in `ItemResult` consumers:
+- [x] CREATE `ExecutionDetail` marker interface in `experiment-core` result package
+- [x] REFACTOR `ItemResult`: replace `@Nullable InvocationResult invocationResult` field with `@Nullable ExecutionDetail executionDetail`
+- [x] UPDATE `ItemResult.Builder` accordingly
+- [x] ADD `ItemResult.toBuilder()` method (needed by `ReEvaluator` in Stage 2)
+- [x] UPDATE all `InvocationResult` references in `ItemResult` consumers:
   - `ExperimentRunner.runItem()` — pass `InvocationResult` as the `ExecutionDetail`
   - `JudgmentContextFactory` — cast `ExecutionDetail` to `InvocationResult`
   - `DefaultEfficiencyEvaluator` / `EfficiencyEvaluator` — cast as needed
   - `ResultObjectMapper` — update Jackson polymorphic deserialization for `ExecutionDetail`
-- [ ] UPDATE all test files that construct `ItemResult` with `invocationResult`
-- [ ] VERIFY: `./mvnw test` passes
+- [x] UPDATE all test files that construct `ItemResult` with `invocationResult`
+- [x] VERIFY: `./mvnw test` passes
 
 **Exit criteria**:
-- [ ] `ExecutionDetail` marker interface exists
-- [ ] `ItemResult.executionDetail()` replaces `ItemResult.invocationResult()`
-- [ ] `InvocationResult` implements `ExecutionDetail`
-- [ ] All existing tests pass unchanged (except field name)
-- [ ] All tests pass: `./mvnw test`
-- [ ] Create: `plans/learnings/step-1.1-execution-detail.md`
-- [ ] Update `CLAUDE.md` with distilled learnings
-- [ ] Update `ROADMAP.md` checkboxes
-- [ ] COMMIT
+- [x] `ExecutionDetail` marker interface exists
+- [x] `ItemResult.executionDetail()` replaces `ItemResult.invocationResult()`
+- [x] `InvocationResult` implements `ExecutionDetail`
+- [x] All existing tests pass unchanged (except field name)
+- [x] All tests pass: `./mvnw test`
+- [x] Create: `plans/learnings/step-1.1-execution-detail.md`
+- [x] Update `CLAUDE.md` with distilled learnings
+- [x] Update `ROADMAP.md` checkboxes
+- [x] COMMIT
 
 **Deliverables**: `ItemResult` decoupled from `InvocationResult` via `ExecutionDetail`
 

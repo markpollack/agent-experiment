@@ -16,6 +16,8 @@ import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.github.markpollack.experiment.agent.InvocationResult;
+import io.github.markpollack.experiment.result.ExecutionDetail;
 import org.springaicommunity.judge.score.BooleanScore;
 import org.springaicommunity.judge.score.CategoricalScore;
 import org.springaicommunity.judge.score.NumericalScore;
@@ -51,6 +53,11 @@ final class ResultObjectMapper {
 		// Score sealed interface — deduction by unique property presence
 		mapper.addMixIn(Score.class, ScoreMixin.class);
 
+		// ExecutionDetail polymorphic deserialization — defaultImpl handles
+		// InvocationResult as the only current subtype. Additional subtypes
+		// (e.g. JudgeExecutionDetail) will be added in Step 3.3.
+		mapper.addMixIn(ExecutionDetail.class, ExecutionDetailMixin.class);
+
 		// Path and Throwable custom serialization
 		SimpleModule module = new SimpleModule("ResultStoreModule");
 		module.addSerializer(Path.class, new PathSerializer());
@@ -68,6 +75,14 @@ final class ResultObjectMapper {
 	@JsonSubTypes({ @JsonSubTypes.Type(BooleanScore.class), @JsonSubTypes.Type(NumericalScore.class),
 			@JsonSubTypes.Type(CategoricalScore.class) })
 	interface ScoreMixin {
+
+	}
+
+	// ExecutionDetail — InvocationResult is the only subtype for now.
+	// defaultImpl ensures deserialization works without type discriminator.
+	@JsonTypeInfo(use = JsonTypeInfo.Id.DEDUCTION, defaultImpl = InvocationResult.class)
+	@JsonSubTypes({ @JsonSubTypes.Type(InvocationResult.class) })
+	interface ExecutionDetailMixin {
 
 	}
 
