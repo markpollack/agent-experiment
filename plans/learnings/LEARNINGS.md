@@ -1,6 +1,6 @@
 # Learnings — Compacted
 
-> Last updated: 2026-05-18 (Stage 2 complete)
+> Last updated: 2026-05-18 (All stages complete)
 
 ## Stage 1: Framework Split
 
@@ -39,3 +39,22 @@
 **Dependency migration** (done during Stage 2 entry):
 - All dependencies migrated from `org.springaicommunity` → `io.github.markpollack` groupId
 - agent-judge: 0.10.0-SNAPSHOT, claude-code-sdk: 1.1.0-SNAPSHOT, claude-code-capture: 1.1.0-SNAPSHOT
+
+## Stage 3: JudgeExperiment
+
+**Goal**: Add `JudgeExperiment` as a sibling typed experiment API alongside `AgentExperiment`, using shared experiment infrastructure.
+
+**Key outcomes**:
+- `JudgeScorer` — `@FunctionalInterface` for scoring judge output against expected labels
+- `JudgeScorers` — built-in scorers: `exactVerdictMatch()`, `exactCategoryMatch()`, `numericalTolerance(double)`
+- `JudgeExecutionDetail implements ExecutionDetail` — stores candidate judgment, expected label, scorer result
+- `JudgeExperiment` — builder-pattern experiment runner for judge calibration
+- `JudgeExperimentResult` — wraps `ExperimentResult` with `agreementRate` and `disagreements`
+- `ResultObjectMapper` — Jackson deduction handles both `InvocationResult` and `JudgeExecutionDetail`
+
+**Design decisions**:
+- `JudgeExperiment` takes `List<DatasetItem>` directly (not `Dataset`) — judge datasets don't need filesystem loading
+- `Verdict.builder()` used (no `Verdict.of()` factory on the agent-judge API)
+- Jackson deduction works because `InvocationResult` and `JudgeExecutionDetail` have no overlapping property names
+
+**Test counts**: 509 total (449 experiment-core + 60 experiment-claude), 0 failures

@@ -356,26 +356,26 @@ Adds `JudgeExperiment` as a sibling typed experiment API alongside `AgentExperim
 ### Step 3.4: Stage 3 Consolidation and Final Review
 
 **Entry criteria**:
-- [ ] All Stage 3 steps complete
-- [ ] Read: all `plans/learnings/step-3.*` files
-- [ ] Read: `plans/learnings/LEARNINGS.md`
+- [x] All Stage 3 steps complete
+- [x] Read: all `plans/learnings/step-3.*` files
+- [x] Read: `plans/learnings/LEARNINGS.md`
 
 **Work items**:
-- [ ] COMPACT learnings into `plans/learnings/LEARNINGS.md`
-- [ ] UPDATE `CLAUDE.md` with distilled learnings from all three stages
-- [ ] VERIFY end-to-end: agent experiment → re-evaluate with improved jury → compare (unit test)
-- [ ] VERIFY end-to-end: judge experiment → compare two judge versions (unit test)
-- [ ] VERIFY cross-type comparison: `ComparisonEngine` can compare agent vs. agent and judge vs. judge results
-- [ ] TRIAGE `plans/inbox/` — archive completed proposals
+- [x] COMPACT learnings into `plans/learnings/LEARNINGS.md`
+- [x] UPDATE `CLAUDE.md` with distilled learnings from all three stages
+- [x] VERIFY end-to-end: agent experiment → re-evaluate with improved jury → compare (unit test)
+- [x] VERIFY end-to-end: judge experiment → compare two judge versions (unit test)
+- [x] VERIFY cross-type comparison: `ComparisonEngine` can compare agent vs. agent and judge vs. judge results
+- [x] TRIAGE `plans/inbox/` — archive completed proposals
 
 **Exit criteria**:
-- [ ] `LEARNINGS.md` updated with full project summary
-- [ ] All end-to-end flows verified
-- [ ] All tests pass: `./mvnw verify`
-- [ ] Create: `plans/learnings/step-3.4-final-summary.md`
-- [ ] Update `CLAUDE.md` with distilled learnings
-- [ ] Update `ROADMAP.md` checkboxes
-- [ ] COMMIT
+- [x] `LEARNINGS.md` updated with full project summary
+- [x] All end-to-end flows verified
+- [x] All tests pass: `./mvnw verify`
+- [x] Create: `plans/learnings/step-3.4-final-summary.md`
+- [x] Update `CLAUDE.md` with distilled learnings
+- [x] Update `ROADMAP.md` checkboxes
+- [x] COMMIT
 
 ---
 
