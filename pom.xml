@@ -43,7 +43,7 @@
 
         <!-- Dependency versions -->
         <claude-code-capture.version>1.1.0-SNAPSHOT</claude-code-capture.version>
-        <agent-judge.version>0.10.0-SNAPSHOT</agent-judge.version>
+        <agent-judge.version>0.10.0</agent-judge.version>
         <claude-code-sdk.version>1.1.0-SNAPSHOT</claude-code-sdk.version>
 
         <!-- Third-party dependency versions -->
