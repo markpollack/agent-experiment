@@ -114,21 +114,21 @@ Extracts shared experiment infrastructure from agent-specific execution. The sin
 ### Step 1.3: Stage 1 Consolidation
 
 **Entry criteria**:
-- [ ] All Stage 1 steps complete
-- [ ] Read: all `plans/learnings/step-1.*` files
+- [x] All Stage 1 steps complete
+- [x] Read: all `plans/learnings/step-1.*` files
 
 **Work items**:
-- [ ] COMPACT learnings from Stage 1 steps into `plans/learnings/LEARNINGS.md`
-- [ ] UPDATE `CLAUDE.md` with distilled learnings from the full stage
-- [ ] VERIFY shared infrastructure types have no agent-specific imports
-- [ ] VERIFY `ExperimentResult`, `ResultStore`, `ComparisonEngine` work with `ExecutionDetail` (not `InvocationResult`)
+- [x] COMPACT learnings from Stage 1 steps into `plans/learnings/LEARNINGS.md`
+- [x] UPDATE `CLAUDE.md` with distilled learnings from the full stage
+- [x] VERIFY shared infrastructure types have no agent-specific imports
+- [x] VERIFY `ExperimentResult`, `ResultStore`, `ComparisonEngine` work with `ExecutionDetail` (not `InvocationResult`)
 
 **Exit criteria**:
-- [ ] `LEARNINGS.md` updated with compacted Stage 1 summary
-- [ ] Create: `plans/learnings/step-1.3-stage1-summary.md`
-- [ ] Update `CLAUDE.md` with distilled learnings
-- [ ] Update `ROADMAP.md` checkboxes
-- [ ] COMMIT
+- [x] `LEARNINGS.md` updated with compacted Stage 1 summary
+- [x] Create: `plans/learnings/step-1.3-stage1-summary.md`
+- [x] Update `CLAUDE.md` with distilled learnings
+- [x] Update `ROADMAP.md` checkboxes
+- [x] COMMIT
 
 ---
 

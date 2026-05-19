@@ -7,9 +7,12 @@
 
 ## Architecture
 - Shared experiment infrastructure (dataset, result, store, comparison, scoring) is domain-neutral — no agent-specific imports
+- Exception: `ResultObjectMapper` imports concrete `ExecutionDetail` subtypes for Jackson deserialization
 - Agent-specific code lives in `agent`, `runner`, `scoring.JudgmentContextFactory`, `diagnostic`, `pipeline` packages
-- The coupling point between shared and agent-specific is `ItemResult.executionDetail` (marker interface `ExecutionDetail`)
-- `InvocationResult` implements `ExecutionDetail` for agent experiments
+- `ItemResult.executionDetail` (marker interface `ExecutionDetail`) is the seam between shared and domain-specific
+- `InvocationResult implements ExecutionDetail` for agent experiments
+- Agent-specific consumers use `instanceof` pattern matching to cast from `ExecutionDetail`
+- `ItemResult.toBuilder()` enables re-evaluation (modifying stored results without re-running agents)
 
 ## Conventions
 - Records with Builder pattern for complex data types
