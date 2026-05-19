@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.github.markpollack.experiment.agent.InvocationResult;
+import io.github.markpollack.experiment.judge.JudgeExecutionDetail;
 import io.github.markpollack.experiment.result.ExecutionDetail;
 import io.github.markpollack.judge.score.BooleanScore;
 import io.github.markpollack.judge.score.CategoricalScore;
@@ -53,9 +54,9 @@ final class ResultObjectMapper {
 		// Score sealed interface — deduction by unique property presence
 		mapper.addMixIn(Score.class, ScoreMixin.class);
 
-		// ExecutionDetail polymorphic deserialization — defaultImpl handles
-		// InvocationResult as the only current subtype. Additional subtypes
-		// (e.g. JudgeExecutionDetail) will be added in Step 3.3.
+		// ExecutionDetail polymorphic deserialization via deduction.
+		// InvocationResult (agent) and JudgeExecutionDetail (judge) discriminated
+		// by unique property presence.
 		mapper.addMixIn(ExecutionDetail.class, ExecutionDetailMixin.class);
 
 		// Path and Throwable custom serialization
@@ -78,10 +79,11 @@ final class ResultObjectMapper {
 
 	}
 
-	// ExecutionDetail — InvocationResult is the only subtype for now.
-	// defaultImpl ensures deserialization works without type discriminator.
+	// ExecutionDetail — deduction by unique property presence.
+	// InvocationResult has "status"/"phases", JudgeExecutionDetail has
+	// "candidateJudgment"/"expectedLabel"/"scorerResult".
 	@JsonTypeInfo(use = JsonTypeInfo.Id.DEDUCTION, defaultImpl = InvocationResult.class)
-	@JsonSubTypes({ @JsonSubTypes.Type(InvocationResult.class) })
+	@JsonSubTypes({ @JsonSubTypes.Type(InvocationResult.class), @JsonSubTypes.Type(JudgeExecutionDetail.class) })
 	interface ExecutionDetailMixin {
 
 	}

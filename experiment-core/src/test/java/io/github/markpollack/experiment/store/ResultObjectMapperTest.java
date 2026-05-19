@@ -216,6 +216,79 @@ class ResultObjectMapperTest {
 	}
 
 	@Test
+	void roundTripsItemResultWithJudgeExecutionDetail() throws Exception {
+		io.github.markpollack.judge.result.Judgment candidateJudgment = Judgment.builder()
+			.score(new BooleanScore(true))
+			.status(JudgmentStatus.PASS)
+			.reasoning("Passed")
+			.build();
+		io.github.markpollack.experiment.judge.JudgeScorerResult scorerResult = new io.github.markpollack.experiment.judge.JudgeScorerResult(
+				true, 1.0, "Expected PASS, got PASS");
+		io.github.markpollack.experiment.judge.JudgeExecutionDetail judgeDetail = new io.github.markpollack.experiment.judge.JudgeExecutionDetail(
+				candidateJudgment, "PASS", scorerResult);
+
+		ItemResult original = ItemResult.builder()
+			.itemId("JUDGE-001")
+			.itemSlug("judge-item")
+			.success(true)
+			.passed(true)
+			.scores(Map.of("agreement", 1.0))
+			.executionDetail(judgeDetail)
+			.metadata(Map.of("experimentType", "judge"))
+			.build();
+
+		String json = mapper.writeValueAsString(original);
+		ItemResult restored = mapper.readValue(json, ItemResult.class);
+
+		assertThat(restored.itemId()).isEqualTo("JUDGE-001");
+		assertThat(restored.executionDetail()).isNotNull();
+		assertThat(restored.executionDetail())
+			.isInstanceOf(io.github.markpollack.experiment.judge.JudgeExecutionDetail.class);
+		io.github.markpollack.experiment.judge.JudgeExecutionDetail restoredDetail = (io.github.markpollack.experiment.judge.JudgeExecutionDetail) restored
+			.executionDetail();
+		assertThat(restoredDetail.expectedLabel()).isEqualTo("PASS");
+		assertThat(restoredDetail.scorerResult().match()).isTrue();
+		assertThat(restoredDetail.candidateJudgment().pass()).isTrue();
+	}
+
+	@Test
+	void bothExecutionDetailSubtypesDeserializeCorrectly() throws Exception {
+		// Agent item with InvocationResult
+		InvocationResult invocation = InvocationResult.completed(List.of(), 100, 200, 50, 0.05, 5000, "session-1",
+				Map.of());
+		ItemResult agentItem = ItemResult.builder()
+			.itemId("AGENT-001")
+			.itemSlug("agent-item")
+			.success(true)
+			.passed(true)
+			.executionDetail(invocation)
+			.build();
+
+		// Judge item with JudgeExecutionDetail
+		io.github.markpollack.experiment.judge.JudgeExecutionDetail judgeDetail = new io.github.markpollack.experiment.judge.JudgeExecutionDetail(
+				Judgment.pass("ok"), "PASS",
+				new io.github.markpollack.experiment.judge.JudgeScorerResult(true, 1.0, "match"));
+		ItemResult judgeItem = ItemResult.builder()
+			.itemId("JUDGE-001")
+			.itemSlug("judge-item")
+			.success(true)
+			.passed(true)
+			.executionDetail(judgeDetail)
+			.build();
+
+		// Round-trip both
+		String agentJson = mapper.writeValueAsString(agentItem);
+		String judgeJson = mapper.writeValueAsString(judgeItem);
+
+		ItemResult restoredAgent = mapper.readValue(agentJson, ItemResult.class);
+		ItemResult restoredJudge = mapper.readValue(judgeJson, ItemResult.class);
+
+		assertThat(restoredAgent.executionDetail()).isInstanceOf(InvocationResult.class);
+		assertThat(restoredJudge.executionDetail())
+			.isInstanceOf(io.github.markpollack.experiment.judge.JudgeExecutionDetail.class);
+	}
+
+	@Test
 	void roundTripsKnowledgeManifest() throws Exception {
 		KnowledgeManifest original = new KnowledgeManifest(Path.of("/tmp/knowledge-store"), "abc123def", false,
 				Instant.parse("2026-02-21T10:00:00Z"), List.of(new KnowledgeFileEntry("spring/boot-migration.md", 4096),

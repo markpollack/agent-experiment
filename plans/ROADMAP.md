@@ -333,25 +333,21 @@ Adds `JudgeExperiment` as a sibling typed experiment API alongside `AgentExperim
 ### Step 3.3: Jackson Polymorphic Serialization for ExecutionDetail
 
 **Entry criteria**:
-- [ ] Step 3.2 complete
-- [ ] Read: `plans/learnings/step-3.2-judge-experiment.md`
+- [x] Step 3.2 complete
+- [x] Read: `plans/learnings/step-3.2-judge-experiment.md`
 
 **Work items**:
-- [ ] UPDATE `ResultObjectMapper` to handle polymorphic `ExecutionDetail` deserialization
-  - `InvocationResult` (agent) and `JudgeExecutionDetail` (judge) must round-trip through JSON
-- [ ] WRITE tests:
-  - Serialize/deserialize `ItemResult` with `InvocationResult` as `ExecutionDetail`
-  - Serialize/deserialize `ItemResult` with `JudgeExecutionDetail` as `ExecutionDetail`
-  - Load a stored agent result, load a stored judge result — both deserialize correctly
-- [ ] VERIFY: `./mvnw test` passes
+- [x] UPDATE `ResultObjectMapper` to handle polymorphic `ExecutionDetail` deserialization
+- [x] WRITE tests (2 new round-trip tests for JudgeExecutionDetail + deduction discrimination)
+- [x] VERIFY: `./mvnw test` passes
 
 **Exit criteria**:
-- [ ] Both `ExecutionDetail` subtypes round-trip through `ResultStore`
-- [ ] All tests pass: `./mvnw test`
-- [ ] Create: `plans/learnings/step-3.3-jackson-polymorphic.md`
-- [ ] Update `CLAUDE.md` with distilled learnings
-- [ ] Update `ROADMAP.md` checkboxes
-- [ ] COMMIT
+- [x] Both `ExecutionDetail` subtypes round-trip through `ResultStore`
+- [x] All tests pass: `./mvnw test`
+- [x] Create: `plans/learnings/step-3.3-jackson-polymorphic.md`
+- [x] Update `CLAUDE.md` with distilled learnings
+- [x] Update `ROADMAP.md` checkboxes
+- [x] COMMIT
 
 **Deliverables**: Polymorphic serialization supporting all `ExecutionDetail` types
 
