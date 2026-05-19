@@ -20,7 +20,7 @@
 ## Key Packages
 - `io.github.markpollack.experiment.result` — ExperimentResult, ItemResult, ExecutionDetail
 - `io.github.markpollack.experiment.agent` — AgentInvoker, InvocationResult, InvocationContext
-- `io.github.markpollack.experiment.runner` — ExperimentRunner (being renamed to AgentExperiment)
+- `io.github.markpollack.experiment.runner` — AgentExperiment (orchestrates agent experiments)
 - `io.github.markpollack.experiment.store` — ResultStore, FileSystemResultStore
 - `io.github.markpollack.experiment.comparison` — ComparisonEngine
 - `io.github.markpollack.experiment.scoring` — VerdictExtractor, JudgmentContextFactory

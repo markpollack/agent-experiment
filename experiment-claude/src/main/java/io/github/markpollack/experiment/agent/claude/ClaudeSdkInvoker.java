@@ -23,7 +23,7 @@ import io.github.markpollack.experiment.agent.InvocationResult;
  * <p>
  * Executes a single-phase invocation: one {@code connect(prompt)} +
  * {@code receiveResponse()} per item. The prompt is already fully constructed by
- * {@link io.github.markpollack.experiment.runner.ExperimentRunner}.
+ * {@link io.github.markpollack.experiment.runner.AgentExperiment}.
  *
  * <p>
  * Thread-safe: each invocation creates its own {@link ClaudeSyncClient}.

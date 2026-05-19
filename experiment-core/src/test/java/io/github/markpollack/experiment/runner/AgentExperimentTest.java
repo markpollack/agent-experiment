@@ -31,7 +31,7 @@ import org.springaicommunity.judge.score.BooleanScore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ExperimentRunnerTest {
+class AgentExperimentTest {
 
 	private static final Path TEST_DATASET = Path.of("src/test/resources/test-dataset").toAbsolutePath();
 
@@ -52,7 +52,7 @@ class ExperimentRunnerTest {
 	void runExecutesFullPipeline() {
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -72,7 +72,7 @@ class ExperimentRunnerTest {
 	void runRecordsPerJudgeScoresOnItems() {
 		Jury jury = juryWith(passingJudge("build_judge"));
 		ExperimentConfig config = defaultConfig().build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -87,7 +87,7 @@ class ExperimentRunnerTest {
 	void runAggregatesScoresAcrossItems() {
 		Jury jury = juryWith(passingJudge("build_judge"));
 		ExperimentConfig config = defaultConfig().build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -101,7 +101,7 @@ class ExperimentRunnerTest {
 		mockAgent.onItem("SIMPLE-001", InvocationResult.error("agent crashed", Map.of("itemId", "SIMPLE-001")));
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -120,7 +120,7 @@ class ExperimentRunnerTest {
 	void runRecordsDatasetVersion() {
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -131,7 +131,7 @@ class ExperimentRunnerTest {
 	void runRecordsMetadata() {
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().metadata(Map.of("model_version", "v1")).build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -142,7 +142,7 @@ class ExperimentRunnerTest {
 	void agentReceivesConstructedPrompt() {
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().promptTemplate("Please do: {{task}}").build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		runner.run(mockAgent);
 
@@ -163,7 +163,7 @@ class ExperimentRunnerTest {
 		});
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -174,7 +174,7 @@ class ExperimentRunnerTest {
 	void buildPromptReplacesTaskPlaceholder() {
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().promptTemplate("Task: {{task}}").build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		// Use a known item to test prompt construction
 		var dataset = datasetManager.load(TEST_DATASET);
@@ -195,7 +195,7 @@ class ExperimentRunnerTest {
 		// Previously this would skip judging entirely; now judges still execute
 		Jury jury = juryWith(passingJudge("build_judge"));
 		ExperimentConfig config = defaultConfig().itemFilter(ItemFilter.bucket("B")).build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -214,7 +214,7 @@ class ExperimentRunnerTest {
 	void passingJudgeProducesPassRate1() {
 		Jury jury = juryWith(passingJudge("judge"));
 		ExperimentConfig config = defaultConfig().build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -225,7 +225,7 @@ class ExperimentRunnerTest {
 	void failingJudgeProducesPassRate0() {
 		Jury jury = juryWith(failingJudge("judge"));
 		ExperimentConfig config = defaultConfig().build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -242,7 +242,7 @@ class ExperimentRunnerTest {
 	void preserveWorkspacesMovesWorkspaceToOutputDir(@TempDir Path outputDir) {
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().preserveWorkspaces(true).outputDir(outputDir).build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -258,7 +258,7 @@ class ExperimentRunnerTest {
 	void workspaceDeletedWhenPreserveDisabled() {
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().preserveWorkspaces(false).build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -272,7 +272,7 @@ class ExperimentRunnerTest {
 		mockAgent.onItem("SIMPLE-001", InvocationResult.error("agent crashed", Map.of("itemId", "SIMPLE-001")));
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().preserveWorkspaces(true).outputDir(outputDir).build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
@@ -291,7 +291,7 @@ class ExperimentRunnerTest {
 
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, sessionStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, sessionStore, config);
 
 		runner.run(mockAgent, activeSession);
 
@@ -308,7 +308,7 @@ class ExperimentRunnerTest {
 
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().preserveWorkspaces(true).outputDir(outputDir).build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, sessionStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, sessionStore, config);
 
 		ExperimentResult result = runner.run(mockAgent, activeSession);
 
@@ -326,7 +326,7 @@ class ExperimentRunnerTest {
 
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().outputDir(outputDir).build();
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, sessionStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, sessionStore, config);
 
 		runner.run(mockAgent, activeSession);
 
@@ -340,7 +340,7 @@ class ExperimentRunnerTest {
 		Jury jury = juryWith(passingJudge("test_judge"));
 		ExperimentConfig config = defaultConfig().build();
 		// Use 4-arg constructor + 1-arg run — identical to pre-session behavior
-		ExperimentRunner runner = new ExperimentRunner(datasetManager, jury, resultStore, config);
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 

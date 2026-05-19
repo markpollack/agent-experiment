@@ -89,23 +89,23 @@ Extracts shared experiment infrastructure from agent-specific execution. The sin
 ### Step 1.2: AgentExperiment Rename
 
 **Entry criteria**:
-- [ ] Step 1.1 complete
-- [ ] Read: `plans/learnings/step-1.1-execution-detail.md`
+- [x] Step 1.1 complete
+- [x] Read: `plans/learnings/step-1.1-execution-detail.md`
 
 **Work items**:
-- [ ] RENAME `ExperimentRunner` → `AgentExperiment` (new class, or rename in place)
-- [ ] UPDATE `ExperimentConfig` if needed (or keep as-is if it's already generic)
-- [ ] UPDATE all references to `ExperimentRunner` in source and tests
-- [ ] VERIFY: `./mvnw test` passes
+- [x] RENAME `ExperimentRunner` → `AgentExperiment` (new class, or rename in place)
+- [x] UPDATE `ExperimentConfig` if needed (or keep as-is if it's already generic)
+- [x] UPDATE all references to `ExperimentRunner` in source and tests
+- [x] VERIFY: `./mvnw test` passes
 
 **Exit criteria**:
-- [ ] `AgentExperiment` is the public entry point for agent experiments
-- [ ] `ExperimentRunner` no longer exists (or is a deprecated alias)
-- [ ] All tests pass: `./mvnw test`
-- [ ] Create: `plans/learnings/step-1.2-agent-experiment-rename.md`
-- [ ] Update `CLAUDE.md` with distilled learnings
-- [ ] Update `ROADMAP.md` checkboxes
-- [ ] COMMIT
+- [x] `AgentExperiment` is the public entry point for agent experiments
+- [x] `ExperimentRunner` no longer exists (or is a deprecated alias)
+- [x] All tests pass: `./mvnw test`
+- [x] Create: `plans/learnings/step-1.2-agent-experiment-rename.md`
+- [x] Update `CLAUDE.md` with distilled learnings
+- [x] Update `ROADMAP.md` checkboxes
+- [x] COMMIT
 
 **Deliverables**: `AgentExperiment` as named entry point
 

@@ -1,7 +1,7 @@
 package io.github.markpollack.experiment.store;
 
 /**
- * Lightweight runtime handle passed to {@code ExperimentRunner} to identify the active
+ * Lightweight runtime handle passed to {@code AgentExperiment} to identify the active
  * session and variant. Immutable and stateless — used only for path computation and
  * session store writes.
  *

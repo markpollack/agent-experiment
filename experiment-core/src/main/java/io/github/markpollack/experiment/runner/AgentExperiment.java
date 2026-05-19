@@ -54,7 +54,7 @@ import org.springaicommunity.judge.jury.Jury;
 import org.springaicommunity.judge.jury.Verdict;
 
 /**
- * Orchestrates the full experiment loop: load dataset, iterate items, invoke agent, judge
+ * Orchestrates a full agent experiment: load dataset, iterate items, invoke agent, judge
  * via Jury, aggregate, and persist results.
  *
  * <p>
@@ -62,9 +62,9 @@ import org.springaicommunity.judge.jury.Verdict;
  * Result store failures DO halt (thrown to caller).
  * </p>
  */
-public class ExperimentRunner {
+public class AgentExperiment {
 
-	private static final Logger logger = LoggerFactory.getLogger(ExperimentRunner.class);
+	private static final Logger logger = LoggerFactory.getLogger(AgentExperiment.class);
 
 	private final DatasetManager datasetManager;
 
@@ -76,12 +76,11 @@ public class ExperimentRunner {
 
 	private final ExperimentConfig config;
 
-	public ExperimentRunner(DatasetManager datasetManager, Jury jury, ResultStore resultStore,
-			ExperimentConfig config) {
+	public AgentExperiment(DatasetManager datasetManager, Jury jury, ResultStore resultStore, ExperimentConfig config) {
 		this(datasetManager, jury, resultStore, null, config);
 	}
 
-	public ExperimentRunner(DatasetManager datasetManager, Jury jury, ResultStore resultStore,
+	public AgentExperiment(DatasetManager datasetManager, Jury jury, ResultStore resultStore,
 			@Nullable SessionStore sessionStore, ExperimentConfig config) {
 		this.datasetManager = java.util.Objects.requireNonNull(datasetManager, "datasetManager must not be null");
 		this.jury = java.util.Objects.requireNonNull(jury, "jury must not be null");
