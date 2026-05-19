@@ -1,5 +1,7 @@
-# Plans — track learnings and roadmap, ignore inbox proposals
+# Plans — track learnings and roadmap, ignore inbox proposals and scratch files
 plans/inbox/
+plans/META-ROADMAP.md
+plans/status.md
 
 # Maven
 target/
