@@ -11,6 +11,12 @@ import org.slf4j.LoggerFactory;
  * Programmatically attaches a Logback {@code FileAppender} to the root logger for the
  * duration of an experiment run. Uses direct Logback API with graceful degradation when
  * Logback isn't on the classpath.
+ *
+ * <p>
+ * All Logback references are isolated in inner classes ({@code LogbackAttacher},
+ * {@code LogbackDetacher}) so the JVM only attempts to link them when logback is actually
+ * present. This avoids forcing logback on experiment-core consumers that use a different
+ * SLF4J backend.
  */
 final class RunLogManager {
 
@@ -28,10 +34,47 @@ final class RunLogManager {
 	static @Nullable Object attach(Path runDir) {
 		try {
 			Files.createDirectories(runDir);
+			return LogbackAttacher.attach(runDir);
+		}
+		catch (NoClassDefFoundError ex) {
+			logger.debug("Logback not on classpath, run log disabled");
+			return null;
+		}
+		catch (Exception ex) {
+			logger.warn("Failed to attach run log to {}: {}", runDir, ex.getMessage());
+			return null;
+		}
+	}
+
+	/**
+	 * Detach a previously attached run log appender.
+	 * @param handle the handle returned by {@link #attach(Path)}, or null (no-op)
+	 */
+	static void detach(@Nullable Object handle) {
+		if (handle == null) {
+			return;
+		}
+		try {
+			LogbackDetacher.detach(handle);
+		}
+		catch (NoClassDefFoundError ex) {
+			// Logback not on classpath — nothing to detach
+		}
+		catch (Exception ex) {
+			logger.warn("Failed to detach run log: {}", ex.getMessage());
+		}
+	}
+
+	/**
+	 * Inner class isolating all Logback references for attach. The JVM only loads and
+	 * links this class when {@link #attach(Path)} is called, so the
+	 * {@code NoClassDefFoundError} catch in the outer method works correctly.
+	 */
+	private static final class LogbackAttacher {
+
+		static Object attach(Path runDir) {
 			Path logFile = runDir.resolve("run.log");
 
-			// Use Logback API via reflection-free direct import — wrapped in
-			// try/catch(NoClassDefFoundError) for classpath safety
 			ch.qos.logback.classic.LoggerContext context = (ch.qos.logback.classic.LoggerContext) org.slf4j.LoggerFactory
 				.getILoggerFactory();
 
@@ -54,26 +97,16 @@ final class RunLogManager {
 			logger.info("Run log attached: {}", logFile);
 			return appender;
 		}
-		catch (NoClassDefFoundError ex) {
-			logger.debug("Logback not on classpath, run log disabled");
-			return null;
-		}
-		catch (Exception ex) {
-			logger.warn("Failed to attach run log to {}: {}", runDir, ex.getMessage());
-			return null;
-		}
+
 	}
 
 	/**
-	 * Detach a previously attached run log appender.
-	 * @param handle the handle returned by {@link #attach(Path)}, or null (no-op)
+	 * Inner class isolating all Logback references for detach.
 	 */
-	@SuppressWarnings("unchecked")
-	static void detach(@Nullable Object handle) {
-		if (handle == null) {
-			return;
-		}
-		try {
+	private static final class LogbackDetacher {
+
+		@SuppressWarnings("unchecked")
+		static void detach(Object handle) {
 			ch.qos.logback.core.FileAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender = (ch.qos.logback.core.FileAppender<ch.qos.logback.classic.spi.ILoggingEvent>) handle;
 
 			ch.qos.logback.classic.LoggerContext context = (ch.qos.logback.classic.LoggerContext) org.slf4j.LoggerFactory
@@ -85,12 +118,7 @@ final class RunLogManager {
 
 			logger.debug("Run log detached");
 		}
-		catch (NoClassDefFoundError ex) {
-			// Logback not on classpath — nothing to detach
-		}
-		catch (Exception ex) {
-			logger.warn("Failed to detach run log: {}", ex.getMessage());
-		}
+
 	}
 
 }
