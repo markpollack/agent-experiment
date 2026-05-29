@@ -30,12 +30,14 @@ import org.jspecify.annotations.Nullable;
  * efficiency evaluation is skipped (backward compatible)
  * @param projectRoot root directory of the experiment project for git versioning; when
  * null, defaults to the JVM working directory at run time
+ * @param requireCleanGit when true, throw if the experiment project has uncommitted
+ * changes; when false (default), log a warning and continue
  */
 public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable ItemFilter itemFilter, String model,
 		String promptTemplate, Duration perItemTimeout, @Nullable String systemPrompt, @Nullable Path knowledgeBaseDir,
 		@Nullable Duration experimentTimeout, Map<String, String> metadata, @Nullable String baselineId,
 		@Nullable Boolean preserveWorkspaces, @Nullable Path outputDir, @Nullable EfficiencyConfig efficiencyConfig,
-		@Nullable Path projectRoot) {
+		@Nullable Path projectRoot, boolean requireCleanGit) {
 
 	public ExperimentConfig {
 		java.util.Objects.requireNonNull(experimentName, "experimentName must not be null");
@@ -89,6 +91,8 @@ public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable
 		private @Nullable EfficiencyConfig efficiencyConfig;
 
 		private @Nullable Path projectRoot;
+
+		private boolean requireCleanGit;
 
 		private Builder() {
 		}
@@ -168,10 +172,15 @@ public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable
 			return this;
 		}
 
+		public Builder requireCleanGit(boolean requireCleanGit) {
+			this.requireCleanGit = requireCleanGit;
+			return this;
+		}
+
 		public ExperimentConfig build() {
 			return new ExperimentConfig(experimentName, datasetDir, itemFilter, model, promptTemplate, perItemTimeout,
 					systemPrompt, knowledgeBaseDir, experimentTimeout, metadata, baselineId, preserveWorkspaces,
-					outputDir, efficiencyConfig, projectRoot);
+					outputDir, efficiencyConfig, projectRoot, requireCleanGit);
 		}
 
 	}

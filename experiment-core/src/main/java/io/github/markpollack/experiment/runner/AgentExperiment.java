@@ -147,11 +147,22 @@ public class AgentExperiment {
 		Path projectRoot = config.projectRoot() != null ? config.projectRoot()
 				: Path.of(System.getProperty("user.dir"));
 		String codeVersion = GitOperations.resolveHead(projectRoot);
-		boolean codeDirty = GitOperations.isDirty(projectRoot);
+		List<String> dirtyFiles = GitOperations.dirtyFiles(projectRoot);
+		boolean codeDirty = !dirtyFiles.isEmpty();
 		if (codeDirty) {
-			throw new IllegalStateException(
-					"Experiment project has uncommitted changes — commit before running to ensure reproducibility. "
-							+ "Run: git commit before starting the experiment.");
+			List<String> critical = GitOperations.criticalDirtyFiles(dirtyFiles);
+			if (!critical.isEmpty()) {
+				String message = "Experiment project has uncommitted changes in behavior-affecting paths: " + critical
+						+ " — commit before running to ensure reproducibility.";
+				if (config.requireCleanGit()) {
+					throw new IllegalStateException(message);
+				}
+				logger.warn(message);
+			}
+			else {
+				logger.info("Experiment running with uncommitted changes in non-critical paths: {} "
+						+ "— dirty state recorded in result for auditing.", dirtyFiles);
+			}
 		}
 
 		Dataset dataset = datasetManager.load(config.datasetDir());

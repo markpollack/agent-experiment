@@ -1,6 +1,7 @@
 package io.github.markpollack.experiment.util;
 
 import java.nio.file.Path;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -44,6 +45,57 @@ class GitOperationsTest {
 
 		// Just verify it returns a boolean without error
 		assertThat(dirty).isIn(true, false);
+	}
+
+	@Test
+	void dirtyFilesReturnsEmptyForNonGitDir(@TempDir Path tempDir) {
+		List<String> files = GitOperations.dirtyFiles(tempDir);
+
+		assertThat(files).isEmpty();
+	}
+
+	@Test
+	void dirtyFilesReturnsListForGitRepo() {
+		Path repoDir = Path.of("src/test/resources/test-dataset").toAbsolutePath();
+
+		List<String> files = GitOperations.dirtyFiles(repoDir);
+
+		// Just verify it returns a list without error
+		assertThat(files).isNotNull();
+	}
+
+	@Test
+	void criticalDirtyFiles_filtersToSrcAndKnowledge() {
+		List<String> dirty = List.of("src/main/java/Foo.java", "knowledge/petclinic/README.md",
+				"results/experiment-1/abc123.json", ".campus/status.json", "plans/inbox/idea.md", "pom.xml");
+
+		List<String> critical = GitOperations.criticalDirtyFiles(dirty);
+
+		assertThat(critical).containsExactly("src/main/java/Foo.java", "knowledge/petclinic/README.md");
+	}
+
+	@Test
+	void criticalDirtyFiles_resultsAreNonCritical() {
+		List<String> dirty = List.of("results/experiment-1/abc123.json", "results/experiment-1/index.json",
+				"results/sessions/suite-1/session.json");
+
+		List<String> critical = GitOperations.criticalDirtyFiles(dirty);
+
+		assertThat(critical).isEmpty();
+	}
+
+	@Test
+	void criticalDirtyFiles_emptyInputReturnsEmpty() {
+		assertThat(GitOperations.criticalDirtyFiles(List.of())).isEmpty();
+	}
+
+	@Test
+	void criticalDirtyFiles_allCriticalReturnsAll() {
+		List<String> dirty = List.of("src/test/java/FooTest.java", "knowledge/base/doc.md");
+
+		List<String> critical = GitOperations.criticalDirtyFiles(dirty);
+
+		assertThat(critical).containsExactlyElementsOf(dirty);
 	}
 
 }
