@@ -193,7 +193,7 @@ public abstract class AbstractTemplateAgentInvoker implements AgentInvoker {
 	/**
 	 * Result from the agent invocation phase, carrying phase captures and session ID.
 	 */
-	protected record AgentResult(List<PhaseCapture> phases, @Nullable String sessionId) {
+	public record AgentResult(List<PhaseCapture> phases, @Nullable String sessionId) {
 	}
 
 }
