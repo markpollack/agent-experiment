@@ -45,6 +45,8 @@
         <claude-code-capture.version>1.4.0</claude-code-capture.version>
         <agent-judge.version>0.12.0</agent-judge.version>
         <claude-code-sdk.version>1.3.0</claude-code-sdk.version>
+        <agent-workflow.version>0.9.0</agent-workflow.version>
+        <agent-client.version>0.20.0</agent-client.version>
 
         <!-- Third-party dependency versions -->
         <jackson.version>2.21.2</jackson.version>
@@ -72,6 +74,7 @@
     <modules>
         <module>experiment-core</module>
         <module>experiment-claude</module>
+        <module>experiment-workflow</module>
     </modules>
 
     <dependencyManagement>
@@ -90,6 +93,42 @@
                 <groupId>io.github.markpollack</groupId>
                 <artifactId>experiment-core</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.markpollack</groupId>
+                <artifactId>experiment-workflow</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- Agent workflow -->
+            <dependency>
+                <groupId>io.github.markpollack</groupId>
+                <artifactId>workflow-flows</artifactId>
+                <version>${agent-workflow.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.markpollack</groupId>
+                <artifactId>workflow-journal</artifactId>
+                <version>${agent-workflow.version}</version>
+            </dependency>
+
+            <!-- Journal core -->
+            <dependency>
+                <groupId>io.github.markpollack</groupId>
+                <artifactId>journal-core</artifactId>
+                <version>${claude-code-capture.version}</version>
+            </dependency>
+
+            <!-- Agent client -->
+            <dependency>
+                <groupId>io.github.markpollack</groupId>
+                <artifactId>agent-client-core</artifactId>
+                <version>${agent-client.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.markpollack</groupId>
+                <artifactId>agent-claude</artifactId>
+                <version>${agent-client.version}</version>
             </dependency>
 
             <dependency>

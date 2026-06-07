@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.github.markpollack</groupId>
+        <artifactId>agent-experiment-parent</artifactId>
+        <version>0.6.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>experiment-workflow</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Experiment Driver Workflow</name>
+    <description>Workflow-backed AgentInvoker base classes: WorkflowInvoker and WorkflowAgentInvoker</description>
+
+    <dependencies>
+        <!-- Internal -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>experiment-core</artifactId>
+        </dependency>
+
+        <!-- Agent workflow -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>workflow-flows</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>workflow-journal</artifactId>
+        </dependency>
+
+        <!-- Journal core: Journal, Run, JsonFileStorage -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>journal-core</artifactId>
+        </dependency>
+
+        <!-- Agent client -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>agent-client-core</artifactId>
+        </dependency>
+
+        <!-- Claude model (optional convenience default — make model injectable to avoid hard dep) -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>agent-claude</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Phase capture for AbstractTemplateAgentInvoker.AgentResult -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>claude-code-capture</artifactId>
+        </dependency>
+
+        <!-- Null safety -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+
+        <!-- Logging -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <!-- Test dependencies -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
