@@ -22,9 +22,9 @@
 
 ## Dependencies
 - All dependencies use `io.github.markpollack` groupId (migrated from org.springaicommunity)
-- agent-judge-core/exec: 0.10.0-SNAPSHOT, package `io.github.markpollack.judge.*`
-- claude-code-sdk: 1.1.0-SNAPSHOT, package `io.github.markpollack.claude.agent.sdk.*`
-- claude-code-capture: 1.1.0-SNAPSHOT, package `io.github.markpollack.journal.*`
+- agent-judge-core/exec: 0.12.0, package `io.github.markpollack.judge.*`
+- claude-code-sdk: 1.3.0, package `io.github.markpollack.claude.agent.sdk.*`
+- claude-code-capture: 1.4.0, package `io.github.markpollack.journal.*`
 
 ## Key Packages
 - `io.github.markpollack.experiment.result` — ExperimentResult, ItemResult, ExecutionDetail

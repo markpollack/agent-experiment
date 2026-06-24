@@ -2,6 +2,7 @@ package io.github.markpollack.experiment.agent.claude;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -105,6 +106,64 @@ class ClaudeSdkInvokerTest {
 		CLIOptions options = invoker.buildOptions(context);
 
 		assertThat(options.timeout()).isEqualTo(Duration.ofMinutes(5));
+	}
+
+	@Test
+	void buildOptionsAppliesToolAndSettingsFlags() {
+		ClaudeSdkInvokerConfig config = ClaudeSdkInvokerConfig.builder()
+			.allowedTools(List.of("Read", "Grep"))
+			.disallowedTools(List.of("Bash", "Write"))
+			.settingsPath("/tmp/settings.json")
+			.extraArgs(Map.of("--verbose", ""))
+			.build();
+		ClaudeSdkInvoker invoker = new ClaudeSdkInvoker(config);
+		InvocationContext context = contextWithModel("sonnet");
+
+		CLIOptions options = invoker.buildOptions(context);
+
+		assertThat(options.getAllowedTools()).containsExactly("Read", "Grep");
+		assertThat(options.getDisallowedTools()).containsExactly("Bash", "Write");
+		assertThat(options.getSettings()).isEqualTo("/tmp/settings.json");
+		assertThat(options.getExtraArgs()).containsEntry("--verbose", "");
+	}
+
+	@Test
+	void buildOptionsOmitsEmptyToolAndSettingsFlags() {
+		ClaudeSdkInvokerConfig config = ClaudeSdkInvokerConfig.defaults();
+		ClaudeSdkInvoker invoker = new ClaudeSdkInvoker(config);
+		InvocationContext context = contextWithModel("haiku");
+
+		CLIOptions options = invoker.buildOptions(context);
+
+		assertThat(options.getAllowedTools()).isEmpty();
+		assertThat(options.getDisallowedTools()).isEmpty();
+		assertThat(options.getSettings()).isNull();
+		assertThat(options.getExtraArgs()).isEmpty();
+	}
+
+	@Test
+	void configDefaultsHasEmptyToolAndSettingsFields() {
+		ClaudeSdkInvokerConfig config = ClaudeSdkInvokerConfig.defaults();
+
+		assertThat(config.allowedTools()).isEmpty();
+		assertThat(config.disallowedTools()).isEmpty();
+		assertThat(config.settingsPath()).isNull();
+		assertThat(config.extraArgs()).isEmpty();
+	}
+
+	@Test
+	void configBuilderRoundTripsToolAndSettingsFields() {
+		ClaudeSdkInvokerConfig config = ClaudeSdkInvokerConfig.builder()
+			.allowedTools(List.of("Read"))
+			.disallowedTools(List.of("Bash"))
+			.settingsPath("/etc/claude/settings.json")
+			.extraArgs(Map.of("--debug", "true"))
+			.build();
+
+		assertThat(config.allowedTools()).containsExactly("Read");
+		assertThat(config.disallowedTools()).containsExactly("Bash");
+		assertThat(config.settingsPath()).isEqualTo("/etc/claude/settings.json");
+		assertThat(config.extraArgs()).containsEntry("--debug", "true");
 	}
 
 	@Test
