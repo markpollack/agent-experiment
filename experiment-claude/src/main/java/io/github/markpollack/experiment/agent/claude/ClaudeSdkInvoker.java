@@ -92,6 +92,18 @@ public class ClaudeSdkInvoker implements AgentInvoker {
 		if (config.maxThinkingTokens() != null) {
 			builder.maxThinkingTokens(config.maxThinkingTokens());
 		}
+		if (!config.allowedTools().isEmpty()) {
+			builder.allowedTools(config.allowedTools());
+		}
+		if (!config.disallowedTools().isEmpty()) {
+			builder.disallowedTools(config.disallowedTools());
+		}
+		if (config.settingsPath() != null) {
+			builder.settings(config.settingsPath());
+		}
+		if (!config.extraArgs().isEmpty()) {
+			builder.extraArgs(config.extraArgs());
+		}
 
 		return builder.build();
 	}
