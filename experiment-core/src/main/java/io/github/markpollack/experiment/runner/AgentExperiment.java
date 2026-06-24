@@ -1,7 +1,6 @@
 package io.github.markpollack.experiment.runner;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,6 +39,8 @@ import io.github.markpollack.experiment.dataset.ResolvedItem;
 import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.result.ItemResult;
 import io.github.markpollack.experiment.result.KnowledgeManifest;
+import io.github.markpollack.experiment.runner.workspace.DefaultWorkspaceProvisioner;
+import io.github.markpollack.experiment.runner.workspace.WorkspaceProvisioner;
 import io.github.markpollack.experiment.scoring.JudgmentContextFactory;
 import io.github.markpollack.experiment.util.GitOperations;
 import io.github.markpollack.experiment.scoring.VerdictExtractor;
@@ -76,17 +77,32 @@ public class AgentExperiment {
 
 	private final ExperimentConfig config;
 
+	private final WorkspaceProvisioner workspaceProvisioner;
+
 	public AgentExperiment(DatasetManager datasetManager, Jury jury, ResultStore resultStore, ExperimentConfig config) {
 		this(datasetManager, jury, resultStore, null, config);
 	}
 
 	public AgentExperiment(DatasetManager datasetManager, Jury jury, ResultStore resultStore,
 			@Nullable SessionStore sessionStore, ExperimentConfig config) {
+		this(datasetManager, jury, resultStore, sessionStore, config, new DefaultWorkspaceProvisioner());
+	}
+
+	/**
+	 * Full constructor allowing a custom {@link WorkspaceProvisioner} — e.g. a
+	 * {@link io.github.markpollack.experiment.runner.workspace.GitWorkspaceProvisioner}
+	 * to check out a dataset item's {@code beforeRef} from git. The provisioner is closed
+	 * at the end of {@link #run(AgentInvoker, ActiveSession)}.
+	 */
+	public AgentExperiment(DatasetManager datasetManager, Jury jury, ResultStore resultStore,
+			@Nullable SessionStore sessionStore, ExperimentConfig config, WorkspaceProvisioner workspaceProvisioner) {
 		this.datasetManager = java.util.Objects.requireNonNull(datasetManager, "datasetManager must not be null");
 		this.jury = java.util.Objects.requireNonNull(jury, "jury must not be null");
 		this.resultStore = java.util.Objects.requireNonNull(resultStore, "resultStore must not be null");
 		this.sessionStore = sessionStore;
 		this.config = java.util.Objects.requireNonNull(config, "config must not be null");
+		this.workspaceProvisioner = java.util.Objects.requireNonNull(workspaceProvisioner,
+				"workspaceProvisioner must not be null");
 	}
 
 	/**
@@ -123,6 +139,7 @@ public class AgentExperiment {
 			return doRun(agentInvoker, startTime, experimentId, runDir, activeSession);
 		}
 		finally {
+			workspaceProvisioner.close();
 			RunLogManager.detach(runLogHandle);
 		}
 	}
@@ -232,7 +249,7 @@ public class AgentExperiment {
 		Path workspace = null;
 		try {
 			ResolvedItem resolved = datasetManager.resolve(item);
-			workspace = createWorkspace(resolved);
+			workspace = workspaceProvisioner.provision(resolved);
 
 			String prompt = buildPrompt(item);
 			InvocationContext context = InvocationContext.builder()
@@ -332,8 +349,8 @@ public class AgentExperiment {
 				.build();
 		}
 		finally {
-			if (workspace != null && !config.shouldPreserveWorkspaces()) {
-				cleanupWorkspace(workspace);
+			if (workspace != null) {
+				workspaceProvisioner.release(workspace);
 			}
 		}
 	}
@@ -377,22 +394,14 @@ public class AgentExperiment {
 		}
 	}
 
-	private Path createWorkspace(ResolvedItem resolved) {
-		try {
-			Path workspace = Files.createTempDirectory("experiment-workspace-");
-			if (resolved.beforeDir() != null) {
-				copyDirectory(resolved.beforeDir(), workspace);
-			}
-			return workspace;
-		}
-		catch (IOException ex) {
-			throw new UncheckedIOException("Failed to create workspace for " + resolved.item().id(), ex);
-		}
-	}
-
 	/**
-	 * Preserve the workspace by moving it to the artifact directory. Returns the
+	 * Preserve the workspace by copying it to the artifact directory. Returns the
 	 * destination path, or null if preservation is disabled or the workspace is null.
+	 *
+	 * <p>
+	 * Copies rather than moves so the original workspace survives for the
+	 * {@link WorkspaceProvisioner} to release — releasing may delete an ephemeral
+	 * workspace or retain a reused git checkout.
 	 */
 	private @Nullable Path preserveWorkspace(@Nullable Path workspace, String experimentId, String itemSlug,
 			@Nullable ActiveSession activeSession) {
@@ -417,45 +426,14 @@ public class AgentExperiment {
 				.resolve(itemSlug);
 		}
 		try {
-			Files.createDirectories(destination.getParent());
-			Files.move(workspace, destination, StandardCopyOption.ATOMIC_MOVE);
+			Files.createDirectories(destination);
+			copyDirectory(workspace, destination);
 			logger.info("Preserved workspace for {} at {}", itemSlug, destination);
 			return destination;
 		}
 		catch (IOException ex) {
-			// ATOMIC_MOVE may fail across filesystems — fall back to copy+delete
-			try {
-				Files.createDirectories(destination);
-				copyDirectory(workspace, destination);
-				cleanupWorkspace(workspace);
-				logger.info("Preserved workspace for {} at {} (copy)", itemSlug, destination);
-				return destination;
-			}
-			catch (IOException copyEx) {
-				logger.warn("Failed to preserve workspace for {}: {}", itemSlug, copyEx.getMessage());
-				return null;
-			}
-		}
-	}
-
-	private void cleanupWorkspace(Path workspace) {
-		try {
-			Files.walkFileTree(workspace, new SimpleFileVisitor<>() {
-				@Override
-				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-					Files.delete(file);
-					return FileVisitResult.CONTINUE;
-				}
-
-				@Override
-				public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-					Files.delete(dir);
-					return FileVisitResult.CONTINUE;
-				}
-			});
-		}
-		catch (IOException ex) {
-			logger.warn("Failed to cleanup workspace {}: {}", workspace, ex.getMessage());
+			logger.warn("Failed to preserve workspace for {}: {}", itemSlug, ex.getMessage());
+			return null;
 		}
 	}
 
