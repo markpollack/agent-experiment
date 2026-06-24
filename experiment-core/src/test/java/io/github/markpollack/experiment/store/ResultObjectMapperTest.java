@@ -216,6 +216,24 @@ class ResultObjectMapperTest {
 	}
 
 	@Test
+	void roundTripPreservesPhasesSoToolTelemetryRecomputes() throws Exception {
+		io.github.markpollack.journal.claude.PhaseCapture phase = new io.github.markpollack.journal.claude.PhaseCapture(
+				"invoke", "prompt", 10, 20, 0, 0, 0, 100, 100, 0.0, "session-1", 3, false, "output", List.of(),
+				List.of(new io.github.markpollack.journal.claude.ToolUseRecord("u1", "Read", Map.of()),
+						new io.github.markpollack.journal.claude.ToolUseRecord("u2", "Bash",
+								Map.of("command", "ls -la"))),
+				"result", List.of());
+		InvocationResult original = InvocationResult.fromPhases(List.of(phase), 1000, "session-1", Map.of());
+
+		String json = mapper.writeValueAsString(original);
+		InvocationResult restored = mapper.readValue(json, InvocationResult.class);
+
+		assertThat(restored.toolTelemetry().numTurns()).isEqualTo(3);
+		assertThat(restored.toolTelemetry().toolCallCounts()).containsEntry("Read", 1).containsEntry("Bash", 1);
+		assertThat(restored.toolTelemetry().bashCommands()).containsExactly("ls -la");
+	}
+
+	@Test
 	void roundTripsItemResultWithJudgeExecutionDetail() throws Exception {
 		io.github.markpollack.judge.result.Judgment candidateJudgment = Judgment.builder()
 			.score(new BooleanScore(true))
