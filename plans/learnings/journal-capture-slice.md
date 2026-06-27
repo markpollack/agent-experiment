@@ -57,11 +57,40 @@ never produced.
   `EVEN_SPLIT`, production `RunRecorder`), so the 1.4.0 → 1.6.0-SNAPSHOT bump did not break
   `experiment-claude`/`experiment-workflow` (full reactor green: 459 + 60 + 7).
 
+## Review responses (slice-2 review + coordinator sync)
+
+- **Q1 — variant/arm in `run.json` (critical seam to ACT).** Cost-weighted `V(EXPLORE)` is per-arm, so
+  the journal must carry the arm label or ACT is forced back onto the result-store join we're retiring.
+  `openItem` now writes `config.variant` (the arm), plus `model`, `session`, `itemId`, `itemSlug` — and
+  `variant`/`itemId`/`session` tags. Variant is threaded from `ActiveSession.variantName()`; non-session
+  runs use the sentinel `"default"`. `(variant, item, runId)` is now recoverable **from the journal
+  alone**. `run.json` = serialized journal-core `RunData`; `config` serializes as a flat object
+  (`@JsonValue Map`), so ACT reads `run.json.config.variant`.
+- **Q2 — concurrency.** Items run **sequentially** within an `AgentExperiment.run()` (a plain for-loop;
+  `invokeWithTimeout` blocks on `future.get()`). The real parallel surface is **across runs** — a sweep
+  runs arms (separate `run()` calls) concurrently, each reconfiguring the process-global `Journal`.
+  `ExperimentJournalConcurrencyTest` runs 8 arms at once on distinct storages and asserts each arm's
+  `analysis.jsonl` has exactly its own tool ids (no cross-run leakage) + its own `run.json` variant.
+  The lock covers only the configure→start→restore swap, not `recordPhase`/`finish` (which run on the
+  per-run bound storage) — so big sweeps don't serialize on journaling writes.
+- **Q3 — stable `run.json` schema + A4 final.** ACT can pin: `id` (runId), `config.{variant,itemId,
+  itemSlug,model,session?}`, `experimentId`, `startTime`/`endTime`, `tags`. Glob is final:
+  `**/journal/experiments/*/runs/*/analysis.jsonl`.
+- **A5 (additive refresh).** agent-journal re-shipped 1.6.0-SNAPSHOT so each `events.jsonl`/
+  `analysis.jsonl` opens with `{"@type":"header","schemaVersion":1,"stream":...,"runId":...}`. Picked up
+  with `mvn -U`, **no code change** — the recorder emits it. Tests now filter to `@type=="step_cost"`
+  and assert the header. Lesson: a moving SNAPSHOT can change emitted output without an API change —
+  raw-jsonl test parsers must be tolerant of additive header/event kinds.
+- **Canonical DESIGN is read-only to stewards.** The A4 convention refinement is **surfaced to the
+  contract owner to record**, not edited into the canonical doc by this slice. (An earlier direct A4
+  edit was reverted.)
+
 ## Acceptance
 
 `AgentExperimentJournalTest` — vanilla run leaves `analysis.jsonl` with `StepCostEvent`s keyed by
 tool_use id (`OUTPUT_TOKEN_PROPORTIONAL`, summing to the run total), `events.jsonl` with the same
-ids, zero invoker changes; opt-out and no-output-dir paths covered.
+ids, zero invoker changes; opt-out, no-output-dir, session-variant-in-run.json, and A5-header paths
+covered. `ExperimentJournalConcurrencyTest` — 8 concurrent arms, no cross-run leakage.
 
 ## Follow-ups (downstream slices)
 

@@ -252,16 +252,22 @@ public class AgentExperiment {
 
 	/**
 	 * Records every {@link PhaseCapture} the invoker returned into a per-item journal
-	 * run. Journal failures are logged but never demote an otherwise-good item result —
-	 * except the slice-1 fail-loud {@code IllegalStateException} (derived events on
-	 * non-durable storage), which is a configuration bug the caller must see, so it
-	 * propagates.
+	 * run. The variant/arm and session labels are carried into the journal's
+	 * {@code run.json} (so per-arm measurement is recoverable from the journal alone); a
+	 * non-session run uses the {@code "default"} variant sentinel. Journal failures are
+	 * logged but never demote an otherwise-good item result — except the slice-1
+	 * fail-loud {@code IllegalStateException} (derived events on non-durable storage),
+	 * which is a configuration bug the caller must see, so it propagates.
 	 */
-	private void journalItem(ExperimentJournal experimentJournal, DatasetItem item, InvocationResult invocationResult) {
+	private void journalItem(ExperimentJournal experimentJournal, DatasetItem item, InvocationResult invocationResult,
+			@Nullable ActiveSession activeSession) {
 		if (!experimentJournal.enabled()) {
 			return;
 		}
-		try (RunJournal journal = experimentJournal.openItem(item.id(), item.slug(), config.model())) {
+		String variant = activeSession != null ? activeSession.variantName() : "default";
+		String session = activeSession != null ? activeSession.sessionName() : null;
+		try (RunJournal journal = experimentJournal.openItem(item.id(), item.slug(), config.model(), variant,
+				session)) {
 			for (PhaseCapture phase : invocationResult.phases()) {
 				journal.recordPhase(phase);
 			}
@@ -302,7 +308,7 @@ public class AgentExperiment {
 			// invoker stays dumb (it only returned PhaseCaptures); we open a Run, record
 			// each phase
 			// (auto-emitting per-step StepCostEvents to analysis.jsonl), and finish.
-			journalItem(experimentJournal, item, invocationResult);
+			journalItem(experimentJournal, item, invocationResult, activeSession);
 
 			// Efficiency evaluation — runs before success check so failed invocations get
 			// scores too

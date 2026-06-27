@@ -30,7 +30,8 @@ The framework owns the run-journal lifecycle; **the invoker stays dumb** (it sti
   - `RunJournal` — per-item seam: `recordPhase(PhaseCapture)` → `finish()` → `close()`. `noop()` for
     opt-out / no-output-dir.
   - `ExperimentJournal` — owns the per-experiment-run `JsonFileStorage`; opens exactly one journal
-    `Run` per dataset item via agent-journal's production `RunRecorder` (slice 1). Brackets the
+    `Run` per dataset item via agent-journal's production `RunRecorder` (slice 1), writing the
+    arm/variant + item + model + session into the run `config` (the ETL join surface). Brackets the
     process-global `Journal` reconfigure under a lock and restores it, so the journal never leaks its
     storage as the process default and concurrent experiment runs don't race.
   - `JsonFileRunJournal` / `NoOpRunJournal` — the two `RunJournal` implementations.
@@ -51,18 +52,46 @@ experiment artifacts as the journal-core-native **experiment → runs** layout:
 <runDir>/journal/                                  ← JsonFileStorage baseDir (ExperimentJournal.journalRoot)
   experiments/<experimentName>/
     runs/<runId>/
-      run.json        ← carries config.itemId / config.itemSlug for item attribution
-      events.jsonl    ← immutable execution events (LLMCallEvent, ToolCallEvent, …)
-      analysis.jsonl  ← derived StepCostEvents, keyed by tool_use id
+      run.json        ← config carries {variant, itemId, itemSlug, model, session?} + tags; id = runId
+      events.jsonl    ← A5 header line, then immutable execution events (LLMCallEvent, ToolCallEvent, …)
+      analysis.jsonl  ← A5 header line, then derived StepCostEvents, keyed by tool_use id
 ```
 
 `<runDir>` is `<outputDir>/<exp>/<experimentId>` (non-session) or
 `<outputDir>/<exp>/sessions/<session>/<variant>` (session) — the same artifact dir that already holds
 the run log and preserved workspaces (i.e. **beside the ResultStore output**). Discoverable,
-config-free: the ETL globs `**/journal/experiments/*/runs/*/analysis.jsonl` and recovers the item
-from each run's `itemId` config. This **refines** the §4 proposal `journal/<item>/…` (recorded as
-amendment **A4** in the canonical design). The result store is unchanged — it stays the experiment
-summary; the journal is the trace source of truth the ETL consumes.
+config-free: the ETL globs `**/journal/experiments/*/runs/*/analysis.jsonl` and recovers
+`(variant, item, runId)` from each run's `run.json` **`config` map alone** — no result-store re-join.
+This **refines** the §4 proposal `journal/<item>/…`; the refinement (the experiment→runs layout and
+the `run.json` join surface) is **surfaced to the canonical owner to record as amendment A4** — this
+slice does not edit the canonical design directly (it is read-only to stewards). The result store is
+unchanged — it stays the experiment summary; the journal is the trace source of truth the ETL consumes.
+
+### `run.json` join surface (stable for the measurement ETL / ACT)
+
+`run.json` is the serialized journal-core `RunData`. The fields ACT can rely on:
+
+| Field | Meaning |
+|---|---|
+| `id` | the run id (the `runs/<runId>` dir name) |
+| `config.variant` | **the arm/variant label** cost-weighted `V(EXPLORE)` groups by; `"default"` for non-session single-arm runs |
+| `config.itemId` / `config.itemSlug` | the dataset item |
+| `config.model` | the model id |
+| `config.session` | the sweep session id (absent for non-session runs) |
+| `experimentId` | the experiment name (the `experiments/<exp>` dir) |
+| `startTime` / `endTime` | run timestamps (ISO-8601) |
+| `tags` | mirror of `variant` / `itemId` / `session` for filtering |
+
+So per-arm grouping is `group by config.variant` — **from the journal alone**. The journal `<exp>`
+dir is the experiment *name*, not the variant.
+
+### A5 schema header (additive — refreshed 1.6.0-SNAPSHOT)
+
+Each `events.jsonl` / `analysis.jsonl` now opens with a header line
+`{"@type":"header","schemaVersion":1,"stream":"events"|"analysis","runId":"…"}`. **No code change on
+this side** — the production recorder emits it; the experiment harness inherited it by re-pulling the
+refreshed SNAPSHOT (`mvn -U`). Raw-jsonl readers (ACT) skip the leading header; the slice's tests
+filter to `@type == "step_cost"` and assert the header's presence.
 
 ## On-by-default + opt-out
 
@@ -76,11 +105,23 @@ summary; the journal is the trace source of truth the ETL consumes.
 `AgentExperimentJournalTest`: a vanilla run with two tool uses + per-turn usage leaves
 `analysis.jsonl` with `StepCostEvent`s keyed by tool_use id (`OUTPUT_TOKEN_PROPORTIONAL`, summing to
 the run total), `events.jsonl` carrying the same ids — **with zero invoker changes**
-(`MockAgentInvoker` untouched). Opt-out and no-output-dir paths covered. Full reactor build green.
+(`MockAgentInvoker` untouched). Also covers: `run.json` carries `variant`/`session`/`model`/`itemId`
+for a sweep arm (and `variant="default"` for a non-session run); the A5 schema header opens each
+stream; opt-out and no-output-dir paths.
+
+`ExperimentJournalConcurrencyTest` (Q2): 8 arms run **concurrently** (the real surface — items are
+sequential within a run, but a sweep runs arms in parallel, each reconfiguring the process-global
+`Journal`), each on its own storage, each recording phases with arm-unique tool ids. Asserts every
+arm's `analysis.jsonl` contains **exactly** its own step ids (no cross-run event leakage) and its
+`run.json` carries its own `variant` — proving the configure→start→restore-under-lock swap binds each
+run to its own storage. The lock covers only the brief context swap, not `recordPhase`/`finish`, so
+big sweeps don't serialize on journaling writes. Full reactor build green.
 
 ## Dependency / release
 
 agent-journal **1.6.0-SNAPSHOT**, pinned bare (no BOM): `claude-code-capture` + `journal-core` via
-the parent `claude-code-capture.version` property (SNAPSHOT-first, DESIGN §9 / A3). Re-`install`
-agent-journal and rebuild if it changes; switch to the BOM-managed release at the single coordinated
-feature release. When done, this unblocks the template (slice 2-twin) and v4 adoption (slice 4).
+the parent `claude-code-capture.version` property (SNAPSHOT-first, DESIGN §9 / A3). It is a moving
+SNAPSHOT — re-pull with `mvn -U` when agent-journal ships an additive change (e.g. **A5**, the schema
+header line, picked up with no code change here). Switch to the BOM-managed release at the single
+coordinated feature release. When done, this unblocks the template (slice 2-twin) and v4 adoption
+(slice 4).

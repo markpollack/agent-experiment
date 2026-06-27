@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import io.github.markpollack.journal.Experiment;
 import io.github.markpollack.journal.Journal;
 import io.github.markpollack.journal.Run;
+import io.github.markpollack.journal.RunBuilder;
 import io.github.markpollack.journal.claude.RunRecorder;
 import io.github.markpollack.journal.storage.JournalStorage;
 import io.github.markpollack.journal.storage.JsonFileStorage;
@@ -26,7 +27,7 @@ import org.slf4j.LoggerFactory;
  * &lt;runDir&gt;/journal/                              ← {@link #journalRoot(Path)}; JsonFileStorage baseDir
  *   experiments/&lt;experimentName&gt;/
  *     runs/&lt;runId&gt;/
- *       run.json        ← carries config.itemId / config.itemSlug for item attribution
+ *       run.json        ← config carries {variant, itemId, itemSlug, model, session?} + tags; id = runId
  *       events.jsonl    ← immutable execution events (LLMCallEvent, ToolCallEvent, …)
  *       analysis.jsonl  ← derived StepCostEvents, keyed by tool_use id
  * </pre>
@@ -35,10 +36,13 @@ import org.slf4j.LoggerFactory;
  * {@code <outputDir>/<exp>/sessions/<session>/<variant>} (session). This is a
  * discoverable, config-free path: the ETL globs
  * {@code **}{@code /journal/experiments/*}{@code /runs/*}{@code
- * /analysis.jsonl} and recovers the item from each run's {@code itemId} config. It
- * refines the frozen §4 proposal ({@code journal/<item>/…}) to the journal-core-native
- * experiment→runs layout, because run ids are library-generated UUIDs and the ETL
- * ({@code load_trace_jsonl}) is built around the experiment/run tree.
+ * /analysis.jsonl} and recovers {@code (variant, item, runId)} from each run's
+ * {@code run.json} {@code config} — <em>from the journal alone</em>, no result-store
+ * re-join. It refines the frozen §4 proposal ({@code journal/<item>/…}) to the
+ * journal-core-native experiment→runs layout, because run ids are library-generated UUIDs
+ * and the ETL ({@code load_trace_jsonl}) is built around the experiment/run tree. (The
+ * journal experiment dir {@code <exp>} is the experiment <em>name</em>, not the variant —
+ * per-arm grouping is by {@code config.variant}, not by directory.)
  *
  * <h2>Global context handling</h2>
  *
@@ -117,13 +121,27 @@ public final class ExperimentJournal {
 	/**
 	 * Opens the journal {@link Run} for one dataset item. When disabled, returns a no-op
 	 * journal.
+	 *
+	 * <p>
+	 * The run's {@code config} is the join surface the measurement ETL (slice 4) reads
+	 * from {@code run.json} — so {@code (variant, item, runId)} is recoverable <em>from
+	 * the journal alone</em>, without re-joining the result store. {@code variant} is the
+	 * arm/variant label cost-weighted {@code V(EXPLORE)} groups by; it is always written
+	 * (the non-session single-arm sentinel is {@code "default"}). {@code model} and
+	 * {@code itemId}/{@code itemSlug} round out the key.
+	 * {@code variant}/{@code itemId}/{@code session} are also tags.
 	 * @param itemId the dataset item id (becomes the run name + {@code itemId} config)
 	 * @param itemSlug the dataset item slug (recorded as {@code itemSlug} config)
 	 * @param model the model id (recorded as {@code model} config — read by the recorder
 	 * for LLM events)
+	 * @param variant the arm/variant label (recorded as {@code variant} config + tag);
+	 * the grouping key for per-arm measurement. Never null — use {@code "default"} for
+	 * single-arm runs.
+	 * @param session the sweep session id, or null for non-session runs (recorded as
+	 * {@code session} config + tag when present)
 	 * @return a journal for the item's phases
 	 */
-	public RunJournal openItem(String itemId, String itemSlug, String model) {
+	public RunJournal openItem(String itemId, String itemSlug, String model, String variant, @Nullable String session) {
 		if (storage == null) {
 			return RunJournal.noop();
 		}
@@ -132,14 +150,18 @@ public final class ExperimentJournal {
 			JournalStorage previous = Journal.storage();
 			Journal.configure(storage);
 			try {
-				Run run = Journal.run(experimentName)
+				RunBuilder builder = Journal.run(experimentName)
 					.name(itemId)
 					.config("model", model)
 					.config("itemId", itemId)
 					.config("itemSlug", itemSlug)
+					.config("variant", variant)
 					.tag("itemId", itemId)
-					.start();
-				recorder = new RunRecorder(run, storage);
+					.tag("variant", variant);
+				if (session != null) {
+					builder = builder.config("session", session).tag("session", session);
+				}
+				recorder = new RunRecorder(builder.start(), storage);
 			}
 			finally {
 				Journal.configure(previous);

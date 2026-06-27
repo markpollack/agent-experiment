@@ -32,7 +32,9 @@ consumes.
   `RunRecorder` (auto-emits `StepCostEvent` → `analysis.jsonl`). No custom recorder.
 - **Convention = journal-core-native experiment→runs** under `<runDir>/journal/`, not the literal §4
   `journal/<item>/…` (run ids are library UUIDs; the ETL is built around the experiment/run tree).
-  Item attribution via `run.json` `itemId` config. Refinement recorded as canonical **A4**.
+  Per-arm grouping via `run.json` **`config.variant`** (+ `itemId`/`itemSlug`/`model`/`session`).
+  Refinement **surfaced to the contract owner to record as A4** — canonical DESIGN is read-only to
+  stewards.
 - **On by default when `outputDir` is set**; `withoutJournal()` opt-out; no-output-dir → WARN + no-op.
 - **Process-global `Journal` context is bracketed and restored** under a lock in `ExperimentJournal`
   — never left reconfigured, never raced across parallel experiment runs.
@@ -193,6 +195,32 @@ consumes.
 
 ---
 
+### Step 1.7: Review response (variant seam, concurrency, A5)
+
+**Entry criteria**:
+- [x] Step 1.6 complete; slice-2 review + coordinator sync received
+
+**Work items**:
+- [x] Q1 (critical): write the arm/variant label into `run.json` `config.variant` (+ `model`,
+      `session`, `itemId`/`itemSlug`; `variant`/`itemId`/`session` tags), threaded from `ActiveSession`;
+      `"default"` sentinel for non-session runs — so `(variant, item, runId)` is recoverable from the
+      journal alone (no result-store re-join)
+- [x] Q2: add `ExperimentJournalConcurrencyTest` — 8 arms concurrently, assert isolated journals + no
+      cross-run event leakage through the global-context-under-lock swap
+- [x] Q3: document the stable `run.json` field set for ACT; confirm the A4 glob final
+- [x] A5: `mvn -U` to pick up the refreshed 1.6.0-SNAPSHOT (schema header line); filter `@type` in test
+      parsers; assert the header (no production code change)
+- [x] Revert the direct A4 edit to the canonical design; surface A4 to the contract owner instead
+      (canonical DESIGN is read-only to stewards)
+
+**Exit criteria**:
+- [x] `variant` present in `run.json`; concurrency test green; full reactor green with `-U`
+- [x] Update `ROADMAP.md` checkboxes; ping the contract owner (A4 to record, A5 + integrity check)
+
+**Deliverables**: ACT-ready join surface (`config.variant`), concurrency proof, A5 pickup.
+
+---
+
 ### Step 1.K: Consolidation, QA Review & Handoff
 
 **Entry criteria**:
@@ -244,3 +272,4 @@ canonical doc first, as A4 here).
 | Timestamp | Change | Trigger |
 |-----------|--------|---------|
 | 2026-06-27T15:00-04:00 | Initial roadmap; Stage 1 implemented and green | `plans/inbox/journal-capture-handoff.md` |
+| 2026-06-27T16:00-04:00 | Step 1.7: variant in run.json, concurrency test, A5 pickup, canonical read-only | slice-2 review + coordinator sync |

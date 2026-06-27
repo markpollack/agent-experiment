@@ -15,7 +15,9 @@ import io.github.markpollack.experiment.dataset.DatasetManager;
 import io.github.markpollack.experiment.dataset.FileSystemDatasetManager;
 import io.github.markpollack.experiment.dataset.ItemFilter;
 import io.github.markpollack.experiment.result.ExperimentResult;
+import io.github.markpollack.experiment.store.ActiveSession;
 import io.github.markpollack.experiment.store.InMemoryResultStore;
+import io.github.markpollack.experiment.store.InMemorySessionStore;
 import io.github.markpollack.journal.Journal;
 import io.github.markpollack.journal.claude.PhaseCapture;
 import io.github.markpollack.journal.claude.ToolUseRecord;
@@ -119,6 +121,9 @@ class AgentExperimentJournalTest {
 					continue;
 				}
 				JsonNode node = MAPPER.readTree(line);
+				if (!isStepCost(node)) {
+					continue; // skip the A5 schema header line
+				}
 				sum += node.get("attributedCostUsd").asDouble();
 				runTotal = node.get("actualRunCostUsd").asDouble();
 			}
@@ -153,16 +158,102 @@ class AgentExperimentJournalTest {
 		assertThat(result.items()).allMatch(i -> i.success());
 	}
 
+	@Test
+	void sessionRunJsonCarriesVariantItemModelSession(@TempDir Path outputDir) throws Exception {
+		// A sweep arm: the variant/session must be recoverable from the journal alone
+		// (run.json),
+		// so the measurement ETL can group per-arm without re-joining the result store.
+		InMemorySessionStore sessionStore = new InMemorySessionStore();
+		sessionStore.createSession("sweep-1", "journal-test-experiment", Map.of());
+		ActiveSession arm = new ActiveSession("sweep-1", "journal-test-experiment", "explorer-handoff");
+
+		mockAgent.defaultResult(
+				ctx -> InvocationResult.fromPhases(List.of(twoToolPhase()), 1500, "session-abc", ctx.metadata()));
+		ExperimentConfig config = baseConfig().outputDir(outputDir).build();
+		AgentExperiment runner = new AgentExperiment(datasetManager, passingJury(), resultStore, sessionStore, config);
+
+		runner.run(mockAgent, arm);
+
+		List<Path> runJsons = findFiles(outputDir, "run.json");
+		assertThat(runJsons).isNotEmpty();
+		for (Path runJson : runJsons) {
+			JsonNode config0 = MAPPER.readTree(runJson.toFile()).get("config");
+			assertThat(config0.get("variant").asText()).isEqualTo("explorer-handoff");
+			assertThat(config0.get("session").asText()).isEqualTo("sweep-1");
+			assertThat(config0.get("model").asText()).isEqualTo("opus");
+			assertThat(config0.has("itemId")).isTrue();
+			assertThat(config0.has("itemSlug")).isTrue();
+		}
+		// The arm label also lives under sessions/<session>/<variant>/ in the path.
+		assertThat(runJsons).allSatisfy(p -> assertThat(p.toString()).contains("sessions/sweep-1/explorer-handoff"));
+	}
+
+	@Test
+	void nonSessionRunUsesDefaultVariant(@TempDir Path outputDir) throws Exception {
+		mockAgent.defaultResult(
+				ctx -> InvocationResult.fromPhases(List.of(twoToolPhase()), 1500, "session-abc", ctx.metadata()));
+		ExperimentConfig config = baseConfig().outputDir(outputDir).build();
+		AgentExperiment runner = new AgentExperiment(datasetManager, passingJury(), resultStore, config);
+
+		runner.run(mockAgent);
+
+		List<Path> runJsons = findFiles(outputDir, "run.json");
+		assertThat(runJsons).isNotEmpty();
+		for (Path runJson : runJsons) {
+			JsonNode config0 = MAPPER.readTree(runJson.toFile()).get("config");
+			assertThat(config0.get("variant").asText()).isEqualTo("default");
+			assertThat(config0.has("session")).isFalse();
+		}
+	}
+
+	@Test
+	void journalStreamsStartWithA5SchemaHeader(@TempDir Path outputDir) throws Exception {
+		// A5 (additive): each events.jsonl/analysis.jsonl now opens with a schema header
+		// line.
+		// The recorder emits it (no code change here); only raw-jsonl readers (ACT) skip
+		// it.
+		mockAgent.defaultResult(
+				ctx -> InvocationResult.fromPhases(List.of(twoToolPhase()), 1500, "session-abc", ctx.metadata()));
+		ExperimentConfig config = baseConfig().outputDir(outputDir).build();
+		AgentExperiment runner = new AgentExperiment(datasetManager, passingJury(), resultStore, config);
+
+		runner.run(mockAgent);
+
+		JsonNode analysisHeader = MAPPER
+			.readTree(Files.readAllLines(findFiles(outputDir, "analysis.jsonl").get(0)).get(0));
+		assertThat(analysisHeader.get("@type").asText()).isEqualTo("header");
+		assertThat(analysisHeader.get("schemaVersion").asInt()).isEqualTo(1);
+		assertThat(analysisHeader.get("stream").asText()).isEqualTo("analysis");
+		assertThat(analysisHeader.has("runId")).isTrue();
+
+		JsonNode eventsHeader = MAPPER.readTree(Files.readAllLines(findFiles(outputDir, "events.jsonl").get(0)).get(0));
+		assertThat(eventsHeader.get("@type").asText()).isEqualTo("header");
+		assertThat(eventsHeader.get("stream").asText()).isEqualTo("events");
+	}
+
 	private List<JsonNode> readAllStepCosts(Path outputDir) throws Exception {
 		List<JsonNode> nodes = new java.util.ArrayList<>();
 		for (Path analysis : findFiles(outputDir, "analysis.jsonl")) {
 			for (String line : Files.readAllLines(analysis)) {
-				if (!line.isBlank()) {
-					nodes.add(MAPPER.readTree(line));
+				if (line.isBlank()) {
+					continue;
+				}
+				JsonNode node = MAPPER.readTree(line);
+				if (isStepCost(node)) {
+					nodes.add(node);
 				}
 			}
 		}
 		return nodes;
+	}
+
+	/**
+	 * True for a derived step-cost event; false for the A5 schema header (and other event
+	 * kinds).
+	 */
+	private static boolean isStepCost(JsonNode node) {
+		JsonNode type = node.get("@type");
+		return type != null && "step_cost".equals(type.asText());
 	}
 
 	private static List<Path> findFiles(Path root, String fileName) {
