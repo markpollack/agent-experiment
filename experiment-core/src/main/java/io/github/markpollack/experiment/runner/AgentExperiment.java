@@ -37,6 +37,8 @@ import io.github.markpollack.experiment.dataset.DatasetItem;
 import io.github.markpollack.experiment.dataset.DatasetManager;
 import io.github.markpollack.experiment.dataset.DatasetVersion;
 import io.github.markpollack.experiment.dataset.ResolvedItem;
+import io.github.markpollack.experiment.journal.ExperimentJournal;
+import io.github.markpollack.experiment.journal.RunJournal;
 import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.result.ItemResult;
 import io.github.markpollack.experiment.result.KnowledgeManifest;
@@ -46,6 +48,7 @@ import io.github.markpollack.experiment.scoring.VerdictExtractor;
 import io.github.markpollack.experiment.store.ActiveSession;
 import io.github.markpollack.experiment.store.ResultStore;
 import io.github.markpollack.experiment.store.SessionStore;
+import io.github.markpollack.journal.claude.PhaseCapture;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,9 +179,11 @@ public class AgentExperiment {
 
 		logger.info("Loaded dataset '{}' v{} ({} items)", dataset.name(), version.semanticVersion(), items.size());
 
+		ExperimentJournal experimentJournal = openExperimentJournal(runDir);
+
 		List<ItemResult> results = new ArrayList<>();
 		for (DatasetItem item : items) {
-			ItemResult result = runItem(agentInvoker, item, experimentId, runDir, activeSession);
+			ItemResult result = runItem(agentInvoker, item, experimentId, runDir, activeSession, experimentJournal);
 			results.add(result);
 			logger.info("Item {}: {} (passed={}, cost=${}, tokens={})", item.id(), item.slug(), result.passed(),
 					String.format("%.4f", result.costUsd()), result.totalTokens());
@@ -226,8 +231,52 @@ public class AgentExperiment {
 		return experimentResult;
 	}
 
+	/**
+	 * Opens the experiment's run journal. On by default; a durable journal needs a run
+	 * directory (it is written beside the experiment artifacts). When journaling is
+	 * requested but there is no output directory, announce the degradation once
+	 * (fail-loud spirit) and fall back to a no-op.
+	 */
+	private ExperimentJournal openExperimentJournal(@Nullable Path runDir) {
+		if (!config.shouldJournal()) {
+			return ExperimentJournal.disabled(config.experimentName());
+		}
+		if (runDir == null) {
+			logger.warn("Journaling is enabled but no outputDir is configured — the canonical per-step "
+					+ "cost journal (analysis.jsonl) will not be written. Set outputDir, or call "
+					+ "withoutJournal() to silence this.");
+			return ExperimentJournal.disabled(config.experimentName());
+		}
+		return ExperimentJournal.open(ExperimentJournal.journalRoot(runDir), config.experimentName());
+	}
+
+	/**
+	 * Records every {@link PhaseCapture} the invoker returned into a per-item journal
+	 * run. Journal failures are logged but never demote an otherwise-good item result —
+	 * except the slice-1 fail-loud {@code IllegalStateException} (derived events on
+	 * non-durable storage), which is a configuration bug the caller must see, so it
+	 * propagates.
+	 */
+	private void journalItem(ExperimentJournal experimentJournal, DatasetItem item, InvocationResult invocationResult) {
+		if (!experimentJournal.enabled()) {
+			return;
+		}
+		try (RunJournal journal = experimentJournal.openItem(item.id(), item.slug(), config.model())) {
+			for (PhaseCapture phase : invocationResult.phases()) {
+				journal.recordPhase(phase);
+			}
+			journal.finish();
+		}
+		catch (IllegalStateException ex) {
+			throw ex;
+		}
+		catch (RuntimeException ex) {
+			logger.error("Failed to journal run for item {}: {}", item.id(), ex.getMessage(), ex);
+		}
+	}
+
 	ItemResult runItem(AgentInvoker agentInvoker, DatasetItem item, String experimentId, @Nullable Path runDir,
-			@Nullable ActiveSession activeSession) {
+			@Nullable ActiveSession activeSession, ExperimentJournal experimentJournal) {
 		long startTime = System.currentTimeMillis();
 		Path workspace = null;
 		try {
@@ -247,6 +296,13 @@ public class AgentExperiment {
 
 			InvocationResult invocationResult = invokeWithTimeout(agentInvoker, context);
 			long durationMs = System.currentTimeMillis() - startTime;
+
+			// Own the run-journal lifecycle here — the framework, not the invoker (DESIGN
+			// §4). The
+			// invoker stays dumb (it only returned PhaseCaptures); we open a Run, record
+			// each phase
+			// (auto-emitting per-step StepCostEvents to analysis.jsonl), and finish.
+			journalItem(experimentJournal, item, invocationResult);
 
 			// Efficiency evaluation — runs before success check so failed invocations get
 			// scores too

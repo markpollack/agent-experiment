@@ -32,12 +32,16 @@ import org.jspecify.annotations.Nullable;
  * null, defaults to the JVM working directory at run time
  * @param requireCleanGit when true, throw if the experiment project has uncommitted
  * changes; when false (default), log a warning and continue
+ * @param journalEnabled whether to write a canonical agent-journal trace (events +
+ * per-step cost) per item; null defaults to true. Requires {@code outputDir} (the durable
+ * journal is written beside the experiment artifacts); a no-op without one. Disable via
+ * {@code withoutJournal()} for lightweight/judge runs.
  */
 public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable ItemFilter itemFilter, String model,
 		String promptTemplate, Duration perItemTimeout, @Nullable String systemPrompt, @Nullable Path knowledgeBaseDir,
 		@Nullable Duration experimentTimeout, Map<String, String> metadata, @Nullable String baselineId,
 		@Nullable Boolean preserveWorkspaces, @Nullable Path outputDir, @Nullable EfficiencyConfig efficiencyConfig,
-		@Nullable Path projectRoot, boolean requireCleanGit) {
+		@Nullable Path projectRoot, boolean requireCleanGit, @Nullable Boolean journalEnabled) {
 
 	public ExperimentConfig {
 		java.util.Objects.requireNonNull(experimentName, "experimentName must not be null");
@@ -54,6 +58,15 @@ public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable
 	 */
 	public boolean shouldPreserveWorkspaces() {
 		return (preserveWorkspaces == null || preserveWorkspaces) && outputDir != null;
+	}
+
+	/**
+	 * Whether per-item journaling is requested. Defaults to true when
+	 * {@code journalEnabled} is null. A durable journal is only actually written when
+	 * {@code outputDir} is also set.
+	 */
+	public boolean shouldJournal() {
+		return journalEnabled == null || journalEnabled;
 	}
 
 	public static Builder builder() {
@@ -93,6 +106,8 @@ public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable
 		private @Nullable Path projectRoot;
 
 		private boolean requireCleanGit;
+
+		private @Nullable Boolean journalEnabled;
 
 		private Builder() {
 		}
@@ -177,10 +192,27 @@ public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable
 			return this;
 		}
 
+		/**
+		 * Whether to write a canonical per-item journal (events + per-step cost). Null
+		 * (the default) means enabled when an {@code outputDir} is configured.
+		 */
+		public Builder journalEnabled(@Nullable Boolean journalEnabled) {
+			this.journalEnabled = journalEnabled;
+			return this;
+		}
+
+		/**
+		 * Disables per-item journaling — the clean opt-out for lightweight/judge runs.
+		 */
+		public Builder withoutJournal() {
+			this.journalEnabled = false;
+			return this;
+		}
+
 		public ExperimentConfig build() {
 			return new ExperimentConfig(experimentName, datasetDir, itemFilter, model, promptTemplate, perItemTimeout,
 					systemPrompt, knowledgeBaseDir, experimentTimeout, metadata, baselineId, preserveWorkspaces,
-					outputDir, efficiencyConfig, projectRoot, requireCleanGit);
+					outputDir, efficiencyConfig, projectRoot, requireCleanGit, journalEnabled);
 		}
 
 	}

@@ -42,7 +42,11 @@
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
         <!-- Dependency versions -->
-        <claude-code-capture.version>1.4.0</claude-code-capture.version>
+        <!-- agent-journal (journal-core + claude-code-capture): SNAPSHOT-first for the
+             first-class journal-capture feature (DESIGN A3). Pinned to the bare
+             1.6.0-SNAPSHOT installed in ~/.m2; switches to the BOM-managed release version
+             at the single coordinated feature release. -->
+        <claude-code-capture.version>1.6.0-SNAPSHOT</claude-code-capture.version>
         <agent-judge.version>0.12.0</agent-judge.version>
         <claude-code-sdk.version>1.3.0</claude-code-sdk.version>
         <agent-workflow.version>0.9.0</agent-workflow.version>

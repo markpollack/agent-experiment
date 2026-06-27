@@ -44,10 +44,15 @@
             <artifactId>agent-judge-exec</artifactId>
         </dependency>
 
-        <!-- Phase capture data types (from agent-journal) -->
+        <!-- Phase capture data types + production RunRecorder (from agent-journal) -->
         <dependency>
             <groupId>io.github.markpollack</groupId>
             <artifactId>claude-code-capture</artifactId>
+        </dependency>
+        <!-- Journal lifecycle: Journal, Run, JsonFileStorage, StepCostEvent, AttributionMethod -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>journal-core</artifactId>
         </dependency>
 
         <!-- Logging -->
