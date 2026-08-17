@@ -18,6 +18,9 @@ bringing the project onto the currently released Java 21 AgentWorks integration 
   types.
 - Updates to Agent Journal/Capture 1.6.0, Claude Code SDK 1.4.0, Agent Workflow 0.10.0, Agent Client
   0.26.0, Agent Judge 0.14.0, and Java 21.
+- Raises the repository-governed Jackson 2, Jackson 3, and optional Logback floors to 2.21.6,
+  3.1.6, and 1.5.34 respectively, closing the validated vulnerability inventory without requiring
+  an unreleased Agent Journal/Capture dependency.
 - Adds a root-only CycloneDX 1.6 aggregate SBOM attached to the parent Maven artifact with classifier
   `cyclonedx`, plus consistent BSL license content in packaged artifacts.
 - Pins reusable build and release workflows to the approved immutable Build Tools revision and

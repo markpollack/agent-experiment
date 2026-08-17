@@ -49,7 +49,8 @@
         <agent-client.version>0.26.0</agent-client.version>
 
         <!-- Third-party dependency versions -->
-        <jackson.version>2.21.2</jackson.version>
+        <jackson.version>2.21.6</jackson.version>
+        <jackson3.version>3.1.6</jackson3.version>
         <slf4j.version>2.0.16</slf4j.version>
         <jspecify.version>1.0.0</jspecify.version>
 
@@ -58,7 +59,7 @@
         <assertj.version>3.26.3</assertj.version>
         <mockito.version>5.14.2</mockito.version>
         <archunit.version>1.4.1</archunit.version>
-        <logback.version>1.5.12</logback.version>
+        <logback.version>1.5.34</logback.version>
 
         <!-- Plugin versions -->
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
@@ -92,7 +93,7 @@
             <dependency>
                 <groupId>tools.jackson</groupId>
                 <artifactId>jackson-bom</artifactId>
-                <version>3.1.4</version>
+                <version>${jackson3.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
