@@ -10,7 +10,6 @@ import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,11 +25,11 @@ class AlwaysPassJudgeTest {
 	}
 
 	@Test
-	void returnsBooleanScoreTrue() {
+	void projectsBooleanOutcomeThroughEffectiveScore() {
 		Judgment judgment = judge.judge(context());
 
-		assertThat(judgment.score()).isInstanceOf(BooleanScore.class);
-		assertThat(((BooleanScore) judgment.score()).value()).isTrue();
+		assertThat(judgment.score()).isNull();
+		assertThat(judgment.effectiveScore()).hasValue(1.0);
 	}
 
 	@Test

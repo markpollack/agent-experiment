@@ -22,15 +22,13 @@ import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.NumericalScore;
 
 /**
  * LLM-powered Tier 3 judge for the {@link io.github.markpollack.judge.jury.CascadedJury}.
  *
  * <p>
  * Extracts VERIFY checkpoints from the execution plan's roadmap and asks Claude to
- * evaluate each criterion against the workspace. Produces a {@link NumericalScore} (0–1)
+ * evaluate each criterion against the workspace. Produces a normalized score (0–1)
  * representing the fraction of satisfied criteria, with per-criterion diagnostic metadata
  * via {@link Check} entries.
  *
@@ -105,7 +103,7 @@ public class SemanticDiffJudge implements JudgeWithMetadata {
 
 		// If ALL criteria failed due to LLM errors, return ERROR judgment
 		if (errorCount == results.size()) {
-			return Judgment.error("All " + results.size() + " criterion evaluations failed due to LLM errors", null);
+			return Judgment.error("All " + results.size() + " criterion evaluations failed due to LLM errors");
 		}
 
 		// Build checks and compute score
@@ -122,15 +120,11 @@ public class SemanticDiffJudge implements JudgeWithMetadata {
 		}
 
 		double scoreValue = (double) passed / results.size();
-		NumericalScore score = NumericalScore.normalized(scoreValue);
-		JudgmentStatus status = scoreValue >= 0.5 ? JudgmentStatus.PASS : JudgmentStatus.FAIL;
-
 		String reasoning = String.format("%d/%d criteria passed (%.0f%%)", passed, results.size(), scoreValue * 100);
 		logger.info("Semantic evaluation complete: {}", reasoning);
 
-		return Judgment.builder()
-			.score(score)
-			.status(status)
+		return Judgment.scored(scoreValue)
+			.passingAt(0.5)
 			.reasoning(reasoning)
 			.checks(checks)
 			.metadata("criteriaTotal", results.size())

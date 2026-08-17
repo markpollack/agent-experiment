@@ -26,8 +26,6 @@ import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -391,11 +389,7 @@ class AgentExperimentTest {
 
 		@Override
 		public Judgment judge(JudgmentContext context) {
-			return Judgment.builder()
-				.score(new BooleanScore(pass))
-				.status(pass ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-				.reasoning(pass ? "Passed" : "Failed")
-				.build();
+			return Judgment.verdict(pass).reasoning(pass ? "Passed" : "Failed").build();
 		}
 
 		@Override

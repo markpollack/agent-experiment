@@ -11,17 +11,21 @@ import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.result.ItemResult;
 import io.github.markpollack.experiment.result.KnowledgeFileEntry;
 import io.github.markpollack.experiment.result.KnowledgeManifest;
+import io.github.markpollack.experiment.result.RecordedCheck;
+import io.github.markpollack.experiment.result.RecordedJudgment;
+import io.github.markpollack.experiment.result.RecordedJudgmentStatus;
+import io.github.markpollack.experiment.result.RecordedVerdict;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import io.github.markpollack.judge.jury.CompositeAttempt;
+import io.github.markpollack.judge.jury.CompositeFailure;
+import io.github.markpollack.judge.jury.CompositeFailureCode;
+import io.github.markpollack.judge.jury.CompositeRelation;
+import io.github.markpollack.judge.jury.TierPolicy;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
-import io.github.markpollack.judge.score.CategoricalScore;
-import io.github.markpollack.judge.score.NumericalScore;
-import io.github.markpollack.judge.score.Score;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -44,65 +48,131 @@ class ResultObjectMapperTest {
 	}
 
 	@Test
-	void roundTripsBooleanScore() throws Exception {
-		Score original = new BooleanScore(true);
+	void readsCompleteExperiment05Judge013FixtureAndWritesNormalizedFormat() throws Exception {
+		ExperimentResult restored;
+		try (var fixture = getClass().getResourceAsStream("/compatibility/experiment-result-0.5-judge-0.13.json")) {
+			assertThat(fixture).isNotNull();
+			restored = mapper.readValue(fixture, ExperimentResult.class);
+		}
 
-		String json = mapper.writeValueAsString(original);
-		Score restored = mapper.readValue(json, Score.class);
+		assertThat(restored.experimentId()).isEqualTo("legacy-exp-013");
+		assertThat(restored.items()).hasSize(1);
+		ItemResult item = restored.items().getFirst();
+		assertThat(item.verdict().aggregated().pass()).isTrue();
+		assertThat(item.verdict().individualByName().get("quality").score()).isEqualTo(0.75);
+		assertThat(item.verdict().compositeAttempts()).singleElement().satisfies(attempt -> {
+			assertThat(attempt.name()).isEqualTo("legacy-sub-verdict-0");
+			assertThat(attempt.relation()).isEqualTo("legacy_sub_verdict");
+			assertThat(attempt.verdict().aggregated().status()).isEqualTo(RecordedJudgmentStatus.FAIL);
+		});
+		var judgeDetail = (io.github.markpollack.experiment.judge.JudgeExecutionDetail) item.executionDetail();
+		assertThat(judgeDetail.candidateJudgment().label()).isEqualTo("good");
 
-		assertThat(restored).isInstanceOf(BooleanScore.class);
-		assertThat(((BooleanScore) restored).value()).isTrue();
+		String normalized = mapper.writeValueAsString(restored);
+		assertThat(normalized).contains("\"score\" : 0.75", "\"label\" : \"good\"", "\"compositeAttempts\"");
+		assertThat(normalized).doesNotContain("subVerdicts", "allowedValues", "\"min\"", "\"max\"");
 	}
 
 	@Test
-	void roundTripsNumericalScore() throws Exception {
-		Score original = new NumericalScore(7.5, 0.0, 10.0);
+	void roundTripsRecordedJudgment() throws Exception {
+		RecordedJudgment original = new RecordedJudgment(RecordedJudgmentStatus.PASS, 0.82, "relevant",
+				"Evidence supports the claim", List.of(RecordedCheck.pass("evidence", "found")),
+				Map.of("source", "test"));
 
 		String json = mapper.writeValueAsString(original);
-		Score restored = mapper.readValue(json, Score.class);
+		RecordedJudgment restored = mapper.readValue(json, RecordedJudgment.class);
 
-		assertThat(restored).isInstanceOf(NumericalScore.class);
-		NumericalScore numerical = (NumericalScore) restored;
-		assertThat(numerical.value()).isEqualTo(7.5);
-		assertThat(numerical.min()).isEqualTo(0.0);
-		assertThat(numerical.max()).isEqualTo(10.0);
+		assertThat(restored).isEqualTo(original);
 	}
 
 	@Test
-	void roundTripsCategoricalScore() throws Exception {
-		Score original = new CategoricalScore("good", List.of("good", "fair", "poor"));
+	void readsLegacyBooleanScoreAsOutcomeOnly() throws Exception {
+		String json = """
+				{"score":{"value":true},"status":"PASS","reasoning":"ok","checks":[],"metadata":{}}
+				""";
 
-		String json = mapper.writeValueAsString(original);
-		Score restored = mapper.readValue(json, Score.class);
+		RecordedJudgment restored = mapper.readValue(json, RecordedJudgment.class);
 
-		assertThat(restored).isInstanceOf(CategoricalScore.class);
-		CategoricalScore categorical = (CategoricalScore) restored;
-		assertThat(categorical.value()).isEqualTo("good");
-		assertThat(categorical.allowedValues()).containsExactly("good", "fair", "poor");
+		assertThat(restored.status()).isEqualTo(RecordedJudgmentStatus.PASS);
+		assertThat(restored.score()).isNull();
+		assertThat(restored.effectiveScore()).hasValue(1.0);
+	}
+
+	@Test
+	void readsLegacyNumericalScoreAsNormalizedMeasurement() throws Exception {
+		String json = """
+				{"score":{"value":7.5,"min":0.0,"max":10.0},"status":"PASS","reasoning":"ok","checks":[],"metadata":{}}
+				""";
+
+		RecordedJudgment restored = mapper.readValue(json, RecordedJudgment.class);
+
+		assertThat(restored.score()).isEqualTo(0.75);
+	}
+
+	@Test
+	void rejectsLegacyNumericalScoreWithInvalidRange() {
+		String json = """
+				{"score":{"value":7.5,"min":10.0,"max":10.0},"status":"PASS","reasoning":"bad","checks":[],"metadata":{}}
+				""";
+
+		assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> mapper.readValue(json, RecordedJudgment.class)))
+			.hasMessageContaining("non-positive range");
+	}
+
+	@Test
+	void readsLegacyCategoricalScoreAsLabel() throws Exception {
+		String json = """
+				{"score":{"value":"good","allowedValues":["good","fair","poor"]},"status":"PASS","reasoning":"ok","checks":[],"metadata":{}}
+				""";
+
+		RecordedJudgment restored = mapper.readValue(json, RecordedJudgment.class);
+
+		assertThat(restored.label()).isEqualTo("good");
+		assertThat(restored.score()).isNull();
 	}
 
 	@Test
 	void roundTripsVerdict() throws Exception {
 		Judgment judgment = Judgment.builder()
-			.score(new BooleanScore(true))
-			.status(JudgmentStatus.PASS)
+			.pass()
 			.reasoning("All checks passed")
 			.check(Check.pass("build", "compiled successfully"))
 			.build();
-		Verdict original = Verdict.builder()
+		RecordedVerdict original = RecordedVerdict.from(Verdict.builder()
 			.aggregated(judgment)
 			.individual(List.of(judgment))
 			.individualByName(Map.of("build_judge", judgment))
 			.weights(Map.of("build_judge", 1.0))
-			.build();
+			.build());
 
 		String json = mapper.writeValueAsString(original);
-		Verdict restored = mapper.readValue(json, Verdict.class);
+		RecordedVerdict restored = mapper.readValue(json, RecordedVerdict.class);
 
 		assertThat(restored.aggregated().pass()).isTrue();
 		assertThat(restored.aggregated().reasoning()).isEqualTo("All checks passed");
 		assertThat(restored.individualByName()).containsKey("build_judge");
 		assertThat(restored.aggregated().checks()).hasSize(1);
+	}
+
+	@Test
+	void recordsAndRoundTripsCompositeFailureCode() throws Exception {
+		Judgment failure = Judgment.error("tier did not return a verdict");
+		Verdict live = Verdict.builder()
+			.aggregated(failure)
+			.compositeAttempts(List.of(new CompositeAttempt("tier-1", CompositeRelation.CASCADE_TIER,
+					TierPolicy.FINAL_TIER, null, new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED))))
+			.build();
+
+		RecordedVerdict restored = mapper.readValue(mapper.writeValueAsString(RecordedVerdict.from(live)),
+				RecordedVerdict.class);
+
+		assertThat(restored.compositeAttempts()).singleElement().satisfies(attempt -> {
+			assertThat(attempt.name()).isEqualTo("tier-1");
+			assertThat(attempt.relation()).isEqualTo("cascade_tier");
+			assertThat(attempt.policy()).isEqualTo("FINAL_TIER");
+			assertThat(attempt.failureCode()).isEqualTo("jury_execution_failed");
+			assertThat(attempt.verdict()).isNull();
+		});
 	}
 
 	@Test
@@ -217,11 +287,7 @@ class ResultObjectMapperTest {
 
 	@Test
 	void roundTripsItemResultWithJudgeExecutionDetail() throws Exception {
-		io.github.markpollack.judge.result.Judgment candidateJudgment = Judgment.builder()
-			.score(new BooleanScore(true))
-			.status(JudgmentStatus.PASS)
-			.reasoning("Passed")
-			.build();
+		io.github.markpollack.judge.result.Judgment candidateJudgment = Judgment.pass("Passed");
 		io.github.markpollack.experiment.judge.JudgeScorerResult scorerResult = new io.github.markpollack.experiment.judge.JudgeScorerResult(
 				true, 1.0, "Expected PASS, got PASS");
 		io.github.markpollack.experiment.judge.JudgeExecutionDetail judgeDetail = new io.github.markpollack.experiment.judge.JudgeExecutionDetail(

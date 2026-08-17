@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.result.ItemResult;
+import io.github.markpollack.experiment.result.RecordedVerdict;
 import io.github.markpollack.experiment.scoring.VerdictExtractor;
 import io.github.markpollack.experiment.store.ResultStore;
 import io.github.markpollack.judge.context.JudgmentContext;
@@ -104,7 +105,7 @@ public final class ReEvaluator {
 		return original.toBuilder()
 			.passed(VerdictExtractor.passed(verdict))
 			.scores(VerdictExtractor.extractScores(verdict))
-			.verdict(verdict)
+			.verdict(RecordedVerdict.from(verdict))
 			.metadata(merge(original.metadata(),
 					Map.of("reEvaluated", "true", "systemReinvoked", "false", "originalCostUsd",
 							String.valueOf(original.costUsd()), "reEvaluationJury", jury.getClass().getSimpleName())))

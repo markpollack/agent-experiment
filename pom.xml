@@ -43,10 +43,7 @@
 
         <!-- Dependency versions -->
         <claude-code-capture.version>1.6.0</claude-code-capture.version>
-        <!-- Agent Judge 0.14 replaces the score hierarchy and composite verdict shape.
-             Agent Experiment persists both, so that migration is a separate public data
-             contract change rather than a dependency-only 0.6.0 release update. -->
-        <agent-judge.version>0.13.0</agent-judge.version>
+        <agent-judge.version>0.14.0</agent-judge.version>
         <claude-code-sdk.version>1.4.0</claude-code-sdk.version>
         <agent-workflow.version>0.10.0</agent-workflow.version>
         <agent-client.version>0.26.0</agent-client.version>
@@ -264,8 +261,8 @@
                             <configuration>
                                 <rules>
                                     <requireJavaVersion>
-                                        <version>[17,)</version>
-                                        <message>Java 17+ is required.</message>
+                                        <version>[21,)</version>
+                                        <message>Java 21+ is required.</message>
                                     </requireJavaVersion>
                                 </rules>
                             </configuration>

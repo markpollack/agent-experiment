@@ -4,8 +4,8 @@ import java.util.List;
 
 import io.github.markpollack.experiment.pipeline.AnalysisEnvelope;
 import io.github.markpollack.experiment.pipeline.ExecutionPlan;
+import io.github.markpollack.experiment.result.RecordedVerdict;
 import org.jspecify.annotations.Nullable;
-import io.github.markpollack.judge.jury.Verdict;
 
 /**
  * Classifies judge failures into structured {@link GapCategory} values.
@@ -24,6 +24,15 @@ public interface GapClassifier {
 	 * @param plan the pipeline execution plan (nullable)
 	 * @return diagnostic checks with gap classifications
 	 */
-	List<DiagnosticCheck> classify(Verdict verdict, @Nullable AnalysisEnvelope analysis, @Nullable ExecutionPlan plan);
+	List<DiagnosticCheck> classify(RecordedVerdict verdict, @Nullable AnalysisEnvelope analysis,
+			@Nullable ExecutionPlan plan);
+
+	/**
+	 * Classify a live verdict after projecting it to the stable recorded representation.
+	 */
+	default List<DiagnosticCheck> classify(io.github.markpollack.judge.jury.Verdict verdict,
+			@Nullable AnalysisEnvelope analysis, @Nullable ExecutionPlan plan) {
+		return classify(RecordedVerdict.from(verdict), analysis, plan);
+	}
 
 }

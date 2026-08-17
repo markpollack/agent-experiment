@@ -10,12 +10,12 @@ import java.util.function.Function;
 import io.github.markpollack.experiment.dataset.DatasetItem;
 import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.result.ItemResult;
+import io.github.markpollack.experiment.result.RecordedJudgment;
+import io.github.markpollack.experiment.result.RecordedVerdict;
 import io.github.markpollack.experiment.store.ResultStore;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.NumericalScore;
 import io.github.markpollack.judge.jury.Verdict;
 
 /**
@@ -101,19 +101,18 @@ public final class JudgeExperiment {
 			.success(true)
 			.passed(scorerResult.match())
 			.scores(Map.of("agreement", scorerResult.score()))
-			.verdict(verdict)
-			.executionDetail(new JudgeExecutionDetail(actual, expectedLabel, scorerResult))
+			.verdict(RecordedVerdict.from(verdict))
+			.executionDetail(new JudgeExecutionDetail(RecordedJudgment.from(actual), expectedLabel, scorerResult))
 			.metadata(Map.of("experimentType", "judge", "expectedLabel", expectedLabel))
 			.build();
 	}
 
 	private Verdict toVerdict(JudgeScorerResult scorerResult) {
-		Judgment judgment = Judgment.builder()
-			.status(scorerResult.match() ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-			.score(new NumericalScore(scorerResult.score(), 0.0, 1.0))
+		Judgment judgment = Judgment.verdict(scorerResult.match())
+			.score(scorerResult.score())
 			.reasoning(scorerResult.reasoning())
 			.build();
-		return Verdict.builder().aggregated(judgment).individualByName(Map.of("scorer", judgment)).build();
+		return Verdict.single("scorer", judgment);
 	}
 
 	private static Map<String, Double> aggregateScores(List<ItemResult> items) {

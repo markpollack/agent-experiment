@@ -1,7 +1,7 @@
 # agent-experiment
 
 ## Build
-- Multi-module Maven project: `experiment-core` (abstractions + runner) and `experiment-claude` (Claude SDK impl)
+- Multi-module Maven project: `experiment-core` (abstractions + runner), `experiment-claude` (Claude SDK impl), and `experiment-workflow` (Agent Workflow adapter)
 - Build: `./mvnw test` or `./mvnw verify`
 - Java 21
 
@@ -29,13 +29,13 @@
 
 ## Dependencies
 - All dependencies use `io.github.markpollack` groupId (migrated from org.springaicommunity)
-- agent-judge-core/exec: 0.13.0. Version 0.14 changes the public and persisted score/verdict contract and is intentionally deferred to a separate compatibility release.
+- agent-judge-core/exec: 0.14.0. Runtime code uses normalized `Judgment`/`Verdict`; persisted results use Agent Experiment-owned `RecordedJudgment`/`RecordedVerdict` projections. The result mapper reads the legacy 0.5/Judge 0.13 score and `subVerdicts` shapes and writes only the normalized format.
 - claude-code-sdk: 1.4.0, package `io.github.markpollack.claude.agent.sdk.*`
 - agent-journal (`journal-core` + `claude-code-capture`): 1.6.0. `journal-core` is a direct `experiment-core` dependency (`Journal`, `Run`, `JsonFileStorage`, `StepCostEvent`, `AttributionMethod`).
 - agent-workflow: 0.10.0; agent-client: 0.26.0
 
 ## Key Packages
-- `io.github.markpollack.experiment.result` — ExperimentResult, ItemResult, ExecutionDetail
+- `io.github.markpollack.experiment.result` — ExperimentResult, ItemResult, ExecutionDetail, RecordedJudgment, RecordedVerdict
 - `io.github.markpollack.experiment.agent` — AgentInvoker, InvocationResult, InvocationContext
 - `io.github.markpollack.experiment.runner` — AgentExperiment (orchestrates agent experiments)
 - `io.github.markpollack.experiment.runner.workspace` — WorkspaceProvisioner seam, DefaultWorkspaceProvisioner (file fixture), GitWorkspaceProvisioner (checks out `beforeRef`), WorkspaceStrategy

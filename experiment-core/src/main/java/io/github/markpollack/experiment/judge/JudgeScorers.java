@@ -1,8 +1,5 @@
 package io.github.markpollack.experiment.judge;
 
-import io.github.markpollack.judge.score.CategoricalScore;
-import io.github.markpollack.judge.score.NumericalScore;
-
 /**
  * Built-in {@link JudgeScorer} implementations.
  */
@@ -20,10 +17,10 @@ public final class JudgeScorers {
 		};
 	}
 
-	/** CategoricalScore value must match expected label (case-insensitive). */
+	/** Judgment label must match expected label (case-insensitive). */
 	public static JudgeScorer exactCategoryMatch() {
 		return input -> {
-			String actualCategory = input.actual().score() instanceof CategoricalScore cs ? cs.value()
+			String actualCategory = input.actual().label() != null ? input.actual().label()
 					: input.actual().status().name();
 			boolean match = actualCategory.equalsIgnoreCase(input.expectedLabel());
 			return new JudgeScorerResult(match, match ? 1.0 : 0.0,
@@ -31,7 +28,7 @@ public final class JudgeScorers {
 		};
 	}
 
-	/** NumericalScore must be within tolerance of expected numeric value. */
+	/** Normalized measured score must be within tolerance of the expected value. */
 	public static JudgeScorer numericalTolerance(double tolerance) {
 		return input -> {
 			double expectedVal;
@@ -41,8 +38,7 @@ public final class JudgeScorers {
 			catch (NumberFormatException e) {
 				return new JudgeScorerResult(false, 0.0, "Expected numeric label, got: " + input.expectedLabel());
 			}
-			double actualVal = input.actual().score() instanceof NumericalScore ns ? ns.normalized()
-					: (input.actual().pass() ? 1.0 : 0.0);
+			double actualVal = input.actual().effectiveScore().orElse(input.actual().pass() ? 1.0 : 0.0);
 			double delta = Math.abs(actualVal - expectedVal);
 			boolean match = delta <= tolerance;
 			return new JudgeScorerResult(match, Math.max(0.0, 1.0 - delta),

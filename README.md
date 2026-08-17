@@ -73,9 +73,17 @@ profile without database updates:
 
 Agent Experiment is a released, pre-1.0 framework: the core lifecycle, stores, comparisons,
 journals, Claude integration, and workflow adapter have automated coverage, while APIs may still
-change between minor versions. Version 0.6 deliberately retains Agent Judge 0.13 because the 0.14
-normalized-Judgment migration changes Agent Experiment's public and persisted result contract; that
-migration belongs in a separately reviewed release.
+change between minor versions. Version 0.6 uses Agent Judge 0.14's normalized `Judgment` and complete
+composite-attempt model. Persisted `ItemResult` verdicts and judge execution details use
+Agent Experiment-owned `RecordedVerdict` and `RecordedJudgment` values so stored results no longer
+depend directly on Agent Judge implementation types.
+
+Results written by Agent Experiment 0.5 with Agent Judge 0.13 remain readable. On read, Boolean
+scores use their judgment status, ranged numerical scores are normalized to `[0.0, 1.0]`,
+categorical values become labels, and legacy `subVerdicts` become synthetic named composite
+attempts. Re-saving writes the 0.6 normalized format; obsolete range bounds, category allow-lists,
+and unavailable legacy composite names/policies cannot be reconstructed. Malformed legacy ranges
+or unknown score shapes fail explicitly during loading instead of being silently reinterpreted.
 
 ## License
 

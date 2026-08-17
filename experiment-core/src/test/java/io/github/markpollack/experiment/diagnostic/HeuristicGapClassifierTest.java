@@ -5,11 +5,12 @@ import java.util.Map;
 
 import io.github.markpollack.experiment.pipeline.ExecutionPlan;
 import org.junit.jupiter.api.Test;
+import io.github.markpollack.judge.jury.CompositeAttempt;
+import io.github.markpollack.judge.jury.CompositeRelation;
+import io.github.markpollack.judge.jury.TierPolicy;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -38,8 +39,7 @@ class HeuristicGapClassifierTest {
 	void buildFailureClassifiedAsAgentExecutionGap() {
 		Verdict verdict = verdictWithJudge("CommandJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("Build failed")
 					.check(Check.fail("command_execution", "Command failed"))
 					.build());
@@ -59,8 +59,7 @@ class HeuristicGapClassifierTest {
 
 		Verdict verdict = verdictWithJudge("JavaxMigrationJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("javax.persistence remaining")
 					.check(Check.fail("javax.persistence removed", "38 residual imports"))
 					.build());
@@ -78,8 +77,7 @@ class HeuristicGapClassifierTest {
 
 		Verdict verdict = verdictWithJudge("JavaxMigrationJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("javax.xml.bind remaining")
 					.check(Check.fail("javax.xml.bind removed", "2 residual imports"))
 					.build());
@@ -108,8 +106,7 @@ class HeuristicGapClassifierTest {
 	void testInvarianceFailIsAgentExecutionGap() {
 		Verdict verdict = verdictWithJudge("TestInvarianceJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("Test count decreased")
 					.check(Check.fail("count_non_decreasing", "40 < 41"))
 					.build());
@@ -129,8 +126,7 @@ class HeuristicGapClassifierTest {
 
 		Verdict verdict = verdictWithJudge("DependencyVersionJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("Version mismatch")
 					.check(Check.fail("boot_version_valid", "Boot 2.7.3 != 3.0.0"))
 					.build());
@@ -147,8 +143,7 @@ class HeuristicGapClassifierTest {
 
 		Verdict verdict = verdictWithJudge("DependencyVersionJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("Version mismatch")
 					.check(Check.fail("boot_version_valid", "Boot 2.7.3 != 3.0.0"))
 					.build());
@@ -177,8 +172,7 @@ class HeuristicGapClassifierTest {
 	void semanticDiffFailOnBuildCriterionIsCriteriaGap() {
 		Verdict verdict = verdictWithJudge("SemanticDiffJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("1/2 criteria passed")
 					.check(Check.fail("./mvnw clean compile", "Build criterion"))
 					.check(Check.pass("No javax.persistence imports", "Verified"))
@@ -195,8 +189,7 @@ class HeuristicGapClassifierTest {
 	void semanticDiffFailOnMigrationCriterionIsAgentGap() {
 		Verdict verdict = verdictWithJudge("SemanticDiffJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("0/1 criteria passed")
 					.check(Check.fail("All JPA entities use jakarta.persistence", "Still using javax"))
 					.build());
@@ -213,8 +206,7 @@ class HeuristicGapClassifierTest {
 	void importDiffFailIsAgentGap() {
 		Verdict verdict = verdictWithJudge("ImportDiffJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("Imports incomplete")
 					.check(Check.fail("import_migration", "80% complete"))
 					.build());
@@ -231,8 +223,7 @@ class HeuristicGapClassifierTest {
 	void unknownJudgeGetsNullCategory() {
 		Verdict verdict = verdictWithJudge("CustomJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("Custom failure")
 					.check(Check.fail("custom_check", "Something failed"))
 					.build());
@@ -250,8 +241,7 @@ class HeuristicGapClassifierTest {
 	void passingVerdictProducesNoDiagnostics() {
 		Verdict verdict = verdictWithJudge("CommandJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.PASS)
-					.score(new BooleanScore(true))
+					.pass()
 					.reasoning("Build succeeded")
 					.check(Check.pass("command_execution", "OK"))
 					.build());
@@ -267,8 +257,7 @@ class HeuristicGapClassifierTest {
 	void multipleFailedChecksProduceMultipleDiagnostics() {
 		Verdict verdict = verdictWithJudge("JavaxMigrationJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("2 namespaces remaining")
 					.check(Check.fail("javax.persistence removed", "38 imports"))
 					.check(Check.fail("javax.validation removed", "9 imports"))
@@ -289,8 +278,7 @@ class HeuristicGapClassifierTest {
 	void classifiesSubVerdicts() {
 		Verdict tier1 = verdictWithJudge("CommandJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("Build failed")
 					.check(Check.fail("command_execution", "exit 1"))
 					.build());
@@ -299,7 +287,8 @@ class HeuristicGapClassifierTest {
 			.aggregated(tier1.aggregated())
 			.individual(tier1.individual())
 			.individualByName(tier1.individualByName())
-			.subVerdicts(List.of(tier1))
+			.compositeAttempts(List
+				.of(new CompositeAttempt("tier-1", CompositeRelation.CASCADE_TIER, TierPolicy.FINAL_TIER, tier1, null)))
 			.build();
 
 		List<DiagnosticCheck> checks = classifier.classify(cascaded, null, null);

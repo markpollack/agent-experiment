@@ -5,20 +5,14 @@ import java.util.Map;
 
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.score.BooleanScore;
-import io.github.markpollack.judge.score.NumericalScore;
-import io.github.markpollack.judge.score.Score;
 
 /**
  * Extracts per-judge normalized scores from a {@link Verdict}.
  *
  * <p>
- * Normalizes each judge's score to the [0, 1] range for cross-run comparison:
- * <ul>
- * <li>{@link BooleanScore}: {@code true} &rarr; 1.0, {@code false} &rarr; 0.0</li>
- * <li>{@link NumericalScore}: delegates to {@link NumericalScore#normalized()}</li>
- * </ul>
- * Scores that cannot be normalized (e.g., {@code CategoricalScore}) are skipped.
+ * Uses Agent Judge 0.14's {@link Judgment#effectiveScore()} so measured normalized scores
+ * are retained, Boolean PASS/FAIL outcomes project to 1.0/0.0, and ABSTAIN/ERROR remain
+ * absent rather than being manufactured as zeroes.
  */
 public final class VerdictExtractor {
 
@@ -38,15 +32,17 @@ public final class VerdictExtractor {
 	}
 
 	private static void extractScoresRecursive(Verdict verdict, Map<String, Double> scores) {
-		// Extract from sub-verdicts first (earlier tiers come first)
-		for (Verdict sub : verdict.subVerdicts()) {
-			extractScoresRecursive(sub, scores);
+		// Extract from successful composite attempts first (configuration order).
+		for (var attempt : verdict.compositeAttempts()) {
+			if (attempt.verdict() != null) {
+				extractScoresRecursive(attempt.verdict(), scores);
+			}
 		}
 		// Then extract from this verdict's own individual judgments
 		for (Map.Entry<String, Judgment> entry : verdict.individualByName().entrySet()) {
-			Double normalized = normalizeScore(entry.getValue().score());
-			if (normalized != null) {
-				scores.put(entry.getKey(), normalized);
+			var effectiveScore = entry.getValue().effectiveScore();
+			if (effectiveScore.isPresent()) {
+				scores.put(entry.getKey(), effectiveScore.getAsDouble());
 			}
 		}
 	}
@@ -58,16 +54,6 @@ public final class VerdictExtractor {
 	 */
 	public static boolean passed(Verdict verdict) {
 		return verdict.aggregated().pass();
-	}
-
-	private static Double normalizeScore(Score score) {
-		if (score instanceof BooleanScore booleanScore) {
-			return booleanScore.value() ? 1.0 : 0.0;
-		}
-		else if (score instanceof NumericalScore numericalScore) {
-			return numericalScore.normalized();
-		}
-		return null;
 	}
 
 }

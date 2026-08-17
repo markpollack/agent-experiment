@@ -5,11 +5,11 @@ import java.util.List;
 
 import io.github.markpollack.experiment.pipeline.AnalysisEnvelope;
 import io.github.markpollack.experiment.pipeline.ExecutionPlan;
+import io.github.markpollack.experiment.result.RecordedCheck;
+import io.github.markpollack.experiment.result.RecordedJudgment;
+import io.github.markpollack.experiment.result.RecordedJudgmentStatus;
+import io.github.markpollack.experiment.result.RecordedVerdict;
 import org.jspecify.annotations.Nullable;
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
 
 /**
  * Heuristic-based gap classifier that maps judge name + failure type to gap categories.
@@ -31,29 +31,31 @@ import io.github.markpollack.judge.result.JudgmentStatus;
 public class HeuristicGapClassifier implements GapClassifier {
 
 	@Override
-	public List<DiagnosticCheck> classify(Verdict verdict, @Nullable AnalysisEnvelope analysis,
+	public List<DiagnosticCheck> classify(RecordedVerdict verdict, @Nullable AnalysisEnvelope analysis,
 			@Nullable ExecutionPlan plan) {
 		List<DiagnosticCheck> results = new ArrayList<>();
 		classifyVerdict(verdict, plan, results);
 		return List.copyOf(results);
 	}
 
-	private void classifyVerdict(Verdict verdict, @Nullable ExecutionPlan plan, List<DiagnosticCheck> results) {
+	private void classifyVerdict(RecordedVerdict verdict, @Nullable ExecutionPlan plan, List<DiagnosticCheck> results) {
 		// Classify individual judgments from the main verdict
 		verdict.individualByName().forEach((judgeName, judgment) -> {
-			if (judgment.status() == JudgmentStatus.PASS) {
+			if (judgment.status() == RecordedJudgmentStatus.PASS) {
 				return;
 			}
 			classifyJudgment(judgeName, judgment, plan, results);
 		});
 
 		// Recursively classify sub-verdicts (from CascadedJury tiers)
-		for (Verdict subVerdict : verdict.subVerdicts()) {
-			classifyVerdict(subVerdict, plan, results);
+		for (var attempt : verdict.compositeAttempts()) {
+			if (attempt.verdict() != null) {
+				classifyVerdict(attempt.verdict(), plan, results);
+			}
 		}
 	}
 
-	private void classifyJudgment(String judgeName, Judgment judgment, @Nullable ExecutionPlan plan,
+	private void classifyJudgment(String judgeName, RecordedJudgment judgment, @Nullable ExecutionPlan plan,
 			List<DiagnosticCheck> results) {
 		if (judgment.checks().isEmpty()) {
 			// No checks — classify the judgment as a whole
@@ -64,7 +66,7 @@ public class HeuristicGapClassifier implements GapClassifier {
 			return;
 		}
 
-		for (Check check : judgment.checks()) {
+		for (RecordedCheck check : judgment.checks()) {
 			if (check.passed()) {
 				continue;
 			}
@@ -76,8 +78,8 @@ public class HeuristicGapClassifier implements GapClassifier {
 	}
 
 	@Nullable
-	private DiagnosticCheck classifyByJudgeName(String judgeName, JudgmentStatus status, @Nullable Check check,
-			@Nullable ExecutionPlan plan) {
+	private DiagnosticCheck classifyByJudgeName(String judgeName, RecordedJudgmentStatus status,
+			@Nullable RecordedCheck check, @Nullable ExecutionPlan plan) {
 		return switch (judgeName) {
 			case "CommandJudge" -> classifyBuildFailure(judgeName, check);
 			case "JavaxMigrationJudge" -> classifyJavaxMigration(judgeName, check, plan);
@@ -100,16 +102,16 @@ public class HeuristicGapClassifier implements GapClassifier {
 		};
 	}
 
-	private DiagnosticCheck classifyBuildFailure(String judgeName, @Nullable Check check) {
-		Check c = check != null ? check : Check.fail("build_failure", "Build failed");
+	private DiagnosticCheck classifyBuildFailure(String judgeName, @Nullable RecordedCheck check) {
+		RecordedCheck c = check != null ? check : RecordedCheck.fail("build_failure", "Build failed");
 		return new DiagnosticCheck(judgeName, c, GapCategory.AGENT_EXECUTION_GAP,
 				"Build failure indicates agent didn't produce compilable code");
 	}
 
-	private DiagnosticCheck classifyJavaxMigration(String judgeName, @Nullable Check check,
+	private DiagnosticCheck classifyJavaxMigration(String judgeName, @Nullable RecordedCheck check,
 			@Nullable ExecutionPlan plan) {
 		if (check == null) {
-			return new DiagnosticCheck(judgeName, Check.fail("javax_migration", "javax migration incomplete"),
+			return new DiagnosticCheck(judgeName, RecordedCheck.fail("javax_migration", "javax migration incomplete"),
 					GapCategory.AGENT_EXECUTION_GAP, "javax imports remaining");
 		}
 
@@ -126,21 +128,24 @@ public class HeuristicGapClassifier implements GapClassifier {
 		}
 	}
 
-	private DiagnosticCheck classifyTestInvariance(String judgeName, JudgmentStatus status, @Nullable Check check) {
-		if (status == JudgmentStatus.ABSTAIN) {
-			Check c = check != null ? check : Check.fail("test_invariance", "Surefire reports not found");
+	private DiagnosticCheck classifyTestInvariance(String judgeName, RecordedJudgmentStatus status,
+			@Nullable RecordedCheck check) {
+		if (status == RecordedJudgmentStatus.ABSTAIN) {
+			RecordedCheck c = check != null ? check
+					: RecordedCheck.fail("test_invariance", "Surefire reports not found");
 			return new DiagnosticCheck(judgeName, c, GapCategory.ANALYSIS_GAP,
 					"Surefire reports not found — build may not have run tests");
 		}
-		Check c = check != null ? check : Check.fail("test_invariance", "Tests failed or count decreased");
+		RecordedCheck c = check != null ? check
+				: RecordedCheck.fail("test_invariance", "Tests failed or count decreased");
 		return new DiagnosticCheck(judgeName, c, GapCategory.AGENT_EXECUTION_GAP,
 				"Agent broke existing tests during migration");
 	}
 
-	private DiagnosticCheck classifyDependencyVersion(String judgeName, @Nullable Check check,
+	private DiagnosticCheck classifyDependencyVersion(String judgeName, @Nullable RecordedCheck check,
 			@Nullable ExecutionPlan plan) {
 		if (check == null) {
-			return new DiagnosticCheck(judgeName, Check.fail("dependency_version", "Version mismatch"),
+			return new DiagnosticCheck(judgeName, RecordedCheck.fail("dependency_version", "Version mismatch"),
 					GapCategory.AGENT_EXECUTION_GAP, "Version upgrade not applied");
 		}
 
@@ -155,20 +160,21 @@ public class HeuristicGapClassifier implements GapClassifier {
 				"Plan didn't include version upgrade step");
 	}
 
-	private DiagnosticCheck classifyAstDiff(String judgeName, JudgmentStatus status, @Nullable Check check) {
-		if (status == JudgmentStatus.ABSTAIN) {
-			Check c = check != null ? check : Check.fail("ast_diff", "Missing beforeDir or data");
+	private DiagnosticCheck classifyAstDiff(String judgeName, RecordedJudgmentStatus status,
+			@Nullable RecordedCheck check) {
+		if (status == RecordedJudgmentStatus.ABSTAIN) {
+			RecordedCheck c = check != null ? check : RecordedCheck.fail("ast_diff", "Missing beforeDir or data");
 			return new DiagnosticCheck(judgeName, c, GapCategory.ANALYSIS_GAP,
 					"ASTDiffJudge needs beforeDir metadata — wiring issue");
 		}
-		Check c = check != null ? check : Check.fail("ast_diff", "Unexpected AST changes");
+		RecordedCheck c = check != null ? check : RecordedCheck.fail("ast_diff", "Unexpected AST changes");
 		return new DiagnosticCheck(judgeName, c, GapCategory.AGENT_EXECUTION_GAP,
 				"Agent made unexpected code changes beyond migration scope");
 	}
 
-	private DiagnosticCheck classifySemanticDiff(String judgeName, @Nullable Check check) {
+	private DiagnosticCheck classifySemanticDiff(String judgeName, @Nullable RecordedCheck check) {
 		if (check == null) {
-			return new DiagnosticCheck(judgeName, Check.fail("semantic_diff", "Semantic evaluation failed"),
+			return new DiagnosticCheck(judgeName, RecordedCheck.fail("semantic_diff", "Semantic evaluation failed"),
 					GapCategory.AGENT_EXECUTION_GAP, "Semantic criteria not met");
 		}
 
@@ -182,7 +188,7 @@ public class HeuristicGapClassifier implements GapClassifier {
 	}
 
 	@Nullable
-	private DiagnosticCheck classifyStructural(String judgeName, @Nullable Check check, GapCategory category,
+	private DiagnosticCheck classifyStructural(String judgeName, @Nullable RecordedCheck check, GapCategory category,
 			String rationale) {
 		if (check == null) {
 			return null;

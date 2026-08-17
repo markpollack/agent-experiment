@@ -15,8 +15,6 @@ import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -207,19 +205,11 @@ class ReEvaluatorTest {
 	}
 
 	private static Judge passingJudge() {
-		return ctx -> Judgment.builder()
-			.score(new BooleanScore(true))
-			.status(JudgmentStatus.PASS)
-			.reasoning("Passed")
-			.build();
+		return ctx -> Judgment.pass("Passed");
 	}
 
 	private static Judge failingJudge() {
-		return ctx -> Judgment.builder()
-			.score(new BooleanScore(false))
-			.status(JudgmentStatus.FAIL)
-			.reasoning("Failed")
-			.build();
+		return ctx -> Judgment.fail("Failed");
 	}
 
 }

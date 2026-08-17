@@ -4,7 +4,6 @@ import java.nio.file.Path;
 import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
-import io.github.markpollack.judge.jury.Verdict;
 
 /**
  * Result of evaluating a single dataset item within an experiment.
@@ -21,14 +20,14 @@ import io.github.markpollack.judge.jury.Verdict;
  * thinking_tokens, etc.)
  * @param executionDetail domain-specific execution detail (e.g. InvocationResult for
  * agent experiments)
- * @param verdict full agent-judge-core Verdict (nullable if invocation failed before
- * judging)
+ * @param verdict Agent Experiment-owned recorded verdict (nullable if invocation failed
+ * before judging)
  * @param metadata item-level metadata
  * @param workspacePath path to preserved workspace (null when not preserved)
  */
 public record ItemResult(String itemId, String itemSlug, boolean success, boolean passed, double costUsd,
 		int totalTokens, long durationMs, Map<String, Double> scores, Map<String, Object> metrics,
-		@Nullable ExecutionDetail executionDetail, @Nullable Verdict verdict, Map<String, Object> metadata,
+		@Nullable ExecutionDetail executionDetail, @Nullable RecordedVerdict verdict, Map<String, Object> metadata,
 		@Nullable Path workspacePath) {
 
 	public ItemResult {
@@ -85,7 +84,7 @@ public record ItemResult(String itemId, String itemSlug, boolean success, boolea
 
 		private @Nullable ExecutionDetail executionDetail;
 
-		private @Nullable Verdict verdict;
+		private @Nullable RecordedVerdict verdict;
 
 		private Map<String, Object> metadata = Map.of();
 
@@ -144,8 +143,14 @@ public record ItemResult(String itemId, String itemSlug, boolean success, boolea
 			return this;
 		}
 
-		public Builder verdict(@Nullable Verdict verdict) {
+		public Builder verdict(@Nullable RecordedVerdict verdict) {
 			this.verdict = verdict;
+			return this;
+		}
+
+		/** Record a live jury verdict using the stable Agent Experiment projection. */
+		public Builder verdict(io.github.markpollack.judge.jury.Verdict verdict) {
+			this.verdict = RecordedVerdict.from(verdict);
 			return this;
 		}
 

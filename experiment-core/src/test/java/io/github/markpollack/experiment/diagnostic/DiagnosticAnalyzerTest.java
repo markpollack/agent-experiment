@@ -12,8 +12,6 @@ import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,8 +26,7 @@ class DiagnosticAnalyzerTest {
 		ExperimentResult result = experimentWith(itemWithVerdict("item-1",
 				verdictWithJudge("CommandJudge",
 						Judgment.builder()
-							.status(JudgmentStatus.FAIL)
-							.score(new BooleanScore(false))
+							.fail()
 							.reasoning("Build failed")
 							.check(Check.fail("command_execution", "exit 1"))
 							.build())));
@@ -49,8 +46,7 @@ class DiagnosticAnalyzerTest {
 		ExperimentResult result = experimentWith(itemWithVerdict("item-1",
 				verdictWithJudge("CommandJudge",
 						Judgment.builder()
-							.status(JudgmentStatus.PASS)
-							.score(new BooleanScore(true))
+							.pass()
 							.reasoning("Build passed")
 							.check(Check.pass("command_execution", "OK"))
 							.build())));
@@ -91,8 +87,7 @@ class DiagnosticAnalyzerTest {
 		ItemResult item1 = itemWithVerdict("item-1",
 				verdictWithJudge("CommandJudge",
 						Judgment.builder()
-							.status(JudgmentStatus.FAIL)
-							.score(new BooleanScore(false))
+							.fail()
 							.reasoning("Build failed")
 							.check(Check.fail("command_execution", "exit 1"))
 							.build()));
@@ -121,8 +116,7 @@ class DiagnosticAnalyzerTest {
 
 		Verdict verdict = verdictWithJudge("JavaxMigrationJudge",
 				Judgment.builder()
-					.status(JudgmentStatus.FAIL)
-					.score(new BooleanScore(false))
+					.fail()
 					.reasoning("javax remaining")
 					.check(Check.fail("javax.persistence removed", "38 imports"))
 					.build());
@@ -146,23 +140,11 @@ class DiagnosticAnalyzerTest {
 
 	@Test
 	void generatesRecommendationForDominantGap() {
-		ItemResult item1 = itemWithVerdict("item-1",
-				verdictWithJudge("CommandJudge",
-						Judgment.builder()
-							.status(JudgmentStatus.FAIL)
-							.score(new BooleanScore(false))
-							.reasoning("Build failed")
-							.check(Check.fail("cmd1", "fail"))
-							.build()));
+		ItemResult item1 = itemWithVerdict("item-1", verdictWithJudge("CommandJudge",
+				Judgment.builder().fail().reasoning("Build failed").check(Check.fail("cmd1", "fail")).build()));
 
-		ItemResult item2 = itemWithVerdict("item-2",
-				verdictWithJudge("CommandJudge",
-						Judgment.builder()
-							.status(JudgmentStatus.FAIL)
-							.score(new BooleanScore(false))
-							.reasoning("Build failed 2")
-							.check(Check.fail("cmd2", "fail"))
-							.build()));
+		ItemResult item2 = itemWithVerdict("item-2", verdictWithJudge("CommandJudge",
+				Judgment.builder().fail().reasoning("Build failed 2").check(Check.fail("cmd2", "fail")).build()));
 
 		DiagnosticReport report = analyzer.analyze(experimentWith(item1, item2));
 
@@ -172,23 +154,11 @@ class DiagnosticAnalyzerTest {
 
 	@Test
 	void generatesRecommendationsForSecondaryGapsAbove20Percent() {
-		ItemResult item1 = itemWithVerdict("item-1",
-				verdictWithJudge("CommandJudge",
-						Judgment.builder()
-							.status(JudgmentStatus.FAIL)
-							.score(new BooleanScore(false))
-							.reasoning("fail")
-							.check(Check.fail("cmd1", "fail"))
-							.build()));
+		ItemResult item1 = itemWithVerdict("item-1", verdictWithJudge("CommandJudge",
+				Judgment.builder().fail().reasoning("fail").check(Check.fail("cmd1", "fail")).build()));
 
-		ItemResult item2 = itemWithVerdict("item-2",
-				verdictWithJudge("CommandJudge",
-						Judgment.builder()
-							.status(JudgmentStatus.FAIL)
-							.score(new BooleanScore(false))
-							.reasoning("fail")
-							.check(Check.fail("cmd2", "fail"))
-							.build()));
+		ItemResult item2 = itemWithVerdict("item-2", verdictWithJudge("CommandJudge",
+				Judgment.builder().fail().reasoning("fail").check(Check.fail("cmd2", "fail")).build()));
 
 		ItemResult item3 = itemWithVerdict("item-3",
 				verdictWithJudge("TestInvarianceJudge", Judgment.abstain("No surefire reports")));

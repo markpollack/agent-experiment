@@ -11,8 +11,6 @@ import io.github.markpollack.experiment.store.InMemoryResultStore;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -150,19 +148,11 @@ class JudgeExperimentTest {
 	}
 
 	private static Judge alwaysPassJudge() {
-		return ctx -> Judgment.builder()
-			.score(new BooleanScore(true))
-			.status(JudgmentStatus.PASS)
-			.reasoning("Passed")
-			.build();
+		return ctx -> Judgment.pass("Passed");
 	}
 
 	private static Judge alwaysFailJudge() {
-		return ctx -> Judgment.builder()
-			.score(new BooleanScore(false))
-			.status(JudgmentStatus.FAIL)
-			.reasoning("Failed")
-			.build();
+		return ctx -> Judgment.fail("Failed");
 	}
 
 }

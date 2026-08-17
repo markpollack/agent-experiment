@@ -40,6 +40,7 @@ import io.github.markpollack.experiment.journal.ExperimentJournal;
 import io.github.markpollack.experiment.journal.RunJournal;
 import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.result.ItemResult;
+import io.github.markpollack.experiment.result.RecordedVerdict;
 import io.github.markpollack.experiment.result.KnowledgeManifest;
 import io.github.markpollack.experiment.runner.workspace.DefaultWorkspaceProvisioner;
 import io.github.markpollack.experiment.runner.workspace.WorkspaceProvisioner;
@@ -387,7 +388,7 @@ public class AgentExperiment {
 				.scores(scores)
 				.metrics(buildMetrics(invocationResult))
 				.executionDetail(invocationResult)
-				.verdict(verdict)
+				.verdict(RecordedVerdict.from(verdict))
 				.workspacePath(preservedPath)
 				.metadata(Map.of())
 				.build();

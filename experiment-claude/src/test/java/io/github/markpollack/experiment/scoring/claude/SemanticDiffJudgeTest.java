@@ -20,7 +20,6 @@ import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.NumericalScore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -102,8 +101,7 @@ class SemanticDiffJudgeTest {
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) judgment.score();
-		assertThat(score.value()).isEqualTo(1.0);
+		assertThat(judgment.score()).isEqualTo(1.0);
 		assertThat(judgment.checks()).hasSize(2);
 		assertThat(judgment.checks()).allSatisfy(check -> assertThat(check.passed()).isTrue());
 	}
@@ -121,8 +119,7 @@ class SemanticDiffJudgeTest {
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS); // 2/3 >= 0.5
-		NumericalScore score = (NumericalScore) judgment.score();
-		assertThat(score.value()).isCloseTo(2.0 / 3.0, org.assertj.core.data.Offset.offset(0.001));
+		assertThat(judgment.score()).isCloseTo(2.0 / 3.0, org.assertj.core.data.Offset.offset(0.001));
 	}
 
 	@Test
@@ -134,8 +131,7 @@ class SemanticDiffJudgeTest {
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
-		NumericalScore score = (NumericalScore) judgment.score();
-		assertThat(score.value()).isEqualTo(0.0);
+		assertThat(judgment.score()).isEqualTo(0.0);
 	}
 
 	@Test
@@ -199,8 +195,7 @@ class SemanticDiffJudgeTest {
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS); // 1/2 >= 0.5
-		NumericalScore score = (NumericalScore) judgment.score();
-		assertThat(score.value()).isEqualTo(0.5);
+		assertThat(judgment.score()).isEqualTo(0.5);
 		List<Check> checks = judgment.checks();
 		assertThat(checks.get(0).passed()).isTrue();
 		assertThat(checks.get(0).message()).isEqualTo("Build compiles successfully");
