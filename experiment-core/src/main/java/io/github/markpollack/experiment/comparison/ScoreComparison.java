@@ -7,8 +7,8 @@ package io.github.markpollack.experiment.comparison;
  * @param currentMean mean score in current experiment
  * @param baselineMean mean score in baseline
  * @param delta currentMean - baselineMean
- * @param improvements items where current > baseline
- * @param regressions items where current < baseline
+ * @param improvements items where current is greater than baseline
+ * @param regressions items where current is less than baseline
  * @param unchanged items where current == baseline
  * @param newItems items in current but not baseline
  * @param removedItems items in baseline but not current

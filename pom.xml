@@ -10,11 +10,11 @@
     <packaging>pom</packaging>
 
     <name>Agent Experiment Parent</name>
-    <description>Purpose-built Java experiment driver for AI agent evaluation</description>
+    <description>Reproducible Java experiment lifecycle for evaluating AI agents</description>
 
     <licenses>
         <license>
-            <name>Business Source License 1.1</name>
+            <name>Business Source License 1.1 (project-specific terms)</name>
             <url>https://github.com/markpollack/agent-experiment/blob/main/LICENSE</url>
             <distribution>repo</distribution>
         </license>
@@ -37,20 +37,19 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <java.version>17</java.version>
+        <java.version>21</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
         <!-- Dependency versions -->
-        <!-- agent-journal (journal-core + claude-code-capture): SNAPSHOT-first for the
-             first-class journal-capture feature (DESIGN A3). Pinned to the bare
-             1.6.0-SNAPSHOT installed in ~/.m2; switches to the BOM-managed release version
-             at the single coordinated feature release. -->
-        <claude-code-capture.version>1.6.0-SNAPSHOT</claude-code-capture.version>
-        <agent-judge.version>0.12.0</agent-judge.version>
-        <claude-code-sdk.version>1.3.0</claude-code-sdk.version>
-        <agent-workflow.version>0.9.0</agent-workflow.version>
-        <agent-client.version>0.20.0</agent-client.version>
+        <claude-code-capture.version>1.6.0</claude-code-capture.version>
+        <!-- Agent Judge 0.14 replaces the score hierarchy and composite verdict shape.
+             Agent Experiment persists both, so that migration is a separate public data
+             contract change rather than a dependency-only 0.6.0 release update. -->
+        <agent-judge.version>0.13.0</agent-judge.version>
+        <claude-code-sdk.version>1.4.0</claude-code-sdk.version>
+        <agent-workflow.version>0.10.0</agent-workflow.version>
+        <agent-client.version>0.26.0</agent-client.version>
 
         <!-- Third-party dependency versions -->
         <jackson.version>2.21.2</jackson.version>
@@ -72,6 +71,8 @@
         <jacoco.version>0.8.11</jacoco.version>
         <spring-javaformat.version>0.0.43</spring-javaformat.version>
         <owasp.version>12.1.0</owasp.version>
+        <cyclonedx-maven-plugin.version>2.9.2</cyclonedx-maven-plugin.version>
+        <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
         <surefire.excludedGroups>integration</surefire.excludedGroups>
     </properties>
 
@@ -207,6 +208,18 @@
     </dependencyManagement>
 
     <build>
+        <resources>
+            <resource>
+                <directory>${maven.multiModuleProjectDirectory}</directory>
+                <includes>
+                    <include>LICENSE</include>
+                </includes>
+                <targetPath>META-INF</targetPath>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/src/main/resources</directory>
+            </resource>
+        </resources>
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -319,6 +332,64 @@
                 <groupId>io.spring.javaformat</groupId>
                 <artifactId>spring-javaformat-maven-plugin</artifactId>
             </plugin>
+            <!-- One root-only CycloneDX 1.6 JSON aggregate, attached to the
+                 deployed parent artifact with classifier "cyclonedx". -->
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>${cyclonedx-maven-plugin.version}</version>
+                <inherited>false</inherited>
+                <configuration>
+                    <projectType>library</projectType>
+                    <schemaVersion>1.6</schemaVersion>
+                    <includeBomSerialNumber>true</includeBomSerialNumber>
+                    <includeCompileScope>true</includeCompileScope>
+                    <includeProvidedScope>true</includeProvidedScope>
+                    <includeRuntimeScope>true</includeRuntimeScope>
+                    <includeSystemScope>true</includeSystemScope>
+                    <includeTestScope>false</includeTestScope>
+                    <includeLicenseText>false</includeLicenseText>
+                    <outputReactorProjects>false</outputReactorProjects>
+                    <skipNotDeployed>false</skipNotDeployed>
+                    <outputFormat>json</outputFormat>
+                    <outputName>agent-experiment-bom</outputName>
+                    <classifier>cyclonedx</classifier>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>aggregate-cyclonedx-sbom</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>makeAggregateBom</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>${maven-resources-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>stage-javadoc-license</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/javadoc-resources/resources</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${maven.multiModuleProjectDirectory}</directory>
+                                    <includes>
+                                        <include>LICENSE</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
@@ -375,8 +446,11 @@
                         <artifactId>maven-javadoc-plugin</artifactId>
                         <version>3.6.0</version>
                         <configuration>
-                            <failOnError>false</failOnError>
+                            <failOnError>true</failOnError>
                             <quiet>true</quiet>
+                            <javadocDirectory>${project.build.directory}/javadoc-resources</javadocDirectory>
+                            <docfilessubdirs>true</docfilessubdirs>
+                            <bottom><![CDATA[Agent Experiment is licensed under the project-specific Business Source License terms in the repository root LICENSE file.]]></bottom>
                         </configuration>
                         <executions>
                             <execution>
@@ -414,19 +488,6 @@
             </build>
         </profile>
     </profiles>
-
-    <repositories>
-        <repository>
-            <id>central-snapshots</id>
-            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-        </repository>
-    </repositories>
 
     <distributionManagement>
         <snapshotRepository>

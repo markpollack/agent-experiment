@@ -3,7 +3,7 @@
 ## Build
 - Multi-module Maven project: `experiment-core` (abstractions + runner) and `experiment-claude` (Claude SDK impl)
 - Build: `./mvnw test` or `./mvnw verify`
-- Java 17
+- Java 21
 
 ## Architecture
 - Shared experiment infrastructure (dataset, result, store, comparison, scoring) is domain-neutral — no agent-specific imports
@@ -29,10 +29,10 @@
 
 ## Dependencies
 - All dependencies use `io.github.markpollack` groupId (migrated from org.springaicommunity)
-- agent-judge-core/exec: 0.10.0-SNAPSHOT, package `io.github.markpollack.judge.*`
-- claude-code-sdk: 1.1.0-SNAPSHOT, package `io.github.markpollack.claude.agent.sdk.*`
-- claude-code-capture: 1.1.0-SNAPSHOT, package `io.github.markpollack.journal.*`
-- agent-journal (journal-core + claude-code-capture): pinned **1.6.0-SNAPSHOT** (bare coordinates via the parent `claude-code-capture.version` property, no BOM) for the journal-capture feature; SNAPSHOT-first until the coordinated release. `journal-core` is a direct `experiment-core` dependency (`Journal`, `Run`, `JsonFileStorage`, `StepCostEvent`, `AttributionMethod`).
+- agent-judge-core/exec: 0.13.0. Version 0.14 changes the public and persisted score/verdict contract and is intentionally deferred to a separate compatibility release.
+- claude-code-sdk: 1.4.0, package `io.github.markpollack.claude.agent.sdk.*`
+- agent-journal (`journal-core` + `claude-code-capture`): 1.6.0. `journal-core` is a direct `experiment-core` dependency (`Journal`, `Run`, `JsonFileStorage`, `StepCostEvent`, `AttributionMethod`).
+- agent-workflow: 0.10.0; agent-client: 0.26.0
 
 ## Key Packages
 - `io.github.markpollack.experiment.result` — ExperimentResult, ItemResult, ExecutionDetail
