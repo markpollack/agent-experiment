@@ -42,7 +42,7 @@
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
         <!-- Dependency versions -->
-        <claude-code-capture.version>1.6.0</claude-code-capture.version>
+        <claude-code-capture.version>1.7.0</claude-code-capture.version>
         <agent-judge.version>0.14.0</agent-judge.version>
         <claude-code-sdk.version>1.4.0</claude-code-sdk.version>
         <agent-workflow.version>0.10.0</agent-workflow.version>

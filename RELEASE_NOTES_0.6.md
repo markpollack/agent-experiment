@@ -16,11 +16,13 @@ bringing the project onto the currently released Java 21 AgentWorks integration 
 - Migrates to Agent Judge 0.14's normalized `Judgment` and complete composite-attempt API, while
   persisting an Agent Experiment-owned result projection instead of Agent Judge implementation
   types.
-- Updates to Agent Journal/Capture 1.6.0, Claude Code SDK 1.4.0, Agent Workflow 0.10.0, Agent Client
+- Updates to Agent Journal/Capture 1.7.0, Claude Code SDK 1.4.0, Agent Workflow 0.10.0, Agent Client
   0.26.0, Agent Judge 0.14.0, and Java 21.
 - Raises the repository-governed Jackson 2, Jackson 3, and optional Logback floors to 2.21.6,
   3.1.6, and 1.5.34 respectively, closing the validated vulnerability inventory without requiring
-  an unreleased Agent Journal/Capture dependency.
+  an unreleased Agent Journal/Capture dependency. The now-public 1.7.0 line keeps `journal-core`
+  and `claude-code-capture` aligned on the same stable release and carries its corrected standalone
+  Jackson closure into journal-backed experiments.
 - Adds a root-only CycloneDX 1.6 aggregate SBOM attached to the parent Maven artifact with classifier
   `cyclonedx`, plus consistent BSL license content in packaged artifacts.
 - Pins reusable build and release workflows to the approved immutable Build Tools revision and

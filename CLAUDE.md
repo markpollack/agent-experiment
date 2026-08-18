@@ -31,7 +31,7 @@
 - All dependencies use `io.github.markpollack` groupId (migrated from org.springaicommunity)
 - agent-judge-core/exec: 0.14.0. Runtime code uses normalized `Judgment`/`Verdict`; persisted results use Agent Experiment-owned `RecordedJudgment`/`RecordedVerdict` projections. The result mapper reads the legacy 0.5/Judge 0.13 score and `subVerdicts` shapes and writes only the normalized format.
 - claude-code-sdk: 1.4.0, package `io.github.markpollack.claude.agent.sdk.*`
-- agent-journal (`journal-core` + `claude-code-capture`): 1.6.0. `journal-core` is a direct `experiment-core` dependency (`Journal`, `Run`, `JsonFileStorage`, `StepCostEvent`, `AttributionMethod`).
+- agent-journal (`journal-core` + `claude-code-capture`): 1.7.0. `journal-core` is a direct `experiment-core` dependency (`Journal`, `Run`, `JsonFileStorage`, `StepCostEvent`, `AttributionMethod`).
 - agent-workflow: 0.10.0; agent-client: 0.26.0
 
 ## Key Packages
