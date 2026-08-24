@@ -64,8 +64,7 @@ public class WorkflowAgentInvoker extends AbstractTemplateAgentInvoker {
 		WorkflowJournal.registerEventType();
 	}
 
-	@Nullable
-	private final AgentApi agentApi;
+	@Nullable private final AgentApi agentApi;
 
 	/** Default constructor — uses {@link ClaudeAgentModel} configured per-invocation. */
 	public WorkflowAgentInvoker() {

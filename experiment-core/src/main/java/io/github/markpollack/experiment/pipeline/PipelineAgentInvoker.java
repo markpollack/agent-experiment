@@ -57,15 +57,13 @@ public class PipelineAgentInvoker implements AgentInvoker {
 	@Override
 	public InvocationResult invoke(InvocationContext context) throws AgentInvocationException {
 		// Phase 1: Analyze
-		@Nullable
-		AnalysisEnvelope analysis = null;
+		@Nullable AnalysisEnvelope analysis = null;
 		if (analyzer != null && pipelineConfig.enableAnalysis()) {
 			analysis = runAnalysis(context.workspacePath());
 		}
 
 		// Phase 2: Plan
-		@Nullable
-		ExecutionPlan plan = null;
+		@Nullable ExecutionPlan plan = null;
 		if (planner != null && pipelineConfig.enablePlanning()) {
 			plan = runPlanning(analysis, context.model(), context.runDir());
 		}
@@ -146,8 +144,7 @@ public class PipelineAgentInvoker implements AgentInvoker {
 			.build();
 	}
 
-	@Nullable
-	String buildSystemPrompt(@Nullable String originalSystemPrompt, @Nullable ExecutionPlan plan) {
+	@Nullable String buildSystemPrompt(@Nullable String originalSystemPrompt, @Nullable ExecutionPlan plan) {
 		if (plan == null) {
 			return originalSystemPrompt;
 		}

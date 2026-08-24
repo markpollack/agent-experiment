@@ -15,7 +15,7 @@ jobs:
     with:
       version: ${{ inputs.version }}
       java-version: '21'
-      release-notes-file: RELEASE_NOTES_0.6.md
+      release-notes-file: RELEASE_NOTES_0.7.md
     secrets:
       MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
       MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}

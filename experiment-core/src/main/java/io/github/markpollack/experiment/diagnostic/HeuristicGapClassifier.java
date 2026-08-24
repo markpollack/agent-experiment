@@ -77,8 +77,7 @@ public class HeuristicGapClassifier implements GapClassifier {
 		}
 	}
 
-	@Nullable
-	private DiagnosticCheck classifyByJudgeName(String judgeName, RecordedJudgmentStatus status,
+	@Nullable private DiagnosticCheck classifyByJudgeName(String judgeName, RecordedJudgmentStatus status,
 			@Nullable RecordedCheck check, @Nullable ExecutionPlan plan) {
 		return switch (judgeName) {
 			case "CommandJudge" -> classifyBuildFailure(judgeName, check);
@@ -187,8 +186,7 @@ public class HeuristicGapClassifier implements GapClassifier {
 				"Agent didn't satisfy semantic criterion: " + check.name());
 	}
 
-	@Nullable
-	private DiagnosticCheck classifyStructural(String judgeName, @Nullable RecordedCheck check, GapCategory category,
+	@Nullable private DiagnosticCheck classifyStructural(String judgeName, @Nullable RecordedCheck check, GapCategory category,
 			String rationale) {
 		if (check == null) {
 			return null;

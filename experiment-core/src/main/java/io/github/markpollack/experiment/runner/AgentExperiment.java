@@ -131,8 +131,7 @@ public class AgentExperiment {
 		String experimentId = UUID.randomUUID().toString();
 
 		// Compute run directory for artifacts (trace files, run log)
-		@Nullable
-		Path runDir = computeRunDir(activeSession, experimentId);
+		@Nullable Path runDir = computeRunDir(activeSession, experimentId);
 
 		logger.info("Starting experiment '{}' (id: {})", config.experimentName(), experimentId);
 
@@ -191,8 +190,7 @@ public class AgentExperiment {
 				? datasetManager.filteredItems(dataset, config.itemFilter()) : datasetManager.activeItems(dataset);
 		DatasetVersion version = datasetManager.currentVersion(dataset);
 
-		@Nullable
-		KnowledgeManifest knowledgeManifest = config.knowledgeBaseDir() != null
+		@Nullable KnowledgeManifest knowledgeManifest = config.knowledgeBaseDir() != null
 				? KnowledgeManifest.snapshot(config.knowledgeBaseDir()) : null;
 
 		logger.info("Loaded dataset '{}' v{} ({} items)", dataset.name(), version.semanticVersion(), items.size());
@@ -345,8 +343,7 @@ public class AgentExperiment {
 			}
 
 			if (!invocationResult.success()) {
-				@Nullable
-				Path preservedPath = preserveWorkspace(workspace, experimentId, item.slug(), activeSession);
+				@Nullable Path preservedPath = preserveWorkspace(workspace, experimentId, item.slug(), activeSession);
 				return ItemResult.builder()
 					.itemId(item.id())
 					.itemSlug(item.slug())
@@ -364,8 +361,7 @@ public class AgentExperiment {
 			}
 
 			// Judge the result
-			@Nullable
-			Path referenceDir = resolved.referenceDir();
+			@Nullable Path referenceDir = resolved.referenceDir();
 			JudgmentContext judgmentContext = JudgmentContextFactory.create(item, workspace, invocationResult,
 					referenceDir, resolved.beforeDir(), invocationResult.analysis(), invocationResult.executionPlan(),
 					config);
@@ -375,8 +371,7 @@ public class AgentExperiment {
 			scores.putAll(efficiencyScores);
 			boolean passed = VerdictExtractor.passed(verdict);
 
-			@Nullable
-			Path preservedPath = preserveWorkspace(workspace, experimentId, item.slug(), activeSession);
+			@Nullable Path preservedPath = preserveWorkspace(workspace, experimentId, item.slug(), activeSession);
 			return ItemResult.builder()
 				.itemId(item.id())
 				.itemSlug(item.slug())
@@ -397,8 +392,7 @@ public class AgentExperiment {
 		catch (Exception ex) {
 			long durationMs = System.currentTimeMillis() - startTime;
 			logger.error("Item {} failed: {}", item.id(), ex.getMessage(), ex);
-			@Nullable
-			Path preservedPath = preserveWorkspace(workspace, experimentId, item.slug(), activeSession);
+			@Nullable Path preservedPath = preserveWorkspace(workspace, experimentId, item.slug(), activeSession);
 			return ItemResult.builder()
 				.itemId(item.id())
 				.itemSlug(item.slug())

@@ -210,8 +210,7 @@ public class FileSystemDatasetManager implements DatasetManager {
 		}
 	}
 
-	@Nullable
-	private SourceRef parseSourceRef(JsonNode root, String fieldName, Path source) {
+	@Nullable private SourceRef parseSourceRef(JsonNode root, String fieldName, Path source) {
 		JsonNode refNode = root.get(fieldName);
 		if (refNode == null || refNode.isNull() || !refNode.isObject()) {
 			return null;

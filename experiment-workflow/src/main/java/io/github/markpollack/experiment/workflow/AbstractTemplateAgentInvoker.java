@@ -62,11 +62,9 @@ public abstract class AbstractTemplateAgentInvoker implements AgentInvoker {
 
 	private static final Logger logger = LoggerFactory.getLogger(AbstractTemplateAgentInvoker.class);
 
-	@Nullable
-	private final Path knowledgeSourceDir;
+	@Nullable private final Path knowledgeSourceDir;
 
-	@Nullable
-	private final List<String> knowledgeFiles;
+	@Nullable private final List<String> knowledgeFiles;
 
 	protected AbstractTemplateAgentInvoker() {
 		this(null, null);

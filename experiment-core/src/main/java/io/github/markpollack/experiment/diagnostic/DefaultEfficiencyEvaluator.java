@@ -164,8 +164,7 @@ public class DefaultEfficiencyEvaluator implements EfficiencyEvaluator {
 	 * Extract the most informative signal from Maven build error output. Mirrors the
 	 * approach in {@code DeterministicReasoner.extractErrorSignal()}.
 	 */
-	@Nullable
-	static String extractErrorSignal(String content) {
+	@Nullable static String extractErrorSignal(String content) {
 		for (String line : content.split("\n")) {
 			String trimmed = line.trim();
 			if (trimmed.startsWith("[ERROR]") && !trimmed.contains("See ") && !trimmed.contains("Re-run")

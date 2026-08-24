@@ -66,8 +66,7 @@ public class DiagnosticAnalyzer {
 		return new DiagnosticReport(result.experimentId(), itemDiagnostics, distribution, recommendations);
 	}
 
-	@Nullable
-	private GapCategory dominantGap(List<DiagnosticCheck> checks) {
+	@Nullable private GapCategory dominantGap(List<DiagnosticCheck> checks) {
 		Map<GapCategory, Integer> counts = new EnumMap<>(GapCategory.class);
 		for (DiagnosticCheck dc : checks) {
 			if (dc.gapCategory() != null) {
