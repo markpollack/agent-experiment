@@ -51,7 +51,7 @@
         <!-- Third-party dependency versions -->
         <jackson.version>2.22.2</jackson.version>
         <jackson3.version>3.2.2</jackson3.version>
-        <slf4j.version>2.0.17</slf4j.version>
+        <slf4j.version>2.0.18</slf4j.version>
         <jspecify.version>1.0.1</jspecify.version>
 
         <!-- Test dependency versions -->
