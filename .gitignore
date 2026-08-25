@@ -1,8 +1,8 @@
-# Plans — track learnings and roadmap, ignore inbox proposals and scratch files
-plans/inbox/
-plans/archive/
-plans/META-ROADMAP.md
-plans/status.md
+# Plans — this repository is PUBLIC. All private planning material (roadmaps, designs,
+# learnings, status reports) lives in the private agent-experiment-steward repository.
+# Ignore the whole tree: a selective list here previously let plans/learnings/ and the
+# plans/*.md design and roadmap files leak to a public remote.
+plans/
 
 # Maven
 target/
