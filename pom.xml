@@ -42,11 +42,11 @@
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
         <!-- Dependency versions -->
-        <claude-code-capture.version>1.8.0</claude-code-capture.version>
-        <agent-judge.version>0.15.0</agent-judge.version>
-        <claude-code-sdk.version>1.5.0</claude-code-sdk.version>
-        <agent-workflow.version>0.12.0</agent-workflow.version>
-        <agent-client.version>0.29.0</agent-client.version>
+        <claude-code-capture.version>1.8.2</claude-code-capture.version>
+        <agent-judge.version>0.15.1</agent-judge.version>
+        <claude-code-sdk.version>1.5.1</claude-code-sdk.version>
+        <agent-workflow.version>0.12.1</agent-workflow.version>
+        <agent-client.version>0.29.3</agent-client.version>
 
         <!-- Third-party dependency versions -->
         <jackson.version>2.22.2</jackson.version>
@@ -69,7 +69,6 @@
         <jacoco.version>0.8.15</jacoco.version>
         <spring-javaformat.version>0.0.48</spring-javaformat.version>
         <owasp.version>13.0.0</owasp.version>
-        <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
         <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
         <surefire.excludedGroups>integration</surefire.excludedGroups>
     </properties>
@@ -329,37 +328,6 @@
             <plugin>
                 <groupId>io.spring.javaformat</groupId>
                 <artifactId>spring-javaformat-maven-plugin</artifactId>
-            </plugin>
-            <!-- One consumer-scoped CycloneDX 1.6 JSON attachment per artifact. -->
-            <plugin>
-                <groupId>org.cyclonedx</groupId>
-                <artifactId>cyclonedx-maven-plugin</artifactId>
-                <version>${cyclonedx-maven-plugin.version}</version>
-                <configuration>
-                    <projectType>library</projectType>
-                    <schemaVersion>1.6</schemaVersion>
-                    <includeBomSerialNumber>true</includeBomSerialNumber>
-                    <includeCompileScope>true</includeCompileScope>
-                    <includeProvidedScope>false</includeProvidedScope>
-                    <includeRuntimeScope>true</includeRuntimeScope>
-                    <includeSystemScope>false</includeSystemScope>
-                    <includeTestScope>false</includeTestScope>
-                    <includeLicenseText>false</includeLicenseText>
-                    <outputReactorProjects>false</outputReactorProjects>
-                    <skipNotDeployed>false</skipNotDeployed>
-                    <outputFormat>json</outputFormat>
-                    <outputName>${project.artifactId}-${project.version}-cyclonedx</outputName>
-                    <classifier>cyclonedx</classifier>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>consumer-cyclonedx-sbom</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>makeBom</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
