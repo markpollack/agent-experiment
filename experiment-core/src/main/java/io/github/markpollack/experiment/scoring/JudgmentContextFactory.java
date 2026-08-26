@@ -54,9 +54,8 @@ public final class JudgmentContextFactory {
 	 * <li>{@code expectedDir} — reference directory for FileComparisonJudge</li>
 	 * <li>{@code beforeDir} — pre-execution workspace state for ASTDiffJudge</li>
 	 * <li>{@code plan} — roadmap markdown for plan-derived LLM judges</li>
-	 * <li>{@code targetBootVersion}, {@code targetJavaVersion},
-	 * {@code targetClassVersion} — forwarded from experiment configuration metadata when
-	 * present</li>
+	 * <li>every entry of the experiment configuration's own metadata, forwarded verbatim
+	 * — the keys are the caller's to choose and the judge's to interpret</li>
 	 * </ul>
 	 * @param item the dataset item being evaluated
 	 * @param workspace the workspace directory where the agent operated
@@ -114,18 +113,17 @@ public final class JudgmentContextFactory {
 		};
 	}
 
+	/**
+	 * Forwards the experiment's configured metadata into the judgment context verbatim.
+	 *
+	 * <p>
+	 * Every entry is passed through as the string it was configured as. This factory
+	 * knows no metadata keys by name: which keys matter, and how their values should be
+	 * interpreted, belongs to the judge that reads them, not to the generic harness.
+	 */
 	private static void enrichFromConfig(JudgmentContext.Builder builder, ExperimentConfig config) {
-		String targetBootVersion = config.metadata().get("targetBootVersion");
-		if (targetBootVersion != null) {
-			builder.metadata("targetBootVersion", targetBootVersion);
-		}
-		String targetJavaVersion = config.metadata().get("targetJavaVersion");
-		if (targetJavaVersion != null) {
-			builder.metadata("targetJavaVersion", targetJavaVersion);
-		}
-		String targetClassVersion = config.metadata().get("targetClassVersion");
-		if (targetClassVersion != null) {
-			builder.metadata("targetClassVersion", Integer.parseInt(targetClassVersion));
+		for (var entry : config.metadata().entrySet()) {
+			builder.metadata(entry.getKey(), entry.getValue());
 		}
 	}
 

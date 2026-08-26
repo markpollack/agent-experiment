@@ -110,7 +110,7 @@ class JudgmentContextFactoryTest {
 			.model("sonnet")
 			.promptTemplate("{{task}}")
 			.perItemTimeout(Duration.ofMinutes(5))
-			.metadata(Map.of("targetBootVersion", "3.0.0", "targetJavaVersion", "17", "targetClassVersion", "61"))
+			.metadata(Map.of("domainKeyOne", "3.0.0", "domainKeyTwo", "17", "domainKeyThree", "61"))
 			.build();
 
 		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), REFERENCE_DIR,
@@ -118,9 +118,9 @@ class JudgmentContextFactoryTest {
 
 		assertThat(ctx.metadata()).containsEntry("expectedDir", REFERENCE_DIR);
 		assertThat(ctx.metadata()).containsEntry("plan", planRoadmap);
-		assertThat(ctx.metadata()).containsEntry("targetBootVersion", "3.0.0");
-		assertThat(ctx.metadata()).containsEntry("targetJavaVersion", "17");
-		assertThat(ctx.metadata()).containsEntry("targetClassVersion", 61);
+		assertThat(ctx.metadata()).containsEntry("domainKeyOne", "3.0.0");
+		assertThat(ctx.metadata()).containsEntry("domainKeyTwo", "17");
+		assertThat(ctx.metadata()).containsEntry("domainKeyThree", "61");
 	}
 
 	@Test
@@ -131,7 +131,7 @@ class JudgmentContextFactoryTest {
 				planRoadmap, null);
 
 		assertThat(ctx.metadata()).containsEntry("plan", planRoadmap);
-		assertThat(ctx.metadata()).doesNotContainKey("targetBootVersion");
+		assertThat(ctx.metadata()).doesNotContainKey("domainKeyOne");
 	}
 
 	@Test
@@ -142,15 +142,15 @@ class JudgmentContextFactoryTest {
 			.model("sonnet")
 			.promptTemplate("{{task}}")
 			.perItemTimeout(Duration.ofMinutes(5))
-			.metadata(Map.of("targetBootVersion", "3.0.0"))
+			.metadata(Map.of("domainKeyOne", "3.0.0"))
 			.build();
 
 		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
 				config);
 
-		assertThat(ctx.metadata()).containsEntry("targetBootVersion", "3.0.0");
-		assertThat(ctx.metadata()).doesNotContainKey("targetJavaVersion");
-		assertThat(ctx.metadata()).doesNotContainKey("targetClassVersion");
+		assertThat(ctx.metadata()).containsEntry("domainKeyOne", "3.0.0");
+		assertThat(ctx.metadata()).doesNotContainKey("domainKeyTwo");
+		assertThat(ctx.metadata()).doesNotContainKey("domainKeyThree");
 		assertThat(ctx.metadata()).doesNotContainKey("plan");
 	}
 
@@ -179,28 +179,29 @@ class JudgmentContextFactoryTest {
 		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
 				config);
 
-		assertThat(ctx.metadata()).doesNotContainKey("targetBootVersion");
-		assertThat(ctx.metadata()).doesNotContainKey("targetJavaVersion");
-		assertThat(ctx.metadata()).doesNotContainKey("targetClassVersion");
+		assertThat(ctx.metadata()).doesNotContainKey("domainKeyOne");
+		assertThat(ctx.metadata()).doesNotContainKey("domainKeyTwo");
+		assertThat(ctx.metadata()).doesNotContainKey("domainKeyThree");
 	}
 
 	@Test
-	void targetClassVersionParsedAsInteger() {
+	void configuredMetadataIsForwardedVerbatimAsStrings() {
 		ExperimentConfig config = ExperimentConfig.builder()
 			.experimentName("test")
 			.datasetDir(Path.of("/dataset"))
 			.model("sonnet")
 			.promptTemplate("{{task}}")
 			.perItemTimeout(Duration.ofMinutes(5))
-			.metadata(Map.of("targetClassVersion", "61"))
+			.metadata(Map.of("domainKeyThree", "61", "anyKeyAtAll", "any value"))
 			.build();
 
 		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
 				config);
 
-		Object classVersion = ctx.metadata().get("targetClassVersion");
-		assertThat(classVersion).isInstanceOf(Integer.class);
-		assertThat(classVersion).isEqualTo(61);
+		// The factory names no key and coerces no value; a judge that wants a number
+		// parses it itself.
+		assertThat(ctx.metadata().get("domainKeyThree")).isInstanceOf(String.class).isEqualTo("61");
+		assertThat(ctx.metadata()).containsEntry("anyKeyAtAll", "any value");
 	}
 
 }

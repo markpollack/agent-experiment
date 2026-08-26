@@ -76,6 +76,7 @@
     <modules>
         <module>experiment-core</module>
         <module>experiment-claude</module>
+        <module>experiment-agent-client</module>
         <module>experiment-workflow</module>
     </modules>
 
@@ -101,6 +102,11 @@
             <dependency>
                 <groupId>io.github.markpollack</groupId>
                 <artifactId>experiment-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.markpollack</groupId>
+                <artifactId>experiment-agent-client</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

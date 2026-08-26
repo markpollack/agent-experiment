@@ -1,7 +1,7 @@
 # agent-experiment
 
 ## Build
-- Multi-module Maven project: `experiment-core` (abstractions + runner), `experiment-claude` (Claude SDK impl), and `experiment-workflow` (Agent Workflow adapter)
+- Multi-module Maven project: `experiment-core` (abstractions + runner), `experiment-agent-client` (AgentClientInvoker — any agent-client provider), `experiment-claude` (Claude-backed scoring), and `experiment-workflow` (Agent Workflow adapter)
 - Build: `./mvnw test` or `./mvnw verify`
 - Java 21
 
@@ -32,7 +32,7 @@
 - agent-judge-core/exec: 0.15.1. Runtime code uses normalized `Judgment`/`Verdict`; persisted results use Agent Experiment-owned `RecordedJudgment`/`RecordedVerdict` projections. The result mapper reads the legacy 0.5/Judge 0.13 score and `subVerdicts` shapes and writes only the normalized format.
 - claude-code-sdk: 1.5.1, package `io.github.markpollack.claude.agent.sdk.*`
 - agent-journal (`journal-core` + `claude-code-capture`): 1.8.2. `journal-core` is a direct `experiment-core` dependency (`Journal`, `Run`, `JsonFileStorage`, `StepCostEvent`, `AttributionMethod`).
-- agent-workflow: 0.12.1; agent-client: 0.29.3 (`provided` in `experiment-workflow`)
+- agent-workflow: 0.12.2; agent-client: 0.29.3. `agent-client-core` is a direct dependency of `experiment-agent-client` and `experiment-workflow`; `agent-claude` is `optional` in both, so the default Claude model is a convenience, not a required dependency.
 
 ## Key Packages
 - `io.github.markpollack.experiment.result` — ExperimentResult, ItemResult, ExecutionDetail, RecordedJudgment, RecordedVerdict

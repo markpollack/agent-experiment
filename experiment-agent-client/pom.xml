@@ -11,11 +11,11 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>experiment-claude</artifactId>
+    <artifactId>experiment-agent-client</artifactId>
     <packaging>jar</packaging>
 
-    <name>Experiment Driver Claude</name>
-    <description>Claude-backed scoring for the experiment driver: SemanticDiffJudge</description>
+    <name>Experiment Driver Agent Client</name>
+    <description>AgentInvoker that drives any agent-client provider: AgentClientInvoker</description>
 
     <dependencies>
         <!-- Internal -->
@@ -24,11 +24,25 @@
             <artifactId>experiment-core</artifactId>
         </dependency>
 
-        <!-- Claude SDK -->
+        <!-- Agent client -->
         <dependency>
             <groupId>io.github.markpollack</groupId>
-            <artifactId>claude-code-sdk</artifactId>
+            <artifactId>agent-client-core</artifactId>
         </dependency>
+
+        <!-- Claude model (optional convenience default — make model injectable to avoid hard dep) -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>agent-claude</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Phase capture: the InvocationResult phase type -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>claude-code-capture</artifactId>
+        </dependency>
+
         <!-- Null safety -->
         <dependency>
             <groupId>org.jspecify</groupId>
