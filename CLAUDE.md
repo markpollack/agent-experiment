@@ -8,7 +8,7 @@
 ## Architecture
 - Shared experiment infrastructure (dataset, result, store, comparison, scoring) is domain-neutral — no agent-specific imports
 - Exception: `ResultObjectMapper` imports concrete `ExecutionDetail` subtypes for Jackson deserialization
-- Agent-specific code lives in `agent`, `runner`, `scoring.JudgmentContextFactory`, `diagnostic`, `pipeline` packages
+- Agent-specific code lives in `agent`, `runner`, `scoring.JudgmentContextFactory` packages
 - `ItemResult.executionDetail` (marker interface `ExecutionDetail`) is the seam between shared and domain-specific
 - `InvocationResult implements ExecutionDetail` for agent experiments
 - Agent-specific consumers use `instanceof` pattern matching to cast from `ExecutionDetail`
@@ -42,7 +42,6 @@
 - `io.github.markpollack.experiment.store` — ResultStore, FileSystemResultStore
 - `io.github.markpollack.experiment.comparison` — ComparisonEngine
 - `io.github.markpollack.experiment.scoring` — VerdictExtractor, JudgmentContextFactory
-- `io.github.markpollack.experiment.diagnostic` — EfficiencyEvaluator, DefaultEfficiencyEvaluator
 - `io.github.markpollack.experiment.reeval` — ReEvaluationContextFactory, AgentReEvaluationContextFactory, ReEvaluator
 - `io.github.markpollack.experiment.judge` — JudgeExperiment, JudgeScorer, JudgeScorers, JudgeExecutionDetail
 - `io.github.markpollack.experiment.journal` — ExperimentJournal, RunJournal (run-journal lifecycle; owns per-item `Run` on `JsonFileStorage`)

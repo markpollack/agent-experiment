@@ -6,8 +6,6 @@ import java.time.Duration;
 import io.github.markpollack.experiment.agent.InvocationResult;
 import io.github.markpollack.experiment.agent.TerminalStatus;
 import io.github.markpollack.experiment.dataset.DatasetItem;
-import io.github.markpollack.experiment.pipeline.AnalysisEnvelope;
-import io.github.markpollack.experiment.pipeline.ExecutionPlan;
 import io.github.markpollack.experiment.runner.ExperimentConfig;
 import org.jspecify.annotations.Nullable;
 import io.github.markpollack.judge.context.ExecutionStatus;
@@ -24,9 +22,9 @@ import io.github.markpollack.judge.context.JudgmentContext;
  *
  * <p>
  * The enriched overload populates additional metadata for tiered jury evaluation:
- * {@code beforeDir}, {@code analysis}, {@code plan}, {@code targetBootVersion},
- * {@code targetJavaVersion}, and {@code targetClassVersion}. All enrichment parameters
- * are nullable — missing data is simply omitted from the context metadata.
+ * {@code beforeDir}, {@code plan}, and any {@code target*} keys carried in the experiment
+ * configuration metadata. All enrichment parameters are nullable — missing data is simply
+ * omitted from the context metadata.
  */
 public final class JudgmentContextFactory {
 
@@ -44,25 +42,21 @@ public final class JudgmentContextFactory {
 	 */
 	public static JudgmentContext create(DatasetItem item, Path workspace, InvocationResult invocationResult,
 			@Nullable Path referenceDir) {
-		return create(item, workspace, invocationResult, referenceDir, null, null, null, null);
+		return create(item, workspace, invocationResult, referenceDir, null, null, null);
 	}
 
 	/**
-	 * Create an enriched {@link JudgmentContext} with pipeline and configuration
-	 * metadata.
+	 * Create an enriched {@link JudgmentContext} with additional judging metadata.
 	 *
 	 * <p>
 	 * Populates metadata keys used by tiered jury judges:
 	 * <ul>
 	 * <li>{@code expectedDir} — reference directory for FileComparisonJudge</li>
 	 * <li>{@code beforeDir} — pre-execution workspace state for ASTDiffJudge</li>
-	 * <li>{@code analysis} — {@link AnalysisEnvelope} for migration/LLM judges</li>
-	 * <li>{@code plan} — {@link ExecutionPlan} for LLM judges</li>
-	 * <li>{@code targetBootVersion} — target Spring Boot version for
-	 * DependencyVersionJudge</li>
-	 * <li>{@code targetJavaVersion} — target Java version for DependencyVersionJudge</li>
-	 * <li>{@code targetClassVersion} — target class file version for
-	 * ClassVersionJudge</li>
+	 * <li>{@code plan} — roadmap markdown for plan-derived LLM judges</li>
+	 * <li>{@code targetBootVersion}, {@code targetJavaVersion},
+	 * {@code targetClassVersion} — forwarded from experiment configuration metadata when
+	 * present</li>
 	 * </ul>
 	 * @param item the dataset item being evaluated
 	 * @param workspace the workspace directory where the agent operated
@@ -70,14 +64,13 @@ public final class JudgmentContextFactory {
 	 * @param referenceDir the reference directory (nullable)
 	 * @param beforeDir the pre-execution workspace directory for baseline comparison
 	 * (nullable)
-	 * @param analysis the pipeline analysis envelope (nullable)
-	 * @param plan the pipeline execution plan (nullable)
+	 * @param planRoadmap roadmap markdown describing the intended work (nullable)
 	 * @param config the experiment configuration (nullable)
 	 * @return a fully populated JudgmentContext with enrichment metadata
 	 */
 	public static JudgmentContext create(DatasetItem item, Path workspace, InvocationResult invocationResult,
-			@Nullable Path referenceDir, @Nullable Path beforeDir, @Nullable AnalysisEnvelope analysis,
-			@Nullable ExecutionPlan plan, @Nullable ExperimentConfig config) {
+			@Nullable Path referenceDir, @Nullable Path beforeDir, @Nullable String planRoadmap,
+			@Nullable ExperimentConfig config) {
 		JudgmentContext.Builder builder = JudgmentContext.builder()
 			.goal(item.developerTask())
 			.workspace(workspace)
@@ -90,11 +83,8 @@ public final class JudgmentContextFactory {
 		if (beforeDir != null) {
 			builder.metadata("beforeDir", beforeDir);
 		}
-		if (analysis != null) {
-			builder.metadata("analysis", analysis);
-		}
-		if (plan != null) {
-			builder.metadata("plan", plan);
+		if (planRoadmap != null) {
+			builder.metadata("plan", planRoadmap);
 		}
 		if (config != null) {
 			enrichFromConfig(builder, config);

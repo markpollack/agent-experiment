@@ -133,7 +133,7 @@ class InvocationResultTest {
 	@Test
 	void totalInputTokensIncludesCacheTokens() {
 		InvocationResult result = new InvocationResult(true, TerminalStatus.COMPLETED, List.of(), 14, 200, 0, 5000,
-				80000, 0.05, 3000, "sess-1", Map.of(), null, null, null);
+				80000, 0.05, 3000, "sess-1", Map.of(), null);
 
 		assertThat(result.cacheCreationInputTokens()).isEqualTo(5000);
 		assertThat(result.cacheReadInputTokens()).isEqualTo(80000);

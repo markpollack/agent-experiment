@@ -28,10 +28,6 @@ import io.github.markpollack.experiment.agent.InvocationContext;
 import io.github.markpollack.experiment.agent.InvocationResult;
 import io.github.markpollack.experiment.agent.TerminalStatus;
 import io.github.markpollack.experiment.dataset.Dataset;
-import io.github.markpollack.experiment.diagnostic.DefaultEfficiencyEvaluator;
-import io.github.markpollack.experiment.diagnostic.EfficiencyEvaluator;
-import io.github.markpollack.experiment.diagnostic.EfficiencyReport;
-import io.github.markpollack.experiment.diagnostic.ReasoningContext;
 import io.github.markpollack.experiment.dataset.DatasetItem;
 import io.github.markpollack.experiment.dataset.DatasetManager;
 import io.github.markpollack.experiment.dataset.DatasetVersion;
@@ -326,22 +322,6 @@ public class AgentExperiment {
 			// (auto-emitting per-step StepCostEvents to analysis.jsonl), and finish.
 			journalItem(experimentJournal, item, invocationResult, activeSession);
 
-			// Efficiency evaluation — runs before success check so failed invocations get
-			// scores too
-			Map<String, Double> efficiencyScores = Map.of();
-			if (config.efficiencyConfig() != null) {
-				try {
-					ReasoningContext reasoningContext = buildReasoningContext(invocationResult);
-					EfficiencyEvaluator evaluator = new DefaultEfficiencyEvaluator();
-					EfficiencyReport efficiencyReport = evaluator.evaluate(invocationResult, reasoningContext,
-							config.efficiencyConfig());
-					efficiencyScores = efficiencyReport.scores();
-				}
-				catch (Exception ex) {
-					logger.warn("Efficiency evaluation failed for item {}: {}", item.id(), ex.getMessage());
-				}
-			}
-
 			if (!invocationResult.success()) {
 				@Nullable Path preservedPath = preserveWorkspace(workspace, experimentId, item.slug(), activeSession);
 				return ItemResult.builder()
@@ -352,7 +332,7 @@ public class AgentExperiment {
 					.costUsd(invocationResult.totalCostUsd())
 					.totalTokens(invocationResult.totalTokens())
 					.durationMs(durationMs)
-					.scores(efficiencyScores)
+					.scores(Map.of())
 					.metrics(buildMetrics(invocationResult))
 					.executionDetail(invocationResult)
 					.workspacePath(preservedPath)
@@ -363,12 +343,10 @@ public class AgentExperiment {
 			// Judge the result
 			@Nullable Path referenceDir = resolved.referenceDir();
 			JudgmentContext judgmentContext = JudgmentContextFactory.create(item, workspace, invocationResult,
-					referenceDir, resolved.beforeDir(), invocationResult.analysis(), invocationResult.executionPlan(),
-					config);
+					referenceDir, resolved.beforeDir(), null, config);
 			Verdict verdict = jury.vote(judgmentContext);
 
 			Map<String, Double> scores = new LinkedHashMap<>(VerdictExtractor.extractScores(verdict));
-			scores.putAll(efficiencyScores);
 			boolean passed = VerdictExtractor.passed(verdict);
 
 			@Nullable Path preservedPath = preserveWorkspace(workspace, experimentId, item.slug(), activeSession);
@@ -513,11 +491,6 @@ public class AgentExperiment {
 	private static Map<String, Object> buildMetrics(InvocationResult result) {
 		return Map.of("input_tokens", result.inputTokens(), "output_tokens", result.outputTokens(), "thinking_tokens",
 				result.thinkingTokens());
-	}
-
-	private static ReasoningContext buildReasoningContext(InvocationResult invocationResult) {
-		return new ReasoningContext(invocationResult.analysis(), invocationResult.executionPlan(), Set.of(),
-				invocationResult.phases(), null, null, List.of(), null, null);
 	}
 
 	private static Map<String, Double> aggregateScores(List<ItemResult> results) {

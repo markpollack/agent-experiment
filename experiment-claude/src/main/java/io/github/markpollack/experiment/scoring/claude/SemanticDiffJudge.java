@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import io.github.markpollack.experiment.pipeline.ExecutionPlan;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -27,13 +26,10 @@ import io.github.markpollack.judge.result.Judgment;
  * LLM-powered Tier 3 judge for the {@link io.github.markpollack.judge.jury.CascadedJury}.
  *
  * <p>
- * Extracts VERIFY checkpoints from the execution plan's roadmap and asks Claude to
- * evaluate each criterion against the workspace. Produces a normalized score (0–1)
- * representing the fraction of satisfied criteria, with per-criterion diagnostic metadata
- * via {@link Check} entries.
- *
- * <p>
- * Follows the {@code ClaudePlanGenerator} pattern for Claude SDK lifecycle management.
+ * Extracts VERIFY checkpoints from the {@code plan} roadmap markdown carried in the
+ * judgment context metadata and asks Claude to evaluate each criterion against the
+ * workspace. Produces a normalized score (0–1) representing the fraction of satisfied
+ * criteria, with per-criterion diagnostic metadata via {@link Check} entries.
  */
 public class SemanticDiffJudge implements JudgeWithMetadata {
 
@@ -65,10 +61,10 @@ public class SemanticDiffJudge implements JudgeWithMetadata {
 
 	@Override
 	public Judgment judge(JudgmentContext context) {
-		// Extract plan from metadata
+		// Extract the roadmap markdown from metadata
 		Object planObj = context.metadata().get("plan");
-		if (!(planObj instanceof ExecutionPlan plan)) {
-			return Judgment.abstain("No execution plan in context metadata");
+		if (!(planObj instanceof String roadmapMarkdown)) {
+			return Judgment.abstain("No plan roadmap in context metadata");
 		}
 
 		// Extract workspace
@@ -78,9 +74,9 @@ public class SemanticDiffJudge implements JudgeWithMetadata {
 		}
 
 		// Extract criteria from roadmap
-		List<String> criteria = CriteriaExtractor.extract(plan.roadmapMarkdown());
+		List<String> criteria = CriteriaExtractor.extract(roadmapMarkdown);
 		if (criteria.isEmpty()) {
-			return Judgment.abstain("No VERIFY criteria found in execution plan roadmap");
+			return Judgment.abstain("No VERIFY criteria found in plan roadmap");
 		}
 
 		// Cap at max

@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import io.github.markpollack.experiment.pipeline.ExecutionPlan;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.claude.agent.sdk.ClaudeSyncClient;
@@ -57,12 +56,12 @@ class SemanticDiffJudgeTest {
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
-		assertThat(judgment.reasoning()).contains("No execution plan");
+		assertThat(judgment.reasoning()).contains("No plan roadmap");
 	}
 
 	@Test
 	void abstainsWhenPlanHasNoVerifyCriteria() {
-		ExecutionPlan plan = planWithRoadmap("## Step 1\n- [ ] Do something\n");
+		String plan = planWithRoadmap("## Step 1\n- [ ] Do something\n");
 		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
@@ -73,7 +72,7 @@ class SemanticDiffJudgeTest {
 
 	@Test
 	void abstainsWhenWorkspaceIsNull() {
-		ExecutionPlan plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile");
+		String plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile");
 		JudgmentContext context = JudgmentContext.builder()
 			.goal("test")
 			.workspace(null)
@@ -92,7 +91,7 @@ class SemanticDiffJudgeTest {
 	@Test
 	void passWhenAllCriteriaPass() {
 		mockStructuredResponses("PASS", "criterion satisfied", "PASS", "criterion satisfied");
-		ExecutionPlan plan = planWithRoadmap("""
+		String plan = planWithRoadmap("""
 				- [ ] VERIFY: ./mvnw compile
 				- [ ] VERIFY: ./mvnw test
 				""");
@@ -109,7 +108,7 @@ class SemanticDiffJudgeTest {
 	@Test
 	void failWhenSomeCriteriaFail() {
 		mockStructuredResponses("PASS", "ok", "FAIL", "not satisfied", "PASS", "ok");
-		ExecutionPlan plan = planWithRoadmap("""
+		String plan = planWithRoadmap("""
 				- [ ] VERIFY: criterion A
 				- [ ] VERIFY: criterion B
 				- [ ] VERIFY: criterion C
@@ -125,7 +124,7 @@ class SemanticDiffJudgeTest {
 	@Test
 	void failWhenAllCriteriaFail() {
 		mockStructuredResponses("FAIL", "not satisfied", "FAIL", "not satisfied");
-		ExecutionPlan plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile\n- [ ] VERIFY: ./mvnw test\n");
+		String plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile\n- [ ] VERIFY: ./mvnw test\n");
 		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
@@ -137,7 +136,7 @@ class SemanticDiffJudgeTest {
 	@Test
 	void diagnosticMetadataContainsCriteriaCounts() {
 		mockStructuredResponses("PASS", "ok", "PASS", "ok");
-		ExecutionPlan plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile\n- [ ] VERIFY: ./mvnw test\n");
+		String plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile\n- [ ] VERIFY: ./mvnw test\n");
 		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
@@ -149,7 +148,7 @@ class SemanticDiffJudgeTest {
 	@Test
 	void checksListHasOneCheckPerCriterion() {
 		mockStructuredResponses("PASS", "ok", "FAIL", "nope");
-		ExecutionPlan plan = planWithRoadmap("- [ ] VERIFY: criterion A\n- [ ] VERIFY: criterion B\n");
+		String plan = planWithRoadmap("- [ ] VERIFY: criterion A\n- [ ] VERIFY: criterion B\n");
 		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
@@ -172,7 +171,7 @@ class SemanticDiffJudgeTest {
 			}
 		};
 		mockStructuredResponses("PASS", "ok", "PASS", "ok");
-		ExecutionPlan plan = planWithRoadmap("""
+		String plan = planWithRoadmap("""
 				- [ ] VERIFY: criterion A
 				- [ ] VERIFY: criterion B
 				- [ ] VERIFY: criterion C
@@ -189,7 +188,7 @@ class SemanticDiffJudgeTest {
 	@Test
 	void parsesJsonStructuredOutput() {
 		mockStructuredResponses("PASS", "Build compiles successfully", "FAIL", "Tests not passing");
-		ExecutionPlan plan = planWithRoadmap("- [ ] VERIFY: compile\n- [ ] VERIFY: test\n");
+		String plan = planWithRoadmap("- [ ] VERIFY: compile\n- [ ] VERIFY: test\n");
 		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
@@ -206,7 +205,7 @@ class SemanticDiffJudgeTest {
 	@Test
 	void llmExceptionReturnsErrorJudgment() {
 		when(mockClient.connectAndReceive(anyString())).thenThrow(new RuntimeException("LLM unavailable"));
-		ExecutionPlan plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile\n");
+		String plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile\n");
 		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
@@ -248,8 +247,8 @@ class SemanticDiffJudgeTest {
 			.build();
 	}
 
-	private ExecutionPlan planWithRoadmap(String roadmap) {
-		return new ExecutionPlan(roadmap, List.of(), List.of(), 0.0, 0, 0, 0, 0L, null);
+	private String planWithRoadmap(String roadmap) {
+		return roadmap;
 	}
 
 }

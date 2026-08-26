@@ -5,7 +5,6 @@ import java.time.Duration;
 import java.util.Map;
 
 import io.github.markpollack.experiment.dataset.ItemFilter;
-import io.github.markpollack.experiment.diagnostic.EfficiencyConfig;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,7 +54,6 @@ class ExperimentConfigTest {
 		assertThat(config.baselineId()).isNull();
 		assertThat(config.preserveWorkspaces()).isNull();
 		assertThat(config.outputDir()).isNull();
-		assertThat(config.efficiencyConfig()).isNull();
 		assertThat(config.metadata()).isEmpty();
 	}
 
@@ -124,22 +122,6 @@ class ExperimentConfigTest {
 
 		assertThat(config.itemFilter()).isNotNull();
 		assertThat(config.itemFilter().bucket()).isEqualTo("A");
-	}
-
-	@Test
-	void efficiencyConfigCanBeSet() {
-		EfficiencyConfig efficiency = EfficiencyConfig.defaults();
-		ExperimentConfig config = ExperimentConfig.builder()
-			.experimentName("test")
-			.datasetDir(Path.of("/data"))
-			.model("sonnet")
-			.promptTemplate("${task}")
-			.perItemTimeout(Duration.ofMinutes(5))
-			.efficiencyConfig(efficiency)
-			.build();
-
-		assertThat(config.efficiencyConfig()).isSameAs(efficiency);
-		assertThat(config.efficiencyConfig().costCeilingUsd()).isEqualTo(5.0);
 	}
 
 	@Test

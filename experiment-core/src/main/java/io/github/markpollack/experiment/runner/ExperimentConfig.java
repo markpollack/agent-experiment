@@ -5,7 +5,6 @@ import java.time.Duration;
 import java.util.Map;
 
 import io.github.markpollack.experiment.dataset.ItemFilter;
-import io.github.markpollack.experiment.diagnostic.EfficiencyConfig;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -26,8 +25,6 @@ import org.jspecify.annotations.Nullable;
  * inspection (null = true)
  * @param outputDir directory for experiment artifacts (preserved workspaces); when null,
  * workspaces are not preserved even if preserveWorkspaces is true
- * @param efficiencyConfig optional efficiency evaluation configuration; when null,
- * efficiency evaluation is skipped (backward compatible)
  * @param projectRoot root directory of the experiment project for git versioning; when
  * null, defaults to the JVM working directory at run time
  * @param requireCleanGit when true, throw if the experiment project has uncommitted
@@ -40,8 +37,8 @@ import org.jspecify.annotations.Nullable;
 public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable ItemFilter itemFilter, String model,
 		String promptTemplate, Duration perItemTimeout, @Nullable String systemPrompt, @Nullable Path knowledgeBaseDir,
 		@Nullable Duration experimentTimeout, Map<String, String> metadata, @Nullable String baselineId,
-		@Nullable Boolean preserveWorkspaces, @Nullable Path outputDir, @Nullable EfficiencyConfig efficiencyConfig,
-		@Nullable Path projectRoot, boolean requireCleanGit, @Nullable Boolean journalEnabled) {
+		@Nullable Boolean preserveWorkspaces, @Nullable Path outputDir, @Nullable Path projectRoot,
+		boolean requireCleanGit, @Nullable Boolean journalEnabled) {
 
 	public ExperimentConfig {
 		java.util.Objects.requireNonNull(experimentName, "experimentName must not be null");
@@ -100,8 +97,6 @@ public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable
 		private @Nullable Boolean preserveWorkspaces;
 
 		private @Nullable Path outputDir;
-
-		private @Nullable EfficiencyConfig efficiencyConfig;
 
 		private @Nullable Path projectRoot;
 
@@ -177,11 +172,6 @@ public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable
 			return this;
 		}
 
-		public Builder efficiencyConfig(@Nullable EfficiencyConfig efficiencyConfig) {
-			this.efficiencyConfig = efficiencyConfig;
-			return this;
-		}
-
 		public Builder projectRoot(@Nullable Path projectRoot) {
 			this.projectRoot = projectRoot;
 			return this;
@@ -212,7 +202,7 @@ public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable
 		public ExperimentConfig build() {
 			return new ExperimentConfig(experimentName, datasetDir, itemFilter, model, promptTemplate, perItemTimeout,
 					systemPrompt, knowledgeBaseDir, experimentTimeout, metadata, baselineId, preserveWorkspaces,
-					outputDir, efficiencyConfig, projectRoot, requireCleanGit, journalEnabled);
+					outputDir, projectRoot, requireCleanGit, journalEnabled);
 		}
 
 	}

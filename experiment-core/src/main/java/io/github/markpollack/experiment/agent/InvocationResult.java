@@ -3,8 +3,6 @@ package io.github.markpollack.experiment.agent;
 import java.util.List;
 import java.util.Map;
 
-import io.github.markpollack.experiment.pipeline.AnalysisEnvelope;
-import io.github.markpollack.experiment.pipeline.ExecutionPlan;
 import io.github.markpollack.experiment.result.ExecutionDetail;
 import io.github.markpollack.journal.claude.PhaseCapture;
 import org.jspecify.annotations.Nullable;
@@ -25,16 +23,11 @@ import org.jspecify.annotations.Nullable;
  * @param sessionId agent session ID (nullable)
  * @param metadata pass-through metadata from context
  * @param errorMessage error detail if status is ERROR/TIMEOUT
- * @param analysis pipeline analysis envelope (nullable — only set by
- * PipelineAgentInvoker)
- * @param executionPlan pipeline execution plan (nullable — only set by
- * PipelineAgentInvoker)
  */
 public record InvocationResult(boolean success, TerminalStatus status, List<PhaseCapture> phases, int inputTokens,
 		int outputTokens, int thinkingTokens, int cacheCreationInputTokens, int cacheReadInputTokens,
 		double totalCostUsd, long durationMs, @Nullable String sessionId, Map<String, String> metadata,
-		@Nullable String errorMessage, @Nullable AnalysisEnvelope analysis,
-		@Nullable ExecutionPlan executionPlan) implements ExecutionDetail {
+		@Nullable String errorMessage) implements ExecutionDetail {
 
 	public InvocationResult {
 		java.util.Objects.requireNonNull(status, "status must not be null");
@@ -57,20 +50,20 @@ public record InvocationResult(boolean success, TerminalStatus status, List<Phas
 			int thinkingTokens, double totalCostUsd, long durationMs, @Nullable String sessionId,
 			Map<String, String> metadata) {
 		return new InvocationResult(true, TerminalStatus.COMPLETED, phases, inputTokens, outputTokens, thinkingTokens,
-				0, 0, totalCostUsd, durationMs, sessionId, metadata, null, null, null);
+				0, 0, totalCostUsd, durationMs, sessionId, metadata, null);
 	}
 
 	/** Factory for a timeout. */
 	public static InvocationResult timeout(long durationMs, Map<String, String> metadata,
 			@Nullable String errorMessage) {
 		return new InvocationResult(false, TerminalStatus.TIMEOUT, List.of(), 0, 0, 0, 0, 0, 0.0, durationMs, null,
-				metadata, errorMessage, null, null);
+				metadata, errorMessage);
 	}
 
 	/** Factory for an error. */
 	public static InvocationResult error(String errorMessage, Map<String, String> metadata) {
 		return new InvocationResult(false, TerminalStatus.ERROR, List.of(), 0, 0, 0, 0, 0, 0.0, 0, null, metadata,
-				errorMessage, null, null);
+				errorMessage);
 	}
 
 	/**
@@ -102,12 +95,11 @@ public record InvocationResult(boolean success, TerminalStatus status, List<Phas
 		if (hasError) {
 			return new InvocationResult(false, TerminalStatus.ERROR, phases, totalInput, totalOutput, totalThinking,
 					totalCacheCreation, totalCacheRead, totalCost, durationMs, resolvedSessionId, metadata,
-					"Agent reported error", null, null);
+					"Agent reported error");
 		}
 
 		return new InvocationResult(true, TerminalStatus.COMPLETED, phases, totalInput, totalOutput, totalThinking,
-				totalCacheCreation, totalCacheRead, totalCost, durationMs, resolvedSessionId, metadata, null, null,
-				null);
+				totalCacheCreation, totalCacheRead, totalCost, durationMs, resolvedSessionId, metadata, null);
 	}
 
 }

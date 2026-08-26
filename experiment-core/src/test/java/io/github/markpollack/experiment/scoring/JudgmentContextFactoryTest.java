@@ -8,8 +8,6 @@ import java.util.Map;
 import io.github.markpollack.experiment.agent.InvocationResult;
 import io.github.markpollack.experiment.agent.TerminalStatus;
 import io.github.markpollack.experiment.dataset.DatasetItem;
-import io.github.markpollack.experiment.pipeline.AnalysisEnvelope;
-import io.github.markpollack.experiment.pipeline.ExecutionPlan;
 import io.github.markpollack.experiment.runner.ExperimentConfig;
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.context.ExecutionStatus;
@@ -88,7 +86,7 @@ class JudgmentContextFactoryTest {
 		Path beforeDir = Path.of("/tmp/before");
 
 		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, beforeDir,
-				null, null, null);
+				null, null);
 
 		assertThat(ctx.metadata()).containsEntry("beforeDir", beforeDir);
 	}
@@ -96,23 +94,16 @@ class JudgmentContextFactoryTest {
 	@Test
 	void omitsBeforeDirWhenNull() {
 		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
-				null, null);
+				null);
 
 		assertThat(ctx.metadata()).doesNotContainKey("beforeDir");
 	}
 
-	// ==================== Enriched 8-param overload ====================
+	// ==================== Enriched 7-param overload ====================
 
 	@Test
 	void fullEnrichmentPopulatesAllMetadataKeys() {
-		AnalysisEnvelope analysis = AnalysisEnvelope.builder()
-			.projectName("petclinic")
-			.bootVersion("2.7.18")
-			.javaVersion("11")
-			.buildTool("maven")
-			.build();
-		ExecutionPlan plan = new ExecutionPlan("# Roadmap\n## Step 1", List.of("javax-to-jakarta"), List.of(), 0.02,
-				500, 300, 100, 5000, "plan-session");
+		String planRoadmap = "# Roadmap\n## Step 1";
 		ExperimentConfig config = ExperimentConfig.builder()
 			.experimentName("test")
 			.datasetDir(Path.of("/dataset"))
@@ -123,39 +114,23 @@ class JudgmentContextFactoryTest {
 			.build();
 
 		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), REFERENCE_DIR,
-				null, analysis, plan, config);
+				null, planRoadmap, config);
 
 		assertThat(ctx.metadata()).containsEntry("expectedDir", REFERENCE_DIR);
-		assertThat(ctx.metadata()).containsEntry("analysis", analysis);
-		assertThat(ctx.metadata()).containsEntry("plan", plan);
+		assertThat(ctx.metadata()).containsEntry("plan", planRoadmap);
 		assertThat(ctx.metadata()).containsEntry("targetBootVersion", "3.0.0");
 		assertThat(ctx.metadata()).containsEntry("targetJavaVersion", "17");
 		assertThat(ctx.metadata()).containsEntry("targetClassVersion", 61);
 	}
 
 	@Test
-	void partialEnrichmentOnlyAnalysis() {
-		AnalysisEnvelope analysis = AnalysisEnvelope.builder().projectName("petclinic").buildTool("maven").build();
+	void partialEnrichmentOnlyPlan() {
+		String planRoadmap = "# Roadmap";
 
 		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null,
-				analysis, null, null);
+				planRoadmap, null);
 
-		assertThat(ctx.metadata()).containsEntry("analysis", analysis);
-		assertThat(ctx.metadata()).doesNotContainKey("plan");
-		assertThat(ctx.metadata()).doesNotContainKey("expectedDir");
-		assertThat(ctx.metadata()).doesNotContainKey("beforeDir");
-		assertThat(ctx.metadata()).doesNotContainKey("targetBootVersion");
-	}
-
-	@Test
-	void partialEnrichmentOnlyPlan() {
-		ExecutionPlan plan = new ExecutionPlan("# Roadmap", List.of(), List.of(), 0.01, 200, 100, 50, 3000, null);
-
-		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
-				plan, null);
-
-		assertThat(ctx.metadata()).containsEntry("plan", plan);
-		assertThat(ctx.metadata()).doesNotContainKey("analysis");
+		assertThat(ctx.metadata()).containsEntry("plan", planRoadmap);
 		assertThat(ctx.metadata()).doesNotContainKey("targetBootVersion");
 	}
 
@@ -171,18 +146,18 @@ class JudgmentContextFactoryTest {
 			.build();
 
 		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
-				null, config);
+				config);
 
 		assertThat(ctx.metadata()).containsEntry("targetBootVersion", "3.0.0");
 		assertThat(ctx.metadata()).doesNotContainKey("targetJavaVersion");
 		assertThat(ctx.metadata()).doesNotContainKey("targetClassVersion");
-		assertThat(ctx.metadata()).doesNotContainKey("analysis");
+		assertThat(ctx.metadata()).doesNotContainKey("plan");
 	}
 
 	@Test
 	void noEnrichmentBackwardCompatible() {
 		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
-				null, null);
+				null);
 
 		assertThat(ctx.goal()).isEqualTo("Upgrade Spring Boot to 3.x");
 		assertThat(ctx.workspace()).isEqualTo(WORKSPACE);
@@ -202,7 +177,7 @@ class JudgmentContextFactoryTest {
 			.build();
 
 		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
-				null, config);
+				config);
 
 		assertThat(ctx.metadata()).doesNotContainKey("targetBootVersion");
 		assertThat(ctx.metadata()).doesNotContainKey("targetJavaVersion");
@@ -221,7 +196,7 @@ class JudgmentContextFactoryTest {
 			.build();
 
 		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
-				null, config);
+				config);
 
 		Object classVersion = ctx.metadata().get("targetClassVersion");
 		assertThat(classVersion).isInstanceOf(Integer.class);
