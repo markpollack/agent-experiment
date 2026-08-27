@@ -25,9 +25,17 @@
         </dependency>
 
         <!-- Claude SDK -->
+        <!-- Agent client -->
         <dependency>
             <groupId>io.github.markpollack</groupId>
-            <artifactId>claude-code-sdk</artifactId>
+            <artifactId>agent-client-core</artifactId>
+        </dependency>
+
+        <!-- Claude model (optional convenience default — make model injectable to avoid hard dep) -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>agent-claude</artifactId>
+            <optional>true</optional>
         </dependency>
         <!-- Null safety -->
         <dependency>

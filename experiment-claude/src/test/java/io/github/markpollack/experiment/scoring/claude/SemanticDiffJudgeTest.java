@@ -3,16 +3,18 @@ package io.github.markpollack.experiment.scoring.claude;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import io.github.markpollack.claude.agent.sdk.ClaudeSyncClient;
-import io.github.markpollack.claude.agent.sdk.transport.CLIOptions;
-import io.github.markpollack.claude.agent.sdk.types.Message;
-import io.github.markpollack.claude.agent.sdk.types.ResultMessage;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.markpollack.agents.model.AgentApi;
+import io.github.markpollack.agents.model.AgentGeneration;
+import io.github.markpollack.agents.model.AgentGenerationMetadata;
+import io.github.markpollack.agents.model.AgentResponse;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
@@ -21,26 +23,35 @@ import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class SemanticDiffJudgeTest {
 
-	private ClaudeSyncClient mockClient;
+	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+	private final Queue<String> cannedOutputs = new ArrayDeque<>();
+
+	private RuntimeException providerFailure;
 
 	private SemanticDiffJudge judge;
 
+	/**
+	 * A stub provider: no Claude, no CLI, no subclassing of the judge. Proves the judge
+	 * drives whatever {@link AgentApi} it is given.
+	 */
+	private final AgentApi stubProvider = request -> {
+		if (providerFailure != null) {
+			throw providerFailure;
+		}
+		String output = cannedOutputs.isEmpty() ? "" : cannedOutputs.poll();
+		return new AgentResponse(
+				List.of(new AgentGeneration(output, new AgentGenerationMetadata("SUCCESS", Map.of()))));
+	};
+
 	@BeforeEach
 	void setUp() {
-		mockClient = mock(ClaudeSyncClient.class);
-		SemanticDiffJudgeConfig config = SemanticDiffJudgeConfig.defaults();
-		judge = new SemanticDiffJudge(config) {
-			@Override
-			ClaudeSyncClient buildClient(CLIOptions options, Path workspace) {
-				return mockClient;
-			}
-		};
+		cannedOutputs.clear();
+		providerFailure = null;
+		judge = new SemanticDiffJudge(SemanticDiffJudgeConfig.defaults(), stubProvider);
 	}
 
 	@Test
@@ -164,12 +175,7 @@ class SemanticDiffJudgeTest {
 	@Test
 	void maxCriteriaToEvaluateCapsEvaluatedCount() {
 		SemanticDiffJudgeConfig limitedConfig = new SemanticDiffJudgeConfig("sonnet", 2, Duration.ofMinutes(2));
-		SemanticDiffJudge limitedJudge = new SemanticDiffJudge(limitedConfig) {
-			@Override
-			ClaudeSyncClient buildClient(CLIOptions options, Path workspace) {
-				return mockClient;
-			}
-		};
+		SemanticDiffJudge limitedJudge = new SemanticDiffJudge(limitedConfig, stubProvider);
 		mockStructuredResponses("PASS", "ok", "PASS", "ok");
 		String plan = planWithRoadmap("""
 				- [ ] VERIFY: criterion A
@@ -204,7 +210,7 @@ class SemanticDiffJudgeTest {
 
 	@Test
 	void llmExceptionReturnsErrorJudgment() {
-		when(mockClient.connectAndReceive(anyString())).thenThrow(new RuntimeException("LLM unavailable"));
+		providerFailure = new RuntimeException("LLM unavailable");
 		String plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile\n");
 		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
 
@@ -214,25 +220,65 @@ class SemanticDiffJudgeTest {
 		assertThat(judgment.reasoning()).contains("failed due to LLM errors");
 	}
 
+	@Test
+	void judgeModelIsRecordedInTheJudgment() {
+		mockStructuredResponses("PASS", "ok");
+		JudgmentContext context = contextWithMetadata(Map.of("plan", planWithRoadmap("- [ ] VERIFY: compile\n")));
+
+		Judgment judgment = judge.judge(context);
+
+		// A score is not interpretable without knowing which instrument produced it.
+		assertThat(judgment.metadata()).containsEntry("judgeModel", "sonnet");
+	}
+
+	@Test
+	void theJudgeDoesNotInheritTheSubjectsModel() {
+		SemanticDiffJudge haikuJudge = new SemanticDiffJudge(
+				new SemanticDiffJudgeConfig("haiku", 20, Duration.ofMinutes(2)), stubProvider);
+		mockStructuredResponses("PASS", "ok");
+
+		// The context describes a run of some other model; the judge must ignore it.
+		Judgment judgment = haikuJudge
+			.judge(contextWithMetadata(Map.of("plan", planWithRoadmap("- [ ] VERIFY: compile\n"), "model", "opus")));
+
+		assertThat(judgment.metadata()).containsEntry("judgeModel", "haiku");
+	}
+
+	@Test
+	void optionsCarryTheSchemaAndTheJudgesOwnModel() {
+		var options = judge.buildOptions(Path.of("/tmp/test-workspace"));
+
+		assertThat(options.getModel()).isEqualTo("sonnet");
+		assertThat(options.getWorkingDirectory()).isEqualTo("/tmp/test-workspace");
+		assertThat(options.getJsonSchema()).isNotNull().containsKey("properties");
+	}
+
+	@Test
+	void proseIsStillParsedButRecordsLowerConfidence() {
+		cannedOutputs.add("PASS - the build compiles cleanly");
+		JudgmentContext context = contextWithMetadata(Map.of("plan", planWithRoadmap("- [ ] VERIFY: compile\n")));
+
+		Judgment judgment = judge.judge(context);
+
+		// A provider that ignores the schema still scores, and the fallback is visible.
+		assertThat(judgment.checks()).hasSize(1);
+		assertThat(judgment.checks().get(0).passed()).isTrue();
+	}
+
 	/**
-	 * Mocks connectAndReceive to return ResultMessage with structured output. Takes
-	 * alternating result/reasoning pairs: "PASS", "reason1", "FAIL", "reason2", ...
+	 * Queues the provider's structured-output answers, as the JSON a schema-honouring
+	 * provider returns. Takes alternating result/reasoning pairs: "PASS", "reason1",
+	 * "FAIL", "reason2", ...
 	 */
 	private void mockStructuredResponses(String... resultReasoningPairs) {
-		List<Iterable<Message>> responses = new ArrayList<>();
 		for (int i = 0; i < resultReasoningPairs.length; i += 2) {
-			String result = resultReasoningPairs[i];
-			String reasoning = resultReasoningPairs[i + 1];
-			ResultMessage rm = ResultMessage.builder()
-				.structuredOutput(Map.of("result", result, "reasoning", reasoning))
-				.build();
-			responses.add(List.of(rm));
-		}
-
-		@SuppressWarnings("unchecked")
-		var stub = when(mockClient.connectAndReceive(anyString()));
-		for (Iterable<Message> response : responses) {
-			stub = stub.thenReturn(response);
+			try {
+				cannedOutputs.add(OBJECT_MAPPER.writeValueAsString(
+						Map.of("result", resultReasoningPairs[i], "reasoning", resultReasoningPairs[i + 1])));
+			}
+			catch (Exception ex) {
+				throw new IllegalStateException(ex);
+			}
 		}
 	}
 

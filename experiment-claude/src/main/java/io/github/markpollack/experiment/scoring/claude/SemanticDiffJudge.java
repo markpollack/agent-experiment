@@ -9,12 +9,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import io.github.markpollack.claude.agent.sdk.ClaudeClient;
-import io.github.markpollack.claude.agent.sdk.ClaudeSyncClient;
-import io.github.markpollack.claude.agent.sdk.config.PermissionMode;
-import io.github.markpollack.claude.agent.sdk.transport.CLIOptions;
-import io.github.markpollack.claude.agent.sdk.types.Message;
-import io.github.markpollack.claude.agent.sdk.types.ResultMessage;
+import io.github.markpollack.agents.claude.ClaudeAgentModel;
+import io.github.markpollack.agents.claude.ClaudeAgentOptions;
+import io.github.markpollack.agents.client.AgentClient;
+import io.github.markpollack.agents.model.AgentApi;
+import io.github.markpollack.agents.model.AgentOptions;
+import org.jspecify.annotations.Nullable;
 import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.JudgeWithMetadata;
@@ -27,9 +27,24 @@ import io.github.markpollack.judge.result.Judgment;
  *
  * <p>
  * Extracts VERIFY checkpoints from the {@code plan} roadmap markdown carried in the
- * judgment context metadata and asks Claude to evaluate each criterion against the
+ * judgment context metadata and asks an agent to evaluate each criterion against the
  * workspace. Produces a normalized score (0–1) representing the fraction of satisfied
  * criteria, with per-criterion diagnostic metadata via {@link Check} entries.
+ *
+ * <p>
+ * Runs through {@link AgentClient} rather than a vendor SDK. The default model is
+ * {@link ClaudeAgentModel}; pass an {@link AgentApi} to drive a different provider, in
+ * which case the caller owns its lifecycle.
+ *
+ * <h2>The judge does not inherit its subject's model</h2>
+ *
+ * <p>
+ * The model comes from {@link SemanticDiffJudgeConfig}, never from the experiment under
+ * test. An experiment varies its subject and holds everything else constant; a judge that
+ * switched model with its subject would be a second variable, and a silent one — every
+ * run would still complete and every score would still be produced. The model that
+ * produced a score is therefore written into the judgment metadata as {@code judgeModel},
+ * because a score is not interpretable without it.
  */
 public class SemanticDiffJudge implements JudgeWithMetadata {
 
@@ -50,8 +65,21 @@ public class SemanticDiffJudge implements JudgeWithMetadata {
 
 	private final SemanticDiffJudgeConfig config;
 
+	private final @Nullable AgentApi agentApi;
+
 	public SemanticDiffJudge(SemanticDiffJudgeConfig config) {
+		this(config, null);
+	}
+
+	/**
+	 * @param config judging policy, including the model that is this instrument's
+	 * identity
+	 * @param agentApi the model to drive, or null for the {@link ClaudeAgentModel}
+	 * default; when non-null the caller owns its lifecycle
+	 */
+	public SemanticDiffJudge(SemanticDiffJudgeConfig config, @Nullable AgentApi agentApi) {
 		this.config = config;
+		this.agentApi = agentApi;
 	}
 
 	@Override
@@ -125,38 +153,13 @@ public class SemanticDiffJudge implements JudgeWithMetadata {
 			.checks(checks)
 			.metadata("criteriaTotal", results.size())
 			.metadata("criteriaPassed", passed)
+			.metadata("judgeModel", config.model())
 			.build();
 	}
 
 	CriterionResult evaluateCriterion(String criterion, Path workspace) {
-		CLIOptions options = buildOptions();
-		try (ClaudeSyncClient client = buildClient(options, workspace)) {
-			String prompt = buildEvaluationPrompt(criterion);
-
-			// Use connectAndReceive to access ResultMessage.structuredOutput
-			// connectText() only returns AssistantMessage text (thinking/tool-use
-			// narrative),
-			// not the --json-schema structured output which lives in the ResultMessage
-			String structuredJson = null;
-			String textFallback = null;
-			StringBuilder textBuilder = new StringBuilder();
-			for (Message msg : client.connectAndReceive(prompt)) {
-				if (msg instanceof ResultMessage rm && rm.hasStructuredOutput()) {
-					Map<String, Object> output = rm.getStructuredOutputAsMap();
-					if (output != null) {
-						structuredJson = OBJECT_MAPPER.writeValueAsString(output);
-					}
-				}
-				else if (msg instanceof io.github.markpollack.claude.agent.sdk.types.AssistantMessage am) {
-					textBuilder.append(am.text());
-				}
-			}
-			if (textBuilder.length() > 0) {
-				textFallback = textBuilder.toString();
-			}
-
-			// Prefer structured output, fall back to text
-			String response = structuredJson != null ? structuredJson : textFallback;
+		try {
+			String response = evaluate(buildEvaluationPrompt(criterion), workspace);
 			return parseResponse(criterion, response);
 		}
 		catch (Exception ex) {
@@ -165,18 +168,44 @@ public class SemanticDiffJudge implements JudgeWithMetadata {
 		}
 	}
 
-	CLIOptions buildOptions() {
-		String resolvedModel = resolveModelId(config.model());
-		return CLIOptions.builder()
-			.permissionMode(PermissionMode.DANGEROUSLY_SKIP_PERMISSIONS)
-			.model(resolvedModel)
+	/**
+	 * Runs one criterion prompt and returns the agent's primary output. Package-private
+	 * for testability.
+	 *
+	 * <p>
+	 * The structured output requested by {@link #EVALUATION_SCHEMA} arrives as that
+	 * primary output: a provider asked for a schema answers with it. When a provider
+	 * answers in prose instead, {@link #parseResponse} still reads it and records the
+	 * lower confidence, so the difference stays visible rather than silent.
+	 */
+	String evaluate(String prompt, Path workspace) {
+		AgentOptions options = buildOptions(workspace);
+
+		if (this.agentApi != null) {
+			return AgentClient.create(this.agentApi).run(prompt, options).getResult();
+		}
+
+		try (ClaudeAgentModel model = ClaudeAgentModel.builder()
+			.workingDirectory(workspace)
 			.timeout(config.timeout())
-			.jsonSchema(EVALUATION_SCHEMA)
-			.build();
+			.build()) {
+			return AgentClient.create(model).run(prompt, options).getResult();
+		}
 	}
 
-	ClaudeSyncClient buildClient(CLIOptions options, Path workspace) {
-		return ClaudeClient.sync(options).workingDirectory(workspace).build();
+	/**
+	 * Builds the provider options for one criterion evaluation. Package-private for
+	 * testability. Model names pass through untranslated — the CLI resolves its own
+	 * aliases, so no model table is pinned here.
+	 */
+	AgentOptions buildOptions(Path workspace) {
+		return ClaudeAgentOptions.builder()
+			.model(config.model())
+			.timeout(config.timeout())
+			.workingDirectory(workspace.toString())
+			.yolo(true)
+			.jsonSchema(EVALUATION_SCHEMA)
+			.build();
 	}
 
 	private String buildEvaluationPrompt(String criterion) {
@@ -228,15 +257,6 @@ public class SemanticDiffJudge implements JudgeWithMetadata {
 		}
 
 		return new CriterionResult(criterion, false, "Ambiguous LLM response: " + response.strip(), 0.5);
-	}
-
-	static String resolveModelId(String name) {
-		return switch (name.toLowerCase()) {
-			case "sonnet" -> CLIOptions.MODEL_SONNET;
-			case "haiku" -> CLIOptions.MODEL_HAIKU;
-			case "opus" -> CLIOptions.MODEL_OPUS;
-			default -> name;
-		};
 	}
 
 }
