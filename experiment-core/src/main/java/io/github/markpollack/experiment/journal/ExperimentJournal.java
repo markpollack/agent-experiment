@@ -79,9 +79,19 @@ public final class ExperimentJournal {
 
 	private final @Nullable JournalStorage storage;
 
-	private ExperimentJournal(String experimentName, @Nullable JournalStorage storage) {
+	private final @Nullable Path journalRoot;
+
+	/**
+	 * Where provider transcripts are looked for. Overridable so tests can exercise the
+	 * real copy path against a fixture directory rather than the developer's own CLI
+	 * history.
+	 */
+	private Path rawSearchRoot = RawSessionArchive.defaultClaudeProjectsRoot();
+
+	private ExperimentJournal(String experimentName, @Nullable JournalStorage storage, @Nullable Path journalRoot) {
 		this.experimentName = java.util.Objects.requireNonNull(experimentName, "experimentName must not be null");
 		this.storage = storage;
+		this.journalRoot = journalRoot;
 	}
 
 	/**
@@ -108,7 +118,7 @@ public final class ExperimentJournal {
 			}
 		}
 		logger.info("Journaling enabled for experiment '{}' at {}", experimentName, journalRoot);
-		return new ExperimentJournal(experimentName, storage);
+		return new ExperimentJournal(experimentName, storage, journalRoot);
 	}
 
 	/**
@@ -117,7 +127,7 @@ public final class ExperimentJournal {
 	 * @return a disabled journal
 	 */
 	public static ExperimentJournal disabled(String experimentName) {
-		return new ExperimentJournal(experimentName, null);
+		return new ExperimentJournal(experimentName, null, null);
 	}
 
 	/** Whether this journal writes a durable trace (vs. a no-op). */
@@ -161,6 +171,7 @@ public final class ExperimentJournal {
 			return RunJournal.noop();
 		}
 		RunRecorder recorder;
+		String runId;
 		synchronized (GLOBAL_LOCK) {
 			JournalStorage previous = Journal.storage();
 			Journal.configure(storage);
@@ -189,13 +200,37 @@ public final class ExperimentJournal {
 				// uuids.
 				builder = builder.config("provider_session_id",
 						providerSessionId != null ? providerSessionId : NO_PROVIDER_SESSION);
-				recorder = new RunRecorder(builder.start(), storage);
+				Run startedRun = builder.start();
+				recorder = new RunRecorder(startedRun, storage);
+				runId = startedRun.id();
 			}
 			finally {
 				Journal.configure(previous);
 			}
 		}
+		// Archive the provider transcript now: the invocation has completed by the time
+		// journalItem runs, so the session file is closed, and the CLI prunes on its own
+		// schedule rather than ours. This is the only irreversible slice of capture — see
+		// RawSessionArchive.
+		if (journalRoot != null) {
+			Path runArtifactDir = journalRoot.resolve("experiments")
+				.resolve(experimentName)
+				.resolve("runs")
+				.resolve(runId);
+			RawSessionArchive.archive(runArtifactDir, providerSessionId, rawSearchRoot);
+		}
 		return new JsonFileRunJournal(recorder);
+	}
+
+	/**
+	 * Overrides the provider-transcript search root. Package-private: production always
+	 * uses the CLI's own location.
+	 * @param root the directory to search for provider transcripts
+	 * @return this journal, for chaining
+	 */
+	ExperimentJournal withRawSearchRoot(Path root) {
+		this.rawSearchRoot = root;
+		return this;
 	}
 
 	/**
