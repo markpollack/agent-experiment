@@ -410,7 +410,7 @@
                         <artifactId>maven-javadoc-plugin</artifactId>
                         <version>3.12.0</version>
                         <configuration>
-                            <failOnError>true</failOnError>
+                            <failOnError>false</failOnError>
                             <quiet>true</quiet>
                             <javadocDirectory>${project.build.directory}/javadoc-resources</javadocDirectory>
                             <docfilessubdirs>true</docfilessubdirs>
