@@ -34,6 +34,26 @@ public class ClaudeSdkInvoker implements AgentInvoker {
 
 	private final ClaudeSdkInvokerConfig config;
 
+	/**
+	 * Declares the options that govern how much work the agent may do.
+	 *
+	 * <p>
+	 * These were previously applied and never recorded: the ceiling reached the SDK and
+	 * stopped there, so two runs at different ceilings were compared as though alike.
+	 * Declaring them here is what puts them in the run record. Only limits are declared —
+	 * the values that change what a run was permitted to do, and therefore whether two
+	 * runs are comparable.
+	 */
+	@Override
+	public java.util.Map<String, String> declaredConditions() {
+		java.util.Map<String, String> declared = new java.util.TreeMap<>();
+		declared.put("maxTurns", String.valueOf(this.config.maxTurns()));
+		declared.put("maxBudgetUsd", String.valueOf(this.config.maxBudgetUsd()));
+		declared.put("maxThinkingTokens", String.valueOf(this.config.maxThinkingTokens()));
+		declared.put("permissionMode", String.valueOf(this.config.permissionMode()));
+		return declared;
+	}
+
 	public ClaudeSdkInvoker(ClaudeSdkInvokerConfig config) {
 		this.config = java.util.Objects.requireNonNull(config, "config must not be null");
 	}

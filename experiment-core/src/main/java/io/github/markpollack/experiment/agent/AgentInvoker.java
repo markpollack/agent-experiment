@@ -36,4 +36,25 @@ public interface AgentInvoker {
 	 */
 	InvocationResult invoke(InvocationContext context) throws AgentInvocationException;
 
+	/**
+	 * The conditions this invoker will actually apply, for the run record.
+	 *
+	 * <p>
+	 * An invoker's configuration does not otherwise cross into
+	 * {@code ExperimentConfig}/{@code ExperimentResult}: a turn ceiling was once set
+	 * here, applied during the run, and never recorded, so two runs permitted different
+	 * amounts of work were compared as though they were alike. Declaring the ceiling here
+	 * is what puts it in the record.
+	 *
+	 * <p>
+	 * The default returns empty, meaning <em>did not declare</em> rather than <em>no
+	 * conditions</em>. A run including an invoker that declares nothing is marked
+	 * incomplete and will not be compared. Override this in any invoker whose
+	 * configuration governs how much work the agent may do.
+	 * @return condition name to value; empty means undeclared
+	 */
+	default java.util.Map<String, String> declaredConditions() {
+		return java.util.Map.of();
+	}
+
 }

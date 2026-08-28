@@ -29,6 +29,19 @@ public class DefaultComparisonEngine implements ComparisonEngine {
 
 	@Override
 	public ComparisonResult compare(ExperimentResult current, ExperimentResult baseline) {
+		// The conditions mark is load-bearing here or it is decorative everywhere. Two
+		// runs
+		// permitted different amounts of work did not measure the same thing, and two
+		// runs that
+		// never said what they were permitted cannot be shown to have. Refusing here is
+		// what
+		// stops a comparison being drawn across them, which is how a withdrawn headline
+		// happened.
+		List<String> blockers = current.conditions().incomparabilityWith(baseline.conditions());
+		if (!blockers.isEmpty()) {
+			throw new IncomparableConditionsException(current.experimentId(), baseline.experimentId(), blockers);
+		}
+
 		Map<String, ItemResult> currentByItem = indexById(current);
 		Map<String, ItemResult> baselineByItem = indexById(baseline);
 

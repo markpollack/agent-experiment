@@ -24,6 +24,7 @@ import java.util.concurrent.TimeoutException;
 
 import io.github.markpollack.experiment.agent.AgentInvocationException;
 import io.github.markpollack.experiment.agent.AgentInvoker;
+import io.github.markpollack.experiment.result.RunConditions;
 import io.github.markpollack.experiment.agent.InvocationContext;
 import io.github.markpollack.experiment.agent.InvocationResult;
 import io.github.markpollack.experiment.agent.TerminalStatus;
@@ -157,6 +158,30 @@ public class AgentExperiment {
 		return config.outputDir().resolve(config.experimentName()).resolve(experimentId);
 	}
 
+	/**
+	 * The conditions this run executed under, gathered at run time from the components
+	 * that know them.
+	 *
+	 * <p>
+	 * The framework's own governing parameters come from {@link ExperimentConfig}; the
+	 * invoker's come from {@link AgentInvoker#declaredConditions()}, because an invoker's
+	 * configuration does not otherwise cross into the result. An invoker that declares
+	 * nothing leaves the run marked incomplete rather than looking like a run with no
+	 * conditions, and {@code DefaultComparisonEngine} then refuses to compare it.
+	 */
+	private static RunConditions runConditions(AgentInvoker agentInvoker, ExperimentConfig config) {
+		Map<String, String> framework = new java.util.TreeMap<>();
+		framework.put("model", config.model());
+		framework.put("perItemTimeout", config.perItemTimeout().toString());
+		if (config.experimentTimeout() != null) {
+			framework.put("experimentTimeout", config.experimentTimeout().toString());
+		}
+		framework.put("requireCleanGit", String.valueOf(config.requireCleanGit()));
+		return RunConditions.undeclared("invoker")
+			.declaring("config", framework)
+			.declaring("invoker", agentInvoker.declaredConditions());
+	}
+
 	private ExperimentResult doRun(AgentInvoker agentInvoker, long startTime, String experimentId,
 			@Nullable Path runDir, @Nullable ActiveSession activeSession) {
 		// Capture experiment code git state for reproducibility
@@ -227,6 +252,7 @@ public class AgentExperiment {
 			.totalDurationMs(totalDurationMs)
 			.codeVersion(codeVersion)
 			.codeDirty(codeDirty)
+			.conditions(runConditions(agentInvoker, config))
 			.build();
 
 		resultStore.save(experimentResult);

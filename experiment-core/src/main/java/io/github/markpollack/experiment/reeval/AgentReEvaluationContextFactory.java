@@ -56,6 +56,10 @@ public class AgentReEvaluationContextFactory implements ReEvaluationContextFacto
 		return switch (status) {
 			case COMPLETED -> ExecutionStatus.SUCCESS;
 			case TIMEOUT -> ExecutionStatus.TIMEOUT;
+			// A ceiling cut the agent off. Closer to a timeout than a failure: the agent
+			// did not
+			// fail at the task, it was not permitted to finish it.
+			case MAX_TURNS -> ExecutionStatus.TIMEOUT;
 			case ERROR -> ExecutionStatus.FAILED;
 		};
 	}

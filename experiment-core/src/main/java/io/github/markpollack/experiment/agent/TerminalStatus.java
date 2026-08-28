@@ -11,6 +11,9 @@ public enum TerminalStatus {
 	/** Agent was terminated due to timeout. */
 	TIMEOUT,
 
+	/** Agent was cut off by its configured turn ceiling. Distinct from failing. */
+	MAX_TURNS,
+
 	/** Agent encountered an unrecoverable error. */
 	ERROR
 

@@ -32,7 +32,7 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 		boolean datasetDirty, String datasetSemanticVersion, @Nullable KnowledgeManifest knowledgeManifest,
 		Instant timestamp, List<ItemResult> items, Map<String, String> metadata, Map<String, Double> aggregateScores,
 		double passRate, double totalCostUsd, int totalTokens, long totalDurationMs, @Nullable String codeVersion,
-		boolean codeDirty) {
+		boolean codeDirty, RunConditions conditions) {
 
 	public ExperimentResult {
 		java.util.Objects.requireNonNull(experimentId, "experimentId must not be null");
@@ -42,6 +42,7 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 		items = List.copyOf(items);
 		metadata = Map.copyOf(metadata);
 		aggregateScores = Map.copyOf(aggregateScores);
+		conditions = conditions == null ? RunConditions.undeclared() : conditions;
 	}
 
 	public static Builder builder() {
@@ -69,6 +70,8 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 		private Map<String, String> metadata = Map.of();
 
 		private Map<String, Double> aggregateScores = Map.of();
+
+		private RunConditions conditions = RunConditions.undeclared();
 
 		private double passRate;
 
@@ -130,6 +133,17 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 			return this;
 		}
 
+		/**
+		 * The conditions this run was executed under. Defaults to
+		 * {@link RunConditions#undeclared()} — a run that declares nothing is marked
+		 * incomplete and will not be compared, rather than silently looking like a run
+		 * with no conditions.
+		 */
+		public Builder conditions(RunConditions conditions) {
+			this.conditions = conditions;
+			return this;
+		}
+
 		public Builder aggregateScores(Map<String, Double> aggregateScores) {
 			this.aggregateScores = aggregateScores;
 			return this;
@@ -168,7 +182,7 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 		public ExperimentResult build() {
 			return new ExperimentResult(experimentId, experimentName, datasetVersion, datasetDirty,
 					datasetSemanticVersion, knowledgeManifest, timestamp, items, metadata, aggregateScores, passRate,
-					totalCostUsd, totalTokens, totalDurationMs, codeVersion, codeDirty);
+					totalCostUsd, totalTokens, totalDurationMs, codeVersion, codeDirty, conditions);
 		}
 
 	}
