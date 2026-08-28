@@ -278,8 +278,8 @@ public class AgentExperiment {
 		}
 		String variant = activeSession != null ? activeSession.variantName() : "default";
 		String session = activeSession != null ? activeSession.sessionName() : null;
-		try (RunJournal journal = experimentJournal.openItem(item.id(), item.slug(), config.model(), variant,
-				session)) {
+		try (RunJournal journal = experimentJournal.openItem(item.id(), item.slug(), config.model(), variant, session,
+				invocationResult.sessionId())) {
 			for (PhaseCapture phase : invocationResult.phases()) {
 				journal.recordPhase(phase);
 			}

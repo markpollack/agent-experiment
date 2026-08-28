@@ -99,7 +99,8 @@ class ExperimentJournalConcurrencyTest {
 		startTogether.await();
 		for (int k = 0; k < ITEMS_PER_ARM; k++) {
 			String itemId = "item-" + arm + "-" + k;
-			try (RunJournal run = journal.openItem(itemId, itemId, "opus", "arm-" + arm, "sweep-1")) {
+			try (RunJournal run = journal.openItem(itemId, itemId, "opus", "arm-" + arm, "sweep-1",
+					"provider-" + arm + "-" + k)) {
 				run.recordPhase(phaseWithTools(toolA(arm, k), toolB(arm, k)));
 				run.finish();
 			}

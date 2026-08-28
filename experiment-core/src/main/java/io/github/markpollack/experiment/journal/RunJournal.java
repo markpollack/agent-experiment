@@ -16,7 +16,8 @@ import io.github.markpollack.journal.claude.PhaseCapture;
  *
  * <p>
  * Always used as an {@link AutoCloseable} around an item's phases: <pre>{@code
- * try (RunJournal journal = experimentJournal.openItem(itemId, itemSlug, model)) {
+ * try (RunJournal journal = experimentJournal.openItem(itemId, itemSlug, model, variant, session,
+ *         invocationResult.sessionId())) {
  *     for (PhaseCapture phase : invocationResult.phases()) {
  *         journal.recordPhase(phase);
  *     }

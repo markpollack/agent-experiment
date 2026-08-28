@@ -79,7 +79,7 @@ class JournalCaptureLiveIT {
 
 		// Drive the EXACT slice-2 journal path with the real capture.
 		ExperimentJournal journal = ExperimentJournal.open(journalRoot, "live-journal-exp");
-		try (RunJournal run = journal.openItem("LIVE-001", "live-item", "haiku", "default", null)) {
+		try (RunJournal run = journal.openItem("LIVE-001", "live-item", "haiku", "default", null, result.sessionId())) {
 			for (PhaseCapture phase : result.phases()) {
 				run.recordPhase(phase);
 			}
