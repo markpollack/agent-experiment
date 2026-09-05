@@ -28,6 +28,7 @@ import io.github.markpollack.experiment.result.RunConditions;
 import io.github.markpollack.experiment.agent.InvocationContext;
 import io.github.markpollack.experiment.agent.InvocationResult;
 import io.github.markpollack.experiment.agent.TerminalStatus;
+import io.github.markpollack.experiment.agent.ToolTelemetry;
 import io.github.markpollack.experiment.dataset.Dataset;
 import io.github.markpollack.experiment.dataset.DatasetItem;
 import io.github.markpollack.experiment.dataset.DatasetManager;
@@ -515,8 +516,10 @@ public class AgentExperiment {
 	}
 
 	private static Map<String, Object> buildMetrics(InvocationResult result) {
+		ToolTelemetry telemetry = result.toolTelemetry();
 		return Map.of("input_tokens", result.inputTokens(), "output_tokens", result.outputTokens(), "thinking_tokens",
-				result.thinkingTokens());
+				result.thinkingTokens(), "num_turns", telemetry.numTurns(), "tool_calls", telemetry.totalToolCalls(),
+				"permission_denials", telemetry.permissionDenials());
 	}
 
 	private static Map<String, Double> aggregateScores(List<ItemResult> results) {

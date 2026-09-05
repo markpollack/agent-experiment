@@ -45,6 +45,15 @@ public record InvocationResult(boolean success, TerminalStatus status, List<Phas
 		return totalInputTokens() + outputTokens + thinkingTokens;
 	}
 
+	/**
+	 * Tool activity tally (per-tool call counts, bash-command breakdown, conversation
+	 * turns, permission denials) derived from the phase captures. Computed on access,
+	 * mirroring {@link #totalTokens()}; not a serialized field.
+	 */
+	public ToolTelemetry toolTelemetry() {
+		return ToolTelemetry.fromPhases(phases);
+	}
+
 	/** Factory for a successful completion. */
 	public static InvocationResult completed(List<PhaseCapture> phases, int inputTokens, int outputTokens,
 			int thinkingTokens, double totalCostUsd, long durationMs, @Nullable String sessionId,
