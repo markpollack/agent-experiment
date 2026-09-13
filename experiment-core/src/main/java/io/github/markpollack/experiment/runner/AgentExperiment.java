@@ -36,11 +36,13 @@ import io.github.markpollack.experiment.dataset.ResolvedItem;
 import io.github.markpollack.experiment.journal.ExperimentJournal;
 import io.github.markpollack.experiment.journal.RunJournal;
 import io.github.markpollack.experiment.result.ExperimentResult;
+import io.github.markpollack.experiment.result.InstrumentRecord;
 import io.github.markpollack.experiment.result.ItemResult;
 import io.github.markpollack.experiment.result.RecordedVerdict;
 import io.github.markpollack.experiment.result.KnowledgeManifest;
 import io.github.markpollack.experiment.runner.workspace.DefaultWorkspaceProvisioner;
 import io.github.markpollack.experiment.runner.workspace.WorkspaceProvisioner;
+import io.github.markpollack.experiment.scoring.InstrumentRecorder;
 import io.github.markpollack.experiment.scoring.JudgmentContextFactory;
 import io.github.markpollack.experiment.util.GitOperations;
 import io.github.markpollack.experiment.scoring.VerdictExtractor;
@@ -72,6 +74,9 @@ public class AgentExperiment {
 
 	private final Jury jury;
 
+	/** The jury described once, before any vote; stamped on every verdict it produces. */
+	private final InstrumentRecord instrument;
+
 	private final ResultStore resultStore;
 
 	private final @Nullable SessionStore sessionStore;
@@ -99,6 +104,7 @@ public class AgentExperiment {
 			@Nullable SessionStore sessionStore, ExperimentConfig config, WorkspaceProvisioner workspaceProvisioner) {
 		this.datasetManager = java.util.Objects.requireNonNull(datasetManager, "datasetManager must not be null");
 		this.jury = java.util.Objects.requireNonNull(jury, "jury must not be null");
+		this.instrument = InstrumentRecorder.describe(jury);
 		this.resultStore = java.util.Objects.requireNonNull(resultStore, "resultStore must not be null");
 		this.sessionStore = sessionStore;
 		this.config = java.util.Objects.requireNonNull(config, "config must not be null");
@@ -253,6 +259,7 @@ public class AgentExperiment {
 			.codeVersion(codeVersion)
 			.codeDirty(codeDirty)
 			.conditions(runConditions(agentInvoker, config))
+			.instrument(instrument)
 			.build();
 
 		resultStore.save(experimentResult);
@@ -387,7 +394,7 @@ public class AgentExperiment {
 				.scores(scores)
 				.metrics(buildMetrics(invocationResult))
 				.executionDetail(invocationResult)
-				.verdict(RecordedVerdict.from(verdict))
+				.verdict(RecordedVerdict.from(verdict, instrument.specHash()))
 				.workspacePath(preservedPath)
 				.metadata(Map.of())
 				.build();

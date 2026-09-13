@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The vote counts one jury recorded for one item, read from its stored aggregation
- * evidence.
+ * evidence, beside the roster its recorded instrument lists.
  *
  * <p>
  * Every count is nullable, and null means <em>not recorded</em>. It never means zero: a
@@ -29,11 +29,13 @@ import org.jspecify.annotations.Nullable;
  * @param eligibleCount judgments that contributed to the reduction, when recorded
  * @param explicitAbstainCount judgments that abstained on their own, when recorded
  * @param errorCount judgments that errored, when recorded
+ * @param rosterCount judgments the jury was configured to submit — its seats, or a
+ * meta-jury's members — when the verdict's instrument was recorded
  */
 public record VoteCount(String scope, @Nullable String relation, @Nullable RecordedJudgmentStatus outcome,
 		@Nullable String failureCode, @Nullable String strategy, @Nullable String errorPolicy,
 		@Nullable Integer inputCount, @Nullable Integer eligibleCount, @Nullable Integer explicitAbstainCount,
-		@Nullable Integer errorCount) {
+		@Nullable Integer errorCount, @Nullable Integer rosterCount) {
 
 	public VoteCount {
 		java.util.Objects.requireNonNull(scope, "scope must not be null");
@@ -46,18 +48,35 @@ public record VoteCount(String scope, @Nullable String relation, @Nullable Recor
 		return this.inputCount != null && this.eligibleCount != null && this.errorCount != null;
 	}
 
-	static VoteCount of(String scope, @Nullable String relation, RecordedJudgment aggregated) {
+	/**
+	 * True when the instrument that produced this verdict recorded this jury's roster.
+	 */
+	public boolean hasRoster() {
+		return this.rosterCount != null;
+	}
+
+	/**
+	 * True when this jury counted a different number of submitted judgments than its
+	 * roster lists — the counted twin disagreeing with the configuration it describes.
+	 */
+	public boolean contradictsRoster() {
+		return hasEvidence() && hasRoster() && !this.rosterCount.equals(this.inputCount);
+	}
+
+	static VoteCount of(String scope, @Nullable String relation, RecordedJudgment aggregated,
+			@Nullable Integer rosterCount) {
 		Map<?, ?> evidence = aggregated.metadata().get(Judgment.AGGREGATION_KEY) instanceof Map<?, ?> map ? map
 				: Map.of();
 		return new VoteCount(scope, relation, aggregated.status(), null, text(evidence, AggregationEvidence.STRATEGY),
 				text(evidence, AggregationEvidence.ERROR_POLICY), count(evidence, AggregationEvidence.INPUT_COUNT),
 				count(evidence, AggregationEvidence.ELIGIBLE_COUNT),
 				count(evidence, AggregationEvidence.EXPLICIT_ABSTAIN_COUNT),
-				count(evidence, AggregationEvidence.ERROR_COUNT));
+				count(evidence, AggregationEvidence.ERROR_COUNT), rosterCount);
 	}
 
-	static VoteCount failed(String scope, String relation, @Nullable String failureCode) {
-		return new VoteCount(scope, relation, null, failureCode, null, null, null, null, null, null);
+	static VoteCount failed(String scope, String relation, @Nullable String failureCode,
+			@Nullable Integer rosterCount) {
+		return new VoteCount(scope, relation, null, failureCode, null, null, null, null, null, null, rosterCount);
 	}
 
 	private static @Nullable String text(Map<?, ?> evidence, String key) {

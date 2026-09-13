@@ -8,12 +8,14 @@ import java.util.Optional;
 import io.github.markpollack.experiment.agent.InvocationResult;
 import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.result.ItemResult;
+import io.github.markpollack.experiment.result.RecordedVerdict;
 import io.github.markpollack.experiment.store.InMemoryResultStore;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.SimpleJury;
+import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.result.Judgment;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -165,6 +167,45 @@ class ReEvaluatorTest {
 		assertThat(comparison).isNotNull();
 		assertThat(comparison.currentExperimentId()).isEqualTo(reEvaluated.experimentId());
 		assertThat(comparison.baselineExperimentId()).isEqualTo(original.experimentId());
+	}
+
+	@Test
+	void reEvaluationRecordsItsOwnJuryOnTheRunAndOnEachRescoredVerdict() {
+		ExperimentResult original = createOriginalResult(true);
+		resultStore.save(original);
+
+		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(failingJudge()));
+
+		assertThat(reEvaluated.instrument()).isNotNull();
+		assertThat(reEvaluated.instrument().specHash()).isNotNull();
+		assertThat(reEvaluated.items().get(0).verdict().instrumentHash())
+			.isEqualTo(reEvaluated.instrument().specHash());
+	}
+
+	@Test
+	void skippedItemKeepsTheInstrumentItWasScoredByAndIsNotCheckedAgainstTheNewOne() {
+		Verdict originalVerdict = juryWith(passingJudge()).vote(JudgmentContext.builder().goal("original").build());
+		ItemResult failedButJudged = ItemResult.builder()
+			.itemId("ITEM-FAILED")
+			.itemSlug("failed-item")
+			.success(false)
+			.verdict(RecordedVerdict.from(originalVerdict, "original-instrument"))
+			.build();
+		ExperimentResult original = experimentWith(List.of(failedButJudged));
+		resultStore.save(original);
+
+		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(passingJudge()));
+
+		ItemResult skipped = reEvaluated.items().get(0);
+		assertThat(skipped.verdict().instrumentHash()).isEqualTo("original-instrument")
+			.isNotEqualTo(reEvaluated.instrument().specHash());
+		assertThat(io.github.markpollack.experiment.attestation.RunAttestation.of(reEvaluated)
+			.items()
+			.get(0)
+			.attestability())
+			.isEqualTo(io.github.markpollack.experiment.attestation.Attestability.VOTES_WITHOUT_ROSTER);
 	}
 
 	// --- Helpers ---

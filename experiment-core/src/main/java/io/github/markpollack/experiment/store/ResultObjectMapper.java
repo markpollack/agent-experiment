@@ -229,7 +229,8 @@ final class ResultObjectMapper {
 				attempts.add(RecordedCompositeAttempt.legacy(legacyIndex++,
 						mapper.treeToValue(subVerdict, RecordedVerdict.class)));
 			}
-			return new RecordedVerdict(aggregated, individual, individualByName, weights, attempts);
+			return new RecordedVerdict(aggregated, individual, individualByName, weights, attempts,
+					nullableText(node.get("instrumentHash")));
 		}
 
 	}

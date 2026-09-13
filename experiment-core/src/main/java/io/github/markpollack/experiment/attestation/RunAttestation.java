@@ -27,10 +27,13 @@ public record RunAttestation(String experimentId, String experimentName, List<It
 		items = List.copyOf(items);
 	}
 
-	/** Read a run's attestation from what it stored. Reads only; changes nothing. */
+	/**
+	 * Read a run's attestation from what it stored, checking each verdict against the
+	 * instrument the run recorded. Reads only; changes nothing.
+	 */
 	public static RunAttestation of(ExperimentResult result) {
 		return new RunAttestation(result.experimentId(), result.experimentName(),
-				result.items().stream().map(ItemAttestation::of).toList());
+				result.items().stream().map(item -> ItemAttestation.of(item, result.instrument())).toList());
 	}
 
 	/** Items with the given attestability. */

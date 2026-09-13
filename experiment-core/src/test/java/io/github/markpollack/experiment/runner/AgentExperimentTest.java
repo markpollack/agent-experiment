@@ -82,6 +82,26 @@ class AgentExperimentTest {
 	}
 
 	@Test
+	void runRecordsTheJuryItWasScoredWithAndStampsItOnEveryVerdict() {
+		Jury jury = juryWith(passingJudge("build_judge"));
+		ExperimentConfig config = defaultConfig().build();
+		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
+
+		ExperimentResult result = runner.run(mockAgent);
+
+		assertThat(result.instrument()).isNotNull();
+		assertThat(result.instrument().describeFailure()).isNull();
+		assertThat(result.instrument().specHash()).matches("[0-9a-f]{64}");
+		assertThat(result.instrument().description()).containsEntry("kind", "SIMPLE");
+		for (ItemResult item : result.items()) {
+			assertThat(item.verdict().instrumentHash()).isEqualTo(result.instrument().specHash());
+		}
+		var attestation = io.github.markpollack.experiment.attestation.RunAttestation.of(result);
+		assertThat(attestation.count(io.github.markpollack.experiment.attestation.Attestability.ATTESTED))
+			.isEqualTo(result.items().size());
+	}
+
+	@Test
 	void runAggregatesScoresAcrossItems() {
 		Jury jury = juryWith(passingJudge("build_judge"));
 		ExperimentConfig config = defaultConfig().build();
