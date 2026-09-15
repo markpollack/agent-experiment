@@ -119,7 +119,7 @@ class RosterAttestationTest {
 		Map<String, Object> twoSeats = Map.of("kind", "SIMPLE", "seats", List.of(Map.of(), Map.of()));
 		Map<String, Object> description = Map.of("descriptionVersion", 1, "kind", "META", "members",
 				List.of(Map.of("name", "first", "jury", twoSeats), Map.of("name", "second", "jury", twoSeats)));
-		InstrumentRecord instrument = new InstrumentRecord(1, "meta-hash", description, null, Map.of());
+		InstrumentRecord instrument = new InstrumentRecord(1, "meta-hash", description, null, Map.of(), Map.of());
 		RecordedVerdict member = verdict(2, List.of(), null);
 		RecordedVerdict meta = verdict(2,
 				List.of(new RecordedCompositeAttempt("first", "meta_member", null, member, null),

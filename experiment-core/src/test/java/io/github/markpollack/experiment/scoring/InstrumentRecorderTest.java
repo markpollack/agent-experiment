@@ -31,6 +31,9 @@ class InstrumentRecorderTest {
 		assertThat(instrument.description()).containsEntry("kind", "SIMPLE");
 		assertThat((List<?>) instrument.description().get("seats")).hasSize(2);
 		assertThat(instrument.libraries()).containsKey("agent-judge-core");
+		// A snapshot version names no particular build, so the jar's own bytes are what
+		// identify the code that scored the run.
+		assertThat(instrument.artifacts().get("agent-judge-core")).matches("sha256:[0-9a-f]{64}");
 	}
 
 	@Test

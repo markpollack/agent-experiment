@@ -34,6 +34,20 @@
         <developerConnection>scm:git:git@github.com:markpollack/agent-experiment.git</developerConnection>
     </scm>
 
+    <repositories>
+        <!-- agent-judge is consumed as a published snapshot; Maven does not search this by default. -->
+        <repository>
+            <id>central-snapshots</id>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -43,7 +57,15 @@
 
         <!-- Dependency versions -->
         <claude-code-capture.version>1.10.0</claude-code-capture.version>
-        <agent-judge.version>0.17.0-SNAPSHOT</agent-judge.version>
+        <!--
+            Pinned to one published snapshot BUILD, not to the floating 0.17.0-SNAPSHOT.
+            A floating snapshot names different code as the library's main branch moves, and
+            a local `mvn install` of that version replaces it in ~/.m2 without changing the
+            version string, so two builds of this project can compile against different
+            libraries and both call it 0.17.0-SNAPSHOT. This build is AJ-18 + AJ-21 + AJ-22.
+            Moving to a later build is a deliberate migration, not a side effect of the clock.
+        -->
+        <agent-judge.version>0.17.0-20260914.144944-4</agent-judge.version>
         <claude-code-sdk.version>1.6.0</claude-code-sdk.version>
         <agent-workflow.version>0.12.2</agent-workflow.version>
         <agent-client.version>0.30.0</agent-client.version>

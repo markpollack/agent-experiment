@@ -28,6 +28,7 @@ import io.github.markpollack.experiment.result.RunConditions;
 import io.github.markpollack.experiment.agent.InvocationContext;
 import io.github.markpollack.experiment.agent.InvocationResult;
 import io.github.markpollack.experiment.agent.TerminalStatus;
+import io.github.markpollack.experiment.attestation.InstrumentFailures;
 import io.github.markpollack.experiment.dataset.Dataset;
 import io.github.markpollack.experiment.dataset.DatasetItem;
 import io.github.markpollack.experiment.dataset.DatasetManager;
@@ -273,6 +274,11 @@ public class AgentExperiment {
 				config.experimentName(), String.format("%.1f%%", passRate * 100), String.format("%.4f", totalCost),
 				totalTokens, totalDurationMs);
 
+		// Only now, with the agent's work persisted, does an instrument failure stop the
+		// run. The judging is cheap to repeat from the stored result; the agent's work is
+		// not.
+		InstrumentFailures.failIfAny(experimentResult);
+
 		return experimentResult;
 	}
 
@@ -383,7 +389,7 @@ public class AgentExperiment {
 			boolean passed = VerdictExtractor.passed(verdict);
 
 			@Nullable Path preservedPath = preserveWorkspace(workspace, experimentId, item.slug(), activeSession);
-			return ItemResult.builder()
+			return InstrumentFailures.mark(ItemResult.builder()
 				.itemId(item.id())
 				.itemSlug(item.slug())
 				.success(true)
@@ -397,7 +403,7 @@ public class AgentExperiment {
 				.verdict(RecordedVerdict.from(verdict, instrument.specHash()))
 				.workspacePath(preservedPath)
 				.metadata(Map.of())
-				.build();
+				.build(), instrument);
 
 		}
 		catch (Exception ex) {
