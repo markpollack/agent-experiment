@@ -8,13 +8,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.github.markpollack.experiment.result.ExperimentResult;
+import io.github.markpollack.experiment.result.InstrumentRecord;
 import io.github.markpollack.experiment.result.ItemResult;
 import io.github.markpollack.experiment.result.RecordedVerdict;
+import io.github.markpollack.experiment.scoring.InstrumentRecorder;
 import io.github.markpollack.experiment.scoring.VerdictExtractor;
 import io.github.markpollack.experiment.store.ResultStore;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.Verdict;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Re-scores stored experiment results with a new Jury. Does NOT re-invoke the original
@@ -52,7 +55,11 @@ public final class ReEvaluator {
 	 * @return a new experiment result with re-evaluated scores
 	 */
 	public ExperimentResult reEvaluate(ExperimentResult original, Jury jury) {
-		List<ItemResult> items = original.items().stream().map(item -> reEvaluateItem(item, jury)).toList();
+		InstrumentRecord instrument = InstrumentRecorder.describe(jury);
+		List<ItemResult> items = original.items()
+			.stream()
+			.map(item -> reEvaluateItem(item, jury, instrument.specHash()))
+			.toList();
 
 		double passRate = items.isEmpty() ? 0.0
 				: (double) items.stream().filter(ItemResult::passed).count() / items.size();
@@ -75,6 +82,7 @@ public final class ReEvaluator {
 			.totalCostUsd(original.totalCostUsd())
 			.totalTokens(original.totalTokens())
 			.totalDurationMs(0)
+			.instrument(instrument)
 			.build();
 
 		resultStore.save(result);
@@ -93,7 +101,7 @@ public final class ReEvaluator {
 		return reEvaluate(original, jury);
 	}
 
-	private ItemResult reEvaluateItem(ItemResult original, Jury jury) {
+	private ItemResult reEvaluateItem(ItemResult original, Jury jury, @Nullable String instrumentHash) {
 		Optional<JudgmentContext> context = contextFactory.create(original);
 
 		if (context.isEmpty()) {
@@ -105,7 +113,7 @@ public final class ReEvaluator {
 		return original.toBuilder()
 			.passed(VerdictExtractor.passed(verdict))
 			.scores(VerdictExtractor.extractScores(verdict))
-			.verdict(RecordedVerdict.from(verdict))
+			.verdict(RecordedVerdict.from(verdict, instrumentHash))
 			.metadata(merge(original.metadata(),
 					Map.of("reEvaluated", "true", "systemReinvoked", "false", "originalCostUsd",
 							String.valueOf(original.costUsd()), "reEvaluationJury", jury.getClass().getSimpleName())))

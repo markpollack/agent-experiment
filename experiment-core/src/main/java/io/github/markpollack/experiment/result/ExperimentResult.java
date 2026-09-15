@@ -27,12 +27,15 @@ import org.jspecify.annotations.Nullable;
  * @param codeVersion git commit SHA of the experiment project at run time (null if not in
  * a git repo)
  * @param codeDirty whether the experiment project had uncommitted changes at run time
+ * @param conditions the conditions the run executed under
+ * @param instrument the jury this run was scored with, described before any vote (null
+ * when not recorded)
  */
 public record ExperimentResult(String experimentId, String experimentName, @Nullable String datasetVersion,
 		boolean datasetDirty, String datasetSemanticVersion, @Nullable KnowledgeManifest knowledgeManifest,
 		Instant timestamp, List<ItemResult> items, Map<String, String> metadata, Map<String, Double> aggregateScores,
 		double passRate, double totalCostUsd, int totalTokens, long totalDurationMs, @Nullable String codeVersion,
-		boolean codeDirty, RunConditions conditions) {
+		boolean codeDirty, RunConditions conditions, @Nullable InstrumentRecord instrument) {
 
 	public ExperimentResult {
 		java.util.Objects.requireNonNull(experimentId, "experimentId must not be null");
@@ -72,6 +75,8 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 		private Map<String, Double> aggregateScores = Map.of();
 
 		private RunConditions conditions = RunConditions.undeclared();
+
+		private @Nullable InstrumentRecord instrument;
 
 		private double passRate;
 
@@ -144,6 +149,15 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 			return this;
 		}
 
+		/**
+		 * The jury this run was scored with. Defaults to null, meaning not recorded —
+		 * never to an empty description, which would pass for a jury with no judges.
+		 */
+		public Builder instrument(@Nullable InstrumentRecord instrument) {
+			this.instrument = instrument;
+			return this;
+		}
+
 		public Builder aggregateScores(Map<String, Double> aggregateScores) {
 			this.aggregateScores = aggregateScores;
 			return this;
@@ -182,7 +196,7 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 		public ExperimentResult build() {
 			return new ExperimentResult(experimentId, experimentName, datasetVersion, datasetDirty,
 					datasetSemanticVersion, knowledgeManifest, timestamp, items, metadata, aggregateScores, passRate,
-					totalCostUsd, totalTokens, totalDurationMs, codeVersion, codeDirty, conditions);
+					totalCostUsd, totalTokens, totalDurationMs, codeVersion, codeDirty, conditions, instrument);
 		}
 
 	}
