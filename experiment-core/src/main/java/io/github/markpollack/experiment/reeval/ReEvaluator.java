@@ -111,10 +111,11 @@ public final class ReEvaluator {
 
 		Verdict verdict = jury.vote(context.get());
 
+		RecordedVerdict recorded = RecordedVerdict.from(verdict, instrumentHash);
 		return original.toBuilder()
-			.passed(VerdictExtractor.passed(verdict))
+			.passed(ItemAccounting.passedFlag(recorded))
 			.scores(VerdictExtractor.extractScores(verdict))
-			.verdict(RecordedVerdict.from(verdict, instrumentHash))
+			.verdict(recorded)
 			.metadata(merge(withoutInstrumentFailure(original.metadata()),
 					Map.of("reEvaluated", "true", "systemReinvoked", "false", "originalCostUsd",
 							String.valueOf(original.costUsd()), "reEvaluationJury", jury.getClass().getSimpleName())))

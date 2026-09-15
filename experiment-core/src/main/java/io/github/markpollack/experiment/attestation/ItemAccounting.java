@@ -49,6 +49,22 @@ public final class ItemAccounting {
 		return new ItemCounts(passes, nonPasses, excluded, instrumentFailures, notJudged, unattestable);
 	}
 
+	/**
+	 * Whether the jury passed the subject, or null when it decided nothing about it.
+	 *
+	 * <p>
+	 * Null rather than false for an excluded, unattestable or unjudged item. A run nobody
+	 * judged and a run that failed everything are different results; recording false for
+	 * both is how they came to render identically.
+	 */
+	public static @Nullable Boolean passedFlag(@Nullable RecordedVerdict verdict) {
+		return switch (outcomeOf(ItemResult.builder().itemId("x").itemSlug("x").verdict(verdict).build())) {
+			case PASS -> Boolean.TRUE;
+			case NON_PASS -> Boolean.FALSE;
+			case EXCLUDED, UNATTESTABLE, NOT_JUDGED -> null;
+		};
+	}
+
 	/** What this item says about the subject. */
 	public static SubjectOutcome outcomeOf(ItemResult item) {
 		RecordedVerdict verdict = item.verdict();

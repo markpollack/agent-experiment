@@ -1,0 +1,89 @@
+{
+  "experimentId" : "nothing-scored",
+  "experimentName" : "conformance",
+  "datasetVersion" : null,
+  "datasetDirty" : false,
+  "datasetSemanticVersion" : "1.0.0",
+  "knowledgeManifest" : null,
+  "timestamp" : "2026-09-15T00:00:00Z",
+  "items" : [ {
+    "itemId" : "a",
+    "itemSlug" : "a",
+    "success" : true,
+    "passed" : null,
+    "costUsd" : 0.0,
+    "totalTokens" : 0,
+    "durationMs" : 0,
+    "scores" : { },
+    "metrics" : { },
+    "executionDetail" : null,
+    "verdict" : {
+      "aggregated" : {
+        "status" : "not_applicable",
+        "reasoning" : "recorded",
+        "checks" : [ ],
+        "metadata" : { }
+      },
+      "individual" : [ ],
+      "individualByName" : { },
+      "weights" : { },
+      "seats" : [ ],
+      "decision" : {
+        "kind" : "own"
+      },
+      "compositeAttempts" : [ ]
+    },
+    "metadata" : { },
+    "workspacePath" : null
+  }, {
+    "itemId" : "b",
+    "itemSlug" : "b",
+    "success" : true,
+    "passed" : null,
+    "costUsd" : 0.0,
+    "totalTokens" : 0,
+    "durationMs" : 0,
+    "scores" : { },
+    "metrics" : { },
+    "executionDetail" : null,
+    "verdict" : {
+      "aggregated" : {
+        "status" : "error",
+        "reasonCode" : "judge_failed",
+        "reasoning" : "recorded",
+        "checks" : [ ],
+        "metadata" : { }
+      },
+      "individual" : [ ],
+      "individualByName" : { },
+      "weights" : { },
+      "seats" : [ ],
+      "decision" : {
+        "kind" : "own"
+      },
+      "compositeAttempts" : [ ]
+    },
+    "metadata" : { },
+    "workspacePath" : null
+  } ],
+  "metadata" : { },
+  "aggregateScores" : { },
+  "counts" : {
+    "passes" : 0,
+    "nonPasses" : 0,
+    "excluded" : 2,
+    "instrumentFailures" : 1,
+    "notJudged" : 0,
+    "unattestable" : 0
+  },
+  "totalCostUsd" : 0.0,
+  "totalTokens" : 0,
+  "totalDurationMs" : 0,
+  "codeVersion" : null,
+  "codeDirty" : false,
+  "conditions" : {
+    "values" : { },
+    "undeclaredBy" : [ ]
+  },
+  "instrument" : null
+}

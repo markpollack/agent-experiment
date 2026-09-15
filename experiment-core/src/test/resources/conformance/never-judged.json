@@ -1,0 +1,44 @@
+{
+  "experimentId" : "never-judged",
+  "experimentName" : "conformance",
+  "datasetVersion" : null,
+  "datasetDirty" : false,
+  "datasetSemanticVersion" : "1.0.0",
+  "knowledgeManifest" : null,
+  "timestamp" : "2026-09-15T00:00:00Z",
+  "items" : [ {
+    "itemId" : "a",
+    "itemSlug" : "a",
+    "success" : true,
+    "passed" : null,
+    "costUsd" : 0.0,
+    "totalTokens" : 0,
+    "durationMs" : 0,
+    "scores" : { },
+    "metrics" : { },
+    "executionDetail" : null,
+    "verdict" : null,
+    "metadata" : { },
+    "workspacePath" : null
+  } ],
+  "metadata" : { },
+  "aggregateScores" : { },
+  "counts" : {
+    "passes" : 0,
+    "nonPasses" : 0,
+    "excluded" : 0,
+    "instrumentFailures" : 0,
+    "notJudged" : 1,
+    "unattestable" : 0
+  },
+  "totalCostUsd" : 0.0,
+  "totalTokens" : 0,
+  "totalDurationMs" : 0,
+  "codeVersion" : null,
+  "codeDirty" : false,
+  "conditions" : {
+    "values" : { },
+    "undeclaredBy" : [ ]
+  },
+  "instrument" : null
+}

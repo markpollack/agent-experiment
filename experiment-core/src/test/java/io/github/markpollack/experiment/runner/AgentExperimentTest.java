@@ -130,7 +130,11 @@ class AgentExperimentTest {
 		// Failed item is recorded
 		ItemResult failedItem = result.items().stream().filter(i -> i.itemId().equals("SIMPLE-001")).findFirst().get();
 		assertThat(failedItem.success()).isFalse();
-		assertThat(failedItem.passed()).isFalse();
+		// The agent did not complete, so no jury reached this item. That is an absence,
+		// not a subject that failed, and the counts keep the two apart.
+		assertThat(failedItem.passed()).isNull();
+		assertThat(result.counts().notJudged()).isEqualTo(1);
+		assertThat(result.counts().nonPasses()).isZero();
 		// Other item still succeeds
 		ItemResult otherItem = result.items().stream().filter(i -> i.itemId().equals("SIMPLE-002")).findFirst().get();
 		assertThat(otherItem.success()).isTrue();

@@ -370,7 +370,9 @@ public class AgentExperiment {
 					.itemId(item.id())
 					.itemSlug(item.slug())
 					.success(false)
-					.passed(false)
+					// The agent did not complete, so no jury ever reached this item. That
+					// is not the subject failing.
+					.passed(null)
 					.costUsd(invocationResult.totalCostUsd())
 					.totalTokens(invocationResult.totalTokens())
 					.durationMs(durationMs)
@@ -389,7 +391,9 @@ public class AgentExperiment {
 			Verdict verdict = jury.vote(judgmentContext);
 
 			Map<String, Double> scores = new LinkedHashMap<>(VerdictExtractor.extractScores(verdict));
-			boolean passed = VerdictExtractor.passed(verdict);
+			RecordedVerdict recorded = RecordedVerdict.from(verdict, instrument.specHash());
+			// Null when the jury decided nothing about the subject, never false.
+			Boolean passed = ItemAccounting.passedFlag(recorded);
 
 			@Nullable Path preservedPath = preserveWorkspace(workspace, experimentId, item.slug(), activeSession);
 			return InstrumentFailures.mark(ItemResult.builder()
@@ -403,7 +407,7 @@ public class AgentExperiment {
 				.scores(scores)
 				.metrics(buildMetrics(invocationResult))
 				.executionDetail(invocationResult)
-				.verdict(RecordedVerdict.from(verdict, instrument.specHash()))
+				.verdict(recorded)
 				.workspacePath(preservedPath)
 				.metadata(Map.of())
 				.build(), instrument);
@@ -417,7 +421,7 @@ public class AgentExperiment {
 				.itemId(item.id())
 				.itemSlug(item.slug())
 				.success(false)
-				.passed(false)
+				.passed(null)
 				.durationMs(durationMs)
 				.scores(Map.of())
 				.metrics(Map.of())

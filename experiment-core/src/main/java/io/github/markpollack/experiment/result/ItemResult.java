@@ -11,7 +11,11 @@ import org.jspecify.annotations.Nullable;
  * @param itemId stable fixture ID (matches across runs)
  * @param itemSlug human-readable fixture slug
  * @param success whether agent invocation succeeded
- * @param passed derived convenience: verdict pass/fail (false if invocation failed)
+ * @param passed whether the jury passed the subject, or <b>null when the jury decided
+ * nothing about it</b>: the item was never judged, the criteria did not apply, or the
+ * instrument could not score it. Null is not false. A run nobody judged and a run that
+ * failed everything are different results, and writing false for both is what made them
+ * render identically on a chart
  * @param costUsd cost in USD for this item
  * @param totalTokens total tokens for this item
  * @param durationMs wall-clock duration for this item
@@ -25,7 +29,7 @@ import org.jspecify.annotations.Nullable;
  * @param metadata item-level metadata
  * @param workspacePath path to preserved workspace (null when not preserved)
  */
-public record ItemResult(String itemId, String itemSlug, boolean success, boolean passed, double costUsd,
+public record ItemResult(String itemId, String itemSlug, boolean success, @Nullable Boolean passed, double costUsd,
 		int totalTokens, long durationMs, Map<String, Double> scores, Map<String, Object> metrics,
 		@Nullable ExecutionDetail executionDetail, @Nullable RecordedVerdict verdict, Map<String, Object> metadata,
 		@Nullable Path workspacePath) {
@@ -70,7 +74,7 @@ public record ItemResult(String itemId, String itemSlug, boolean success, boolea
 
 		private boolean success;
 
-		private boolean passed;
+		private @Nullable Boolean passed;
 
 		private double costUsd;
 
@@ -108,7 +112,11 @@ public record ItemResult(String itemId, String itemSlug, boolean success, boolea
 			return this;
 		}
 
-		public Builder passed(boolean passed) {
+		/**
+		 * Whether the jury passed the subject. Pass null when it decided nothing — never
+		 * judged, not applicable, or unscorable — rather than false.
+		 */
+		public Builder passed(@Nullable Boolean passed) {
 			this.passed = passed;
 			return this;
 		}
