@@ -62,7 +62,8 @@
             A floating snapshot names different code as the library's main branch moves, and
             a local `mvn install` of that version replaces it in ~/.m2 without changing the
             version string, so two builds of this project can compile against different
-            libraries and both call it 0.17.0-SNAPSHOT. This build is AJ-18 + AJ-21 + AJ-22.
+            libraries and both call it 0.17.0-SNAPSHOT. This build is the one carrying the
+            jury description API this project records.
             Moving to a later build is a deliberate migration, not a side effect of the clock.
         -->
         <agent-judge.version>0.17.0-20260914.144944-4</agent-judge.version>
