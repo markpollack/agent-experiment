@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import io.github.markpollack.experiment.attestation.InstrumentFailures;
 import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.result.InstrumentRecord;
 import io.github.markpollack.experiment.result.ItemResult;
@@ -58,7 +59,7 @@ public final class ReEvaluator {
 		InstrumentRecord instrument = InstrumentRecorder.describe(jury);
 		List<ItemResult> items = original.items()
 			.stream()
-			.map(item -> reEvaluateItem(item, jury, instrument.specHash()))
+			.map(item -> InstrumentFailures.mark(reEvaluateItem(item, jury, instrument.specHash()), instrument))
 			.toList();
 
 		double passRate = items.isEmpty() ? 0.0
@@ -86,6 +87,7 @@ public final class ReEvaluator {
 			.build();
 
 		resultStore.save(result);
+		InstrumentFailures.failIfAny(result);
 		return result;
 	}
 

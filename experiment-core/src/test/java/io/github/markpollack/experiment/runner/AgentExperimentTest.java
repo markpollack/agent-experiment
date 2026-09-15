@@ -28,6 +28,7 @@ import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.result.Judgment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AgentExperimentTest {
 
@@ -365,6 +366,55 @@ class AgentExperimentTest {
 		assertThat(result.experimentName()).isEqualTo("test-experiment");
 		assertThat(result.items()).hasSizeGreaterThan(0);
 		assertThat(resultStore.size()).isEqualTo(1);
+	}
+
+	@Test
+	void aJuryThatVotesWithFewerJudgesThanItListsKeepsTheWorkThenFailsTheRun() {
+		Jury listed = SimpleJury.builder()
+			.judge(passingJudge("a"), 1.0)
+			.judge(passingJudge("b"), 1.0)
+			.judge(passingJudge("c"), 1.0)
+			.votingStrategy(new io.github.markpollack.judge.jury.MajorityVotingStrategy())
+			.build();
+		Jury voting = juryWith(passingJudge("a"));
+		Jury silentlyShort = new Jury() {
+			@Override
+			public List<Judge> getJudges() {
+				return listed.getJudges();
+			}
+
+			@Override
+			public io.github.markpollack.judge.jury.VotingStrategy getVotingStrategy() {
+				return listed.getVotingStrategy();
+			}
+
+			@Override
+			public io.github.markpollack.judge.jury.Verdict vote(JudgmentContext context) {
+				return voting.vote(context);
+			}
+
+			@Override
+			public io.github.markpollack.judge.description.JuryDescription describe() {
+				return listed.describe();
+			}
+		};
+		AgentExperiment runner = new AgentExperiment(datasetManager, silentlyShort, resultStore,
+				defaultConfig().build());
+
+		assertThatThrownBy(() -> runner.run(mockAgent))
+			.isInstanceOf(io.github.markpollack.experiment.attestation.InstrumentFailureException.class)
+			.hasMessageContaining("did not convene as configured");
+
+		// The agent's work is the expensive half and it survives the instrument's
+		// failure: the result is saved before the run fails, and the items are marked as
+		// a jury failure rather than as an agent that did not pass.
+		assertThat(resultStore.size()).isEqualTo(1);
+		ExperimentResult saved = resultStore.listByName("test-experiment").get(0);
+		for (ItemResult item : saved.items()) {
+			assertThat(item.metadata()).containsEntry("instrumentFailure", "rosterMismatch");
+			assertThat(item.metadata().get("instrumentFailureDetail").toString()).contains("lists 3, voted 1");
+			assertThat(item.passed()).isTrue();
+		}
 	}
 
 	private static ExperimentConfig.Builder defaultConfig() {
