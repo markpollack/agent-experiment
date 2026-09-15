@@ -73,9 +73,9 @@ public class DefaultComparisonEngine implements ComparisonEngine {
 
 	@Override
 	public ExperimentSummary summarize(ExperimentResult experiment) {
-		return new ExperimentSummary(experiment.experimentId(), experiment.experimentName(), experiment.items().size(),
-				experiment.passRate(), experiment.totalCostUsd(), experiment.totalTokens(),
-				experiment.totalDurationMs(), experiment.aggregateScores());
+		return ExperimentSummary.of(experiment.experimentId(), experiment.experimentName(), experiment.items().size(),
+				experiment.counts(), experiment.totalCostUsd(), experiment.totalTokens(), experiment.totalDurationMs(),
+				experiment.aggregateScores());
 	}
 
 	@Override

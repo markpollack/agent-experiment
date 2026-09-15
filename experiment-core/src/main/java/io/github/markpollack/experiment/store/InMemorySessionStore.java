@@ -35,8 +35,8 @@ public class InMemorySessionStore implements SessionStore {
 			throw new ResultStoreException("Session not found: " + sessionName, null);
 		}
 
-		VariantEntry entry = new VariantEntry(variantName, result.experimentId(), variantName + ".json",
-				result.passRate(), result.items().size(), result.totalCostUsd(), result.totalDurationMs());
+		VariantEntry entry = VariantEntry.of(variantName, result.experimentId(), variantName + ".json", result.counts(),
+				result.items().size(), result.totalCostUsd(), result.totalDurationMs());
 
 		List<VariantEntry> updatedVariants = new ArrayList<>();
 		boolean replaced = false;

@@ -90,7 +90,6 @@ class InMemoryResultStoreTest {
 			.items(List.of())
 			.metadata(Map.of())
 			.aggregateScores(Map.of())
-			.passRate(0.0)
 			.build();
 	}
 

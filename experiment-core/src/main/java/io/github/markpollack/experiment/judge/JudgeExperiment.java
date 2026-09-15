@@ -14,6 +14,7 @@ import io.github.markpollack.experiment.result.RecordedJudgment;
 import io.github.markpollack.experiment.result.RecordedVerdict;
 import io.github.markpollack.experiment.store.ResultStore;
 import io.github.markpollack.judge.Judge;
+import io.github.markpollack.experiment.attestation.ItemAccounting;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.jury.Verdict;
@@ -66,8 +67,6 @@ public final class JudgeExperiment {
 	public JudgeExperimentResult run() {
 		List<ItemResult> itemResults = items.stream().map(this::runItem).toList();
 
-		double passRate = itemResults.isEmpty() ? 0.0
-				: (double) itemResults.stream().filter(ItemResult::passed).count() / itemResults.size();
 		Map<String, Double> aggregateScores = aggregateScores(itemResults);
 
 		ExperimentResult experimentResult = ExperimentResult.builder()
@@ -79,7 +78,7 @@ public final class JudgeExperiment {
 			.metadata(Map.of("experimentType", "judge", "candidateJudge", candidate.getClass().getSimpleName(),
 					"scorer", scorer.getClass().getSimpleName()))
 			.aggregateScores(aggregateScores)
-			.passRate(passRate)
+			.counts(ItemAccounting.count(itemResults))
 			.build();
 
 		resultStore.save(experimentResult);

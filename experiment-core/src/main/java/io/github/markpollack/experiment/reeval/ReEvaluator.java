@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.github.markpollack.experiment.attestation.InstrumentFailures;
+import io.github.markpollack.experiment.attestation.ItemAccounting;
 import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.result.InstrumentRecord;
 import io.github.markpollack.experiment.result.ItemResult;
@@ -62,8 +63,6 @@ public final class ReEvaluator {
 			.map(item -> InstrumentFailures.mark(reEvaluateItem(item, jury, instrument.specHash()), instrument))
 			.toList();
 
-		double passRate = items.isEmpty() ? 0.0
-				: (double) items.stream().filter(ItemResult::passed).count() / items.size();
 		Map<String, Double> aggregateScores = aggregateScores(items);
 
 		ExperimentResult result = ExperimentResult.builder()
@@ -79,7 +78,7 @@ public final class ReEvaluator {
 					Map.of("reEvaluatedFrom", original.experimentId(), "systemReinvoked", "false", "originalTimestamp",
 							original.timestamp().toString(), "reEvaluationJury", jury.getClass().getSimpleName()))
 			.aggregateScores(aggregateScores)
-			.passRate(passRate)
+			.counts(ItemAccounting.count(items))
 			.totalCostUsd(original.totalCostUsd())
 			.totalTokens(original.totalTokens())
 			.totalDurationMs(0)

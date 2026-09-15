@@ -123,7 +123,6 @@ class FileSystemResultStoreTest {
 			.items(List.of())
 			.metadata(Map.of())
 			.aggregateScores(Map.of())
-			.passRate(0.5)
 			.build();
 		store.save(updated);
 
@@ -160,7 +159,6 @@ class FileSystemResultStoreTest {
 			.items(List.of(item))
 			.metadata(Map.of("model", "opus", "run", "1"))
 			.aggregateScores(Map.of("build", 1.0, "file_comparison", 0.85))
-			.passRate(1.0)
 			.totalCostUsd(0.05)
 			.totalTokens(350)
 			.totalDurationMs(5000)
@@ -194,7 +192,6 @@ class FileSystemResultStoreTest {
 			.items(List.of())
 			.metadata(Map.of())
 			.aggregateScores(Map.of())
-			.passRate(0.0)
 			.build();
 
 		store.save(original);
@@ -224,7 +221,6 @@ class FileSystemResultStoreTest {
 			.items(List.of())
 			.metadata(Map.of())
 			.aggregateScores(Map.of())
-			.passRate(0.0)
 			.build();
 	}
 

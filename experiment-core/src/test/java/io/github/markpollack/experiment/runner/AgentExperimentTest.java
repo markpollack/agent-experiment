@@ -57,7 +57,8 @@ class AgentExperimentTest {
 
 		assertThat(result.experimentName()).isEqualTo("test-experiment");
 		assertThat(result.items()).hasSizeGreaterThan(0);
-		assertThat(result.passRate()).isEqualTo(1.0);
+		assertThat(result.counts().passes()).isEqualTo(result.items().size());
+		assertThat(result.counts().passRate()).hasValue(1.0);
 		assertThat(result.totalCostUsd()).isGreaterThan(0);
 		assertThat(result.totalTokens()).isGreaterThan(0);
 		assertThat(result.totalDurationMs()).isGreaterThan(0);
@@ -230,25 +231,29 @@ class AgentExperimentTest {
 	}
 
 	@Test
-	void passingJudgeProducesPassRate1() {
+	void passingJudgeCountsEveryItemAsAPass() {
 		Jury jury = juryWith(passingJudge("judge"));
 		ExperimentConfig config = defaultConfig().build();
 		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
-		assertThat(result.passRate()).isEqualTo(1.0);
+		assertThat(result.counts().nonPasses()).isZero();
+		assertThat(result.counts().excluded()).isZero();
+		assertThat(result.counts().instrumentFailures()).isZero();
+		assertThat(result.counts().passRate()).hasValue(1.0);
 	}
 
 	@Test
-	void failingJudgeProducesPassRate0() {
+	void failingJudgeCountsEveryItemAgainstTheSubject() {
 		Jury jury = juryWith(failingJudge("judge"));
 		ExperimentConfig config = defaultConfig().build();
 		AgentExperiment runner = new AgentExperiment(datasetManager, jury, resultStore, config);
 
 		ExperimentResult result = runner.run(mockAgent);
 
-		assertThat(result.passRate()).isEqualTo(0.0);
+		assertThat(result.counts().passes()).isZero();
+		assertThat(result.counts().passRate()).hasValue(0.0);
 		for (ItemResult item : result.items()) {
 			if (item.success()) {
 				assertThat(item.passed()).isFalse();

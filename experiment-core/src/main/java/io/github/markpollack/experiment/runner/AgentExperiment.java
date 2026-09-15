@@ -29,6 +29,8 @@ import io.github.markpollack.experiment.agent.InvocationContext;
 import io.github.markpollack.experiment.agent.InvocationResult;
 import io.github.markpollack.experiment.agent.TerminalStatus;
 import io.github.markpollack.experiment.attestation.InstrumentFailures;
+import io.github.markpollack.experiment.attestation.ItemAccounting;
+import io.github.markpollack.experiment.result.ItemCounts;
 import io.github.markpollack.experiment.dataset.Dataset;
 import io.github.markpollack.experiment.dataset.DatasetItem;
 import io.github.markpollack.experiment.dataset.DatasetManager;
@@ -237,8 +239,7 @@ public class AgentExperiment {
 
 		// Aggregate scores — mean per judge across items
 		Map<String, Double> aggregateScores = aggregateScores(results);
-		double passRate = results.isEmpty() ? 0.0
-				: results.stream().filter(ItemResult::passed).count() / (double) results.size();
+		ItemCounts counts = ItemAccounting.count(results);
 		double totalCost = results.stream().mapToDouble(ItemResult::costUsd).sum();
 		int totalTokens = results.stream().mapToInt(ItemResult::totalTokens).sum();
 
@@ -253,7 +254,7 @@ public class AgentExperiment {
 			.items(results)
 			.metadata(config.metadata())
 			.aggregateScores(aggregateScores)
-			.passRate(passRate)
+			.counts(counts)
 			.totalCostUsd(totalCost)
 			.totalTokens(totalTokens)
 			.totalDurationMs(totalDurationMs)
@@ -270,9 +271,11 @@ public class AgentExperiment {
 					activeSession.variantName(), experimentResult);
 		}
 
-		logger.info("Experiment '{}' complete: passRate={}, cost=${}, tokens={}, duration={}ms",
-				config.experimentName(), String.format("%.1f%%", passRate * 100), String.format("%.4f", totalCost),
-				totalTokens, totalDurationMs);
+		logger.info(
+				"Experiment '{}' complete: {} passed, {} not passed, {} excluded, {} not judged, "
+						+ "{} instrument failure(s), cost=${}, tokens={}, duration={}ms",
+				config.experimentName(), counts.passes(), counts.nonPasses(), counts.excluded(), counts.notJudged(),
+				counts.instrumentFailures(), String.format("%.4f", totalCost), totalTokens, totalDurationMs);
 
 		// Only now, with the agent's work persisted, does an instrument failure stop the
 		// run. The judging is cheap to repeat from the stored result; the agent's work is

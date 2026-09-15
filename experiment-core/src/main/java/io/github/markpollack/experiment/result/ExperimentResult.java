@@ -20,7 +20,10 @@ import org.jspecify.annotations.Nullable;
  * @param items per-item results
  * @param metadata run-level metadata
  * @param aggregateScores aggregated scores across items (mean per judge)
- * @param passRate fraction of items where verdict passed
+ * @param counts what the run observed, counted: passes, non-passes, excluded items,
+ * instrument failures and items never judged. No rate is stored; a rate is a derivation
+ * and belongs to the reader, which is why {@link ItemCounts#passRate()} returns nothing
+ * when the jury scored nothing. Null means a run recorded before counts existed
  * @param totalCostUsd sum of cost across all items
  * @param totalTokens sum of tokens across all items
  * @param totalDurationMs wall-clock duration of entire experiment
@@ -34,8 +37,9 @@ import org.jspecify.annotations.Nullable;
 public record ExperimentResult(String experimentId, String experimentName, @Nullable String datasetVersion,
 		boolean datasetDirty, String datasetSemanticVersion, @Nullable KnowledgeManifest knowledgeManifest,
 		Instant timestamp, List<ItemResult> items, Map<String, String> metadata, Map<String, Double> aggregateScores,
-		double passRate, double totalCostUsd, int totalTokens, long totalDurationMs, @Nullable String codeVersion,
-		boolean codeDirty, RunConditions conditions, @Nullable InstrumentRecord instrument) {
+		@Nullable ItemCounts counts, double totalCostUsd, int totalTokens, long totalDurationMs,
+		@Nullable String codeVersion, boolean codeDirty, RunConditions conditions,
+		@Nullable InstrumentRecord instrument) {
 
 	public ExperimentResult {
 		java.util.Objects.requireNonNull(experimentId, "experimentId must not be null");
@@ -78,7 +82,7 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 
 		private @Nullable InstrumentRecord instrument;
 
-		private double passRate;
+		private @Nullable ItemCounts counts;
 
 		private double totalCostUsd;
 
@@ -163,8 +167,12 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 			return this;
 		}
 
-		public Builder passRate(double passRate) {
-			this.passRate = passRate;
+		/**
+		 * What the run observed, counted. Defaults to null, meaning not recorded — a run
+		 * from before counts existed, never a run that counted nothing.
+		 */
+		public Builder counts(@Nullable ItemCounts counts) {
+			this.counts = counts;
 			return this;
 		}
 
@@ -195,7 +203,7 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 
 		public ExperimentResult build() {
 			return new ExperimentResult(experimentId, experimentName, datasetVersion, datasetDirty,
-					datasetSemanticVersion, knowledgeManifest, timestamp, items, metadata, aggregateScores, passRate,
+					datasetSemanticVersion, knowledgeManifest, timestamp, items, metadata, aggregateScores, counts,
 					totalCostUsd, totalTokens, totalDurationMs, codeVersion, codeDirty, conditions, instrument);
 		}
 

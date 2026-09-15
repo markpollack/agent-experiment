@@ -95,8 +95,8 @@ public class FileSystemSessionStore implements SessionStore {
 
 			// Update session manifest
 			RunSession current = objectMapper.readValue(sessionFile.toFile(), RunSession.class);
-			VariantEntry entry = new VariantEntry(variantName, result.experimentId(), variantName + ".json",
-					result.passRate(), result.items().size(), result.totalCostUsd(), result.totalDurationMs());
+			VariantEntry entry = VariantEntry.of(variantName, result.experimentId(), variantName + ".json",
+					result.counts(), result.items().size(), result.totalCostUsd(), result.totalDurationMs());
 
 			// Replace existing entry for same variant or add new
 			List<VariantEntry> updatedVariants = new ArrayList<>();

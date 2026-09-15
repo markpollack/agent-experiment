@@ -37,7 +37,6 @@ class ExperimentResultTest {
 			.items(List.of(item))
 			.metadata(Map.of("model", "sonnet"))
 			.aggregateScores(Map.of("build_success", 1.0, "file_comparison", 0.9))
-			.passRate(1.0)
 			.totalCostUsd(0.05)
 			.totalTokens(1700)
 			.totalDurationMs(3000)
@@ -48,7 +47,9 @@ class ExperimentResultTest {
 		assertThat(result.datasetVersion()).isNotNull();
 		assertThat(result.datasetDirty()).isFalse();
 		assertThat(result.items()).hasSize(1);
-		assertThat(result.passRate()).isEqualTo(1.0);
+		// A builder that was told nothing about counts records none, rather than a run
+		// that counted nothing.
+		assertThat(result.counts()).isNull();
 		assertThat(result.knowledgeManifest()).isNull();
 	}
 

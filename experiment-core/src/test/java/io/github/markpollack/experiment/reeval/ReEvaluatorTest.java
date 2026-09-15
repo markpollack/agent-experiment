@@ -43,7 +43,9 @@ class ReEvaluatorTest {
 
 		assertThat(reEvaluated.experimentId()).isNotEqualTo(original.experimentId());
 		assertThat(reEvaluated.experimentName()).isEqualTo(original.experimentName());
-		assertThat(reEvaluated.passRate()).isEqualTo(0.0);
+		assertThat(reEvaluated.counts().passes()).isZero();
+		assertThat(reEvaluated.counts().nonPasses()).isEqualTo(1);
+		assertThat(reEvaluated.counts().passRate()).hasValue(0.0);
 		assertThat(reEvaluated.items().get(0).passed()).isFalse();
 	}
 

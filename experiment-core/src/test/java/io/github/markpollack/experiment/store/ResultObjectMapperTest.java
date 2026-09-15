@@ -44,7 +44,7 @@ class ResultObjectMapperTest {
 		assertThat(restored.experimentId()).isEqualTo(original.experimentId());
 		assertThat(restored.experimentName()).isEqualTo(original.experimentName());
 		assertThat(restored.timestamp()).isEqualTo(original.timestamp());
-		assertThat(restored.passRate()).isEqualTo(original.passRate());
+		assertThat(restored.counts()).isEqualTo(original.counts());
 		assertThat(restored.items()).hasSize(original.items().size());
 	}
 
@@ -233,7 +233,6 @@ class ResultObjectMapperTest {
 			.items(List.of())
 			.metadata(Map.of())
 			.aggregateScores(Map.of())
-			.passRate(0.0)
 			.totalCostUsd(0.0)
 			.totalTokens(0)
 			.totalDurationMs(0)
@@ -405,7 +404,6 @@ class ResultObjectMapperTest {
 				.build()))
 			.metadata(Map.of("model", "opus"))
 			.aggregateScores(Map.of("build", 1.0))
-			.passRate(1.0)
 			.totalCostUsd(0.05)
 			.totalTokens(350)
 			.totalDurationMs(5000)

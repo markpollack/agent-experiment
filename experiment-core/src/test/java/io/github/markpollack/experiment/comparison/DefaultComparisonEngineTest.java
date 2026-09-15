@@ -171,7 +171,7 @@ class DefaultComparisonEngineTest {
 			.items(List.of(item("ITEM-1", Map.of("build", 1.0)), item("ITEM-2", Map.of("build", 0.0))))
 			.metadata(Map.of())
 			.aggregateScores(Map.of("build", 0.5))
-			.passRate(0.5)
+			.counts(new io.github.markpollack.experiment.result.ItemCounts(1, 1, 0, 0, 0))
 			.totalCostUsd(3.50)
 			.totalTokens(1000)
 			.totalDurationMs(60000)
@@ -218,7 +218,6 @@ class DefaultComparisonEngineTest {
 			.items(List.of())
 			.metadata(Map.of("baselineId", "base-1"))
 			.aggregateScores(Map.of())
-			.passRate(0.0)
 			.build();
 
 		Optional<ExperimentResult> resolved = engine.resolveBaseline(current, Optional.empty());
@@ -318,7 +317,6 @@ class DefaultComparisonEngineTest {
 			.items(items)
 			.metadata(Map.of())
 			.aggregateScores(Map.of())
-			.passRate(0.0)
 			.build();
 	}
 

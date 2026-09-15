@@ -238,7 +238,6 @@ class FileSystemSweepStoreTest {
 			.items(List.of())
 			.metadata(Map.of())
 			.aggregateScores(Map.of())
-			.passRate(1.0)
 			.totalCostUsd(0.05)
 			.totalTokens(350)
 			.totalDurationMs(5000)
