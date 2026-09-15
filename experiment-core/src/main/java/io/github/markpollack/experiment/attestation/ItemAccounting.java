@@ -147,8 +147,12 @@ public final class ItemAccounting {
 			return false;
 		}
 		for (RecordedCompositeAttempt attempt : verdict.compositeAttempts()) {
-			if (attempt.disposition() == null || attempt.disposition().isBlank()) {
-				return false; // a stage whose usability was never recorded
+			// Not merely present: readable. A disposition this version does not recognise
+			// — a value from a later format — says nothing about whether the parent could
+			// use the stage, and treating it as usable would be a guess dressed as a
+			// fact.
+			if (!used(attempt) && !attempt.stageFailed()) {
+				return false;
 			}
 			if (attempt.verdict() != null && !attestable(attempt.verdict())) {
 				return false;
@@ -199,6 +203,14 @@ public final class ItemAccounting {
 			}
 			current = next;
 		}
+	}
+
+	/**
+	 * True when the record says, in a word this version knows, that the parent used the
+	 * stage.
+	 */
+	private static boolean used(RecordedCompositeAttempt attempt) {
+		return "used".equalsIgnoreCase(attempt.disposition()) || "USED".equals(attempt.disposition());
 	}
 
 	private static @Nullable RecordedVerdict namedAttempt(RecordedVerdict verdict, String name) {

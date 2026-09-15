@@ -69,7 +69,10 @@ public final class HistoricalResults {
 		if (node.hasNonNull("seats")) {
 			seats = new ArrayList<>();
 			for (JsonNode seat : node.get("seats")) {
-				seats.add(new HistoricalSeat(seat.hasNonNull("position") ? seat.get("position").asInt() : null,
+				// A position that is present but not a number was not recorded as a
+				// position. asInt() would turn "unknown" into seat zero.
+				JsonNode position = seat.get("position");
+				seats.add(new HistoricalSeat(position != null && position.isInt() ? position.intValue() : null,
 						text(seat.get("verdictKey")), text(seat.get("keySource"))));
 			}
 		}
@@ -96,9 +99,12 @@ public final class HistoricalResults {
 	private static HistoricalJudgment judgment(JsonNode node) {
 		List<HistoricalCheck> checks = new ArrayList<>();
 		for (JsonNode check : node.path("checks")) {
-			// A check with no recorded outcome is not a failed check.
+			// A check with no recorded outcome is not a failed check, and neither is one
+			// whose outcome is present but unreadable: asBoolean() turns "unknown" into
+			// false.
+			JsonNode passed = check.get("passed");
 			checks.add(new HistoricalCheck(check.path("name").asText(""),
-					check.hasNonNull("passed") ? check.get("passed").asBoolean() : null,
+					passed != null && passed.isBoolean() ? passed.booleanValue() : null,
 					check.path("message").asText("")));
 		}
 		Map<String, Object> metadata = node.hasNonNull("metadata")

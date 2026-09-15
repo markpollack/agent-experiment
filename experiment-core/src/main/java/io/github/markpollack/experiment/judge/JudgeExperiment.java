@@ -17,6 +17,7 @@ import io.github.markpollack.judge.Judge;
 import io.github.markpollack.experiment.attestation.ItemAccounting;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentReasonCode;
 import io.github.markpollack.judge.jury.Verdict;
 
 /**
@@ -92,26 +93,48 @@ public final class JudgeExperiment {
 
 		JudgeScorerResult scorerResult = scorer.score(new JudgeScoringInput(item, actual, expectedLabel));
 
-		Verdict verdict = toVerdict(scorerResult);
+		RecordedVerdict recorded = RecordedVerdict.from(toVerdict(scorerResult, actual));
 
 		return ItemResult.builder()
 			.itemId(item.id())
 			.itemSlug(item.slug())
-			.success(true)
-			.passed(scorerResult.match())
-			.scores(Map.of("agreement", scorerResult.score()))
-			.verdict(RecordedVerdict.from(verdict))
+			// Null when nothing was decided about the candidate, never false.
+			.passed(ItemAccounting.passedFlag(recorded))
+			// An unscored comparison records no agreement score rather than a zero one.
+			.scores(scorerResult.scored() ? Map.of("agreement", scorerResult.score()) : Map.<String, Double>of())
+			.verdict(recorded)
 			.executionDetail(new JudgeExecutionDetail(RecordedJudgment.from(actual), expectedLabel, scorerResult))
 			.metadata(Map.of("experimentType", "judge", "expectedLabel", expectedLabel))
 			.build();
 	}
 
-	private Verdict toVerdict(JudgeScorerResult scorerResult) {
-		Judgment judgment = Judgment.verdict(scorerResult.match())
-			.score(scorerResult.score())
-			.reasoning(scorerResult.reasoning())
-			.build();
-		return Verdict.single("scorer", judgment);
+	/**
+	 * Turn a scoring result into the verdict that gets stored.
+	 *
+	 * <p>
+	 * When the scorer could not compare — the candidate errored, abstained, or found the
+	 * criterion inapplicable — the verdict mirrors the candidate's own status instead of
+	 * manufacturing a pass or a fail. The counting rules then apply on their own terms: a
+	 * not-applicable item leaves the denominator, an error is excluded and counted as an
+	 * instrument failure rather than scored against the subject, and an abstention counts
+	 * against it.
+	 */
+	private Verdict toVerdict(JudgeScorerResult scorerResult, Judgment candidate) {
+		if (scorerResult.scored()) {
+			Judgment judgment = Judgment.verdict(scorerResult.match())
+				.score(scorerResult.score())
+				.reasoning(scorerResult.reasoning())
+				.build();
+			return Verdict.single("scorer", judgment);
+		}
+		Judgment mirrored = switch (candidate.status()) {
+			case NOT_APPLICABLE -> Judgment.notApplicable(scorerResult.reasoning());
+			case ERROR -> Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, scorerResult.reasoning());
+			// A candidate that reached a verdict the scorer still could not compare has
+			// left the comparison undecided, which is what an abstention says.
+			case ABSTAIN, PASS, FAIL -> Judgment.abstain(scorerResult.reasoning());
+		};
+		return Verdict.single("scorer", mirrored);
 	}
 
 	private static Map<String, Double> aggregateScores(List<ItemResult> items) {

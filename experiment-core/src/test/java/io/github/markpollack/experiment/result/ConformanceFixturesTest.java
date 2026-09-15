@@ -3,9 +3,12 @@ package io.github.markpollack.experiment.result;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.markpollack.experiment.attestation.ItemAccounting;
 import io.github.markpollack.experiment.store.FileSystemResultStore;
 import org.junit.jupiter.api.Test;
@@ -19,72 +22,81 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>
  * A reader in another language cannot share this code, so what stops it drifting is a
  * file this writer produced and a number this writer expects. The cases here are the ones
- * a reader gets wrong by accident, and each one is a case where an absence could be
- * rendered as a measurement:
+ * a reader gets wrong by accident, and each is a case where an absence could be rendered
+ * as a measurement:
  *
  * <ul>
- * <li><b>nothing scored</b> — every item excluded. There is no rate. A reader that emits
- * 0.0 here draws a run that measured nothing at the same height as a run that failed
- * everything.</li>
+ * <li><b>nothing scored</b> — every item excluded. There is no rate.</li>
  * <li><b>no items at all</b> — same, with nothing to divide.</li>
- * <li><b>never judged</b> — the agent ran and no jury reached it. Distinct from
- * failing.</li>
+ * <li><b>never judged</b> — the agent ran and no jury reached it.</li>
  * <li><b>judged and all failed</b> — a real 0.0, which must stay distinguishable from the
  * three above.</li>
  * </ul>
  *
  * <p>
- * Regenerate with {@code -Dconformance.regenerate=true} after a deliberate format change.
- * The committed files are then the contract other languages test against.
+ * <b>Every assertion here is made against the JSON as written, item by item.</b> An
+ * earlier version asserted that the text contained one {@code "passed" : null} somewhere,
+ * which a regression could satisfy by leaving one item right and breaking another.
+ * Regeneration ({@code -Dconformance.regenerate=true}) rewrites the committed file, so
+ * the assertions must be able to catch a regression on their own rather than relying on
+ * the snapshot.
  */
 class ConformanceFixturesTest {
 
 	private static final Path FIXTURES = Path.of("src/test/resources/conformance");
 
+	private static final ObjectMapper JSON = new ObjectMapper();
+
 	@Test
-	void nothingScoredHasNoRate(@TempDir Path dir) throws Exception {
-		ItemCounts counts = fixture(dir, "nothing-scored",
+	void nothingScoredHasNoRateAndEveryItemRecordsNoDecision(@TempDir Path dir) throws Exception {
+		Fixture fixture = write(dir, "nothing-scored",
 				List.of(item("a", RecordedJudgmentStatus.NOT_APPLICABLE), item("b", RecordedJudgmentStatus.ERROR)));
 
-		assertThat(counts).isEqualTo(new ItemCounts(0, 0, 2, 1, 0, 0));
-		assertThat(counts.passRate()).isEmpty();
-		assertThat(counts.scored()).isZero();
+		assertThat(fixture.counts()).isEqualTo(new ItemCounts(0, 0, 2, 1, 0, 0));
+		assertThat(fixture.counts().passRate()).isEmpty();
+		// Both items, named individually: an explicit null, not an omission and not
+		// false.
+		assertThat(fixture.passedByItem()).containsExactly("null", "null");
 	}
 
 	@Test
 	void aRunWithNoItemsHasNoRate(@TempDir Path dir) throws Exception {
-		ItemCounts counts = fixture(dir, "no-items", List.of());
+		Fixture fixture = write(dir, "no-items", List.of());
 
-		assertThat(counts).isEqualTo(new ItemCounts(0, 0, 0, 0, 0, 0));
-		assertThat(counts.passRate()).isEmpty();
+		assertThat(fixture.counts()).isEqualTo(new ItemCounts(0, 0, 0, 0, 0, 0));
+		assertThat(fixture.counts().passRate()).isEmpty();
+		assertThat(fixture.passedByItem()).isEmpty();
 	}
 
 	@Test
 	void neverJudgedIsNotTheSameAsFailing(@TempDir Path dir) throws Exception {
-		ItemCounts neverJudged = fixture(dir, "never-judged",
+		Fixture fixture = write(dir, "never-judged",
 				List.of(ItemResult.builder().itemId("a").itemSlug("a").success(true).build()));
 
-		assertThat(neverJudged).isEqualTo(new ItemCounts(0, 0, 0, 0, 1, 0));
-		// No jury reached this item, so there is no rate to report — not a zero one.
-		assertThat(neverJudged.passRate()).isEmpty();
-		assertThat(neverJudged.notJudged()).isEqualTo(1);
+		assertThat(fixture.counts()).isEqualTo(new ItemCounts(0, 0, 0, 0, 1, 0));
+		assertThat(fixture.counts().passRate()).isEmpty();
+		assertThat(fixture.passedByItem()).containsExactly("null");
 	}
 
 	@Test
 	void judgedAndAllFailedIsARealZero(@TempDir Path dir) throws Exception {
-		ItemCounts counts = fixture(dir, "all-failed",
+		Fixture fixture = write(dir, "all-failed",
 				List.of(item("a", RecordedJudgmentStatus.FAIL), item("b", RecordedJudgmentStatus.FAIL)));
 
 		// The one case that genuinely is 0.0, and the reason the others must not be.
-		assertThat(counts).isEqualTo(new ItemCounts(0, 2, 0, 0, 0, 0));
-		assertThat(counts.passRate()).hasValue(0.0);
+		assertThat(fixture.counts()).isEqualTo(new ItemCounts(0, 2, 0, 0, 0, 0));
+		assertThat(fixture.counts().passRate()).hasValue(0.0);
+		assertThat(fixture.passedByItem()).containsExactly("false", "false");
+	}
+
+	private record Fixture(ItemCounts counts, List<String> passedByItem) {
 	}
 
 	/**
-	 * Write the fixture and check it against the committed one, so a format change that
-	 * nobody meant shows up here rather than in another language's reader.
+	 * Write the fixture, check it against the committed one, and read back what each item
+	 * actually recorded.
 	 */
-	private static ItemCounts fixture(Path dir, String name, List<ItemResult> items) throws Exception {
+	private static Fixture write(Path dir, String name, List<ItemResult> items) throws Exception {
 		ExperimentResult result = ExperimentResult.builder()
 			.experimentId(name)
 			.experimentName("conformance")
@@ -106,19 +118,20 @@ class ConformanceFixturesTest {
 		// No stored rate anywhere: a reader has to derive one, and deriving forces it to
 		// handle a denominator of zero.
 		assertThat(written).doesNotContain("passRate");
-		return result.counts();
+		return new Fixture(result.counts(), passedByItem(written));
 	}
 
-	@Test
-	void anUndecidedItemWritesPassedAsAnExplicitNullRatherThanOmittingIt(@TempDir Path dir) throws Exception {
-		fixture(dir, "nothing-scored",
-				List.of(item("a", RecordedJudgmentStatus.NOT_APPLICABLE), item("b", RecordedJudgmentStatus.ERROR)));
-
-		String written = Files.readString(FIXTURES.resolve("nothing-scored.json"));
-
-		// Explicit null, not omission. An omitted field lets a reader write
-		// get("passed", False) and carry on; a null makes that line fail where it stands.
-		assertThat(written).contains("\"passed\" : null");
+	/**
+	 * What each item recorded for {@code passed}, as written: absent, null, true or
+	 * false.
+	 */
+	private static List<String> passedByItem(String written) throws Exception {
+		List<String> flags = new ArrayList<>();
+		for (JsonNode item : JSON.readTree(written).path("items")) {
+			JsonNode passed = item.get("passed");
+			flags.add(passed == null ? "absent" : passed.isNull() ? "null" : passed.asText());
+		}
+		return flags;
 	}
 
 	private static ItemResult item(String id, RecordedJudgmentStatus status) {
