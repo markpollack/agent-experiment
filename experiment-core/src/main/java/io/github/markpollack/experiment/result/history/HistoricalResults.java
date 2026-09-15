@@ -8,12 +8,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.markpollack.experiment.result.RecordedCheck;
 import io.github.markpollack.experiment.result.RecordedDecision;
 import io.github.markpollack.experiment.result.RecordedJudgmentStatus;
-import io.github.markpollack.experiment.result.RecordedSeat;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -55,17 +54,23 @@ public final class HistoricalResults {
 		Map<String, HistoricalJudgment> byName = new LinkedHashMap<>();
 		node.path("individualByName").properties().forEach(e -> byName.put(e.getKey(), judgment(e.getValue())));
 
+		// A weight that is not a number was not recorded as a weight. Reading it as 0.0
+		// would silence a judge that may have carried the vote.
 		Map<String, Double> weights = new LinkedHashMap<>();
-		node.path("weights").properties().forEach(e -> weights.put(e.getKey(), e.getValue().asDouble()));
+		node.path("weights").properties().forEach(e -> {
+			if (e.getValue() != null && e.getValue().isNumber()) {
+				weights.put(e.getKey(), e.getValue().doubleValue());
+			}
+		});
 
 		// Absent stays absent: no seat list at all is not the same as a recorded empty
 		// one.
-		List<RecordedSeat> seats = null;
+		List<HistoricalSeat> seats = null;
 		if (node.hasNonNull("seats")) {
 			seats = new ArrayList<>();
 			for (JsonNode seat : node.get("seats")) {
-				seats.add(new RecordedSeat(seat.path("position").asInt(), seat.path("verdictKey").asText(""),
-						text(seat.get("keySource"))));
+				seats.add(new HistoricalSeat(seat.hasNonNull("position") ? seat.get("position").asInt() : null,
+						text(seat.get("verdictKey")), text(seat.get("keySource"))));
 			}
 		}
 
@@ -89,13 +94,15 @@ public final class HistoricalResults {
 	}
 
 	private static HistoricalJudgment judgment(JsonNode node) {
-		List<RecordedCheck> checks = new ArrayList<>();
+		List<HistoricalCheck> checks = new ArrayList<>();
 		for (JsonNode check : node.path("checks")) {
-			checks.add(new RecordedCheck(check.path("name").asText(""), check.path("passed").asBoolean(),
+			// A check with no recorded outcome is not a failed check.
+			checks.add(new HistoricalCheck(check.path("name").asText(""),
+					check.hasNonNull("passed") ? check.get("passed").asBoolean() : null,
 					check.path("message").asText("")));
 		}
 		Map<String, Object> metadata = node.hasNonNull("metadata")
-				? JSON.convertValue(node.get("metadata"), new com.fasterxml.jackson.core.type.TypeReference<>() {
+				? JSON.convertValue(node.get("metadata"), new TypeReference<Map<String, Object>>() {
 				}) : Map.of();
 		// A status this reader has never heard of is an absence, not a crash: the whole
 		// point of a historical read is that it survives what it does not recognise.

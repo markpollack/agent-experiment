@@ -33,19 +33,20 @@ public final class ItemAccounting {
 
 	/** Count a run's items into the parts a pass rate is made of. */
 	public static ItemCounts count(List<ItemResult> items) {
-		int passes = 0, nonPasses = 0, excluded = 0, instrumentFailures = 0, notJudged = 0;
+		int passes = 0, nonPasses = 0, excluded = 0, instrumentFailures = 0, notJudged = 0, unattestable = 0;
 		for (ItemResult item : items) {
 			switch (outcomeOf(item)) {
 				case PASS -> passes++;
 				case NON_PASS -> nonPasses++;
 				case EXCLUDED -> excluded++;
 				case NOT_JUDGED -> notJudged++;
+				case UNATTESTABLE -> unattestable++;
 			}
 			if (instrumentFailed(item)) {
 				instrumentFailures++;
 			}
 		}
-		return new ItemCounts(passes, nonPasses, excluded, instrumentFailures, notJudged);
+		return new ItemCounts(passes, nonPasses, excluded, instrumentFailures, notJudged, unattestable);
 	}
 
 	/** What this item says about the subject. */
@@ -53,6 +54,12 @@ public final class ItemAccounting {
 		RecordedVerdict verdict = item.verdict();
 		if (verdict == null) {
 			return SubjectOutcome.NOT_JUDGED;
+		}
+		if (!attestable(verdict)) {
+			// The facts needed to read an outcome were never recorded. Falling back to
+			// the aggregate's status here would manufacture a definite answer out of an
+			// absence, which is the defect this record exists to prevent.
+			return SubjectOutcome.UNATTESTABLE;
 		}
 		RecordedDecision decision = verdict.decision();
 		if (decision != null && decision.individualRejection()) {
@@ -95,6 +102,38 @@ public final class ItemAccounting {
 			return true;
 		}
 		return anyStageFailed(verdict);
+	}
+
+	/**
+	 * Whether this verdict recorded the facts an outcome must be read from.
+	 *
+	 * <p>
+	 * Required, per the result-format contract: a stopping decision, complete enough to
+	 * follow; a disposition on every stage the jury entered; and, where the decision
+	 * names a stage, that stage actually present. A verdict written before those existed
+	 * is unattestable rather than wrong — its outcome is not recoverable, and guessing it
+	 * from the aggregate is what this refuses to do.
+	 */
+	public static boolean attestable(RecordedVerdict verdict) {
+		RecordedDecision decision = verdict.decision();
+		if (decision == null || decision.kind().isBlank()) {
+			return false;
+		}
+		if (decision.tier() != null && decision.basis() == null) {
+			return false; // names the deciding stage but not what decided it
+		}
+		for (RecordedCompositeAttempt attempt : verdict.compositeAttempts()) {
+			if (attempt.disposition() == null || attempt.disposition().isBlank()) {
+				return false; // a stage whose usability was never recorded
+			}
+			if (attempt.verdict() != null && !attestable(attempt.verdict())) {
+				return false;
+			}
+		}
+		if (decision.tierOutcome()) {
+			return decision.tier() != null && namedAttempt(verdict, decision.tier()) != null;
+		}
+		return true;
 	}
 
 	/**

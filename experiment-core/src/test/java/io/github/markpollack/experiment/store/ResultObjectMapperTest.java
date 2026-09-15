@@ -173,6 +173,21 @@ class ResultObjectMapperTest {
 	}
 
 	@Test
+	void aVerdictThatRecordedNoSeatsStillRecordsNoneAfterALoadAndSave() throws Exception {
+		String storedBeforeSeatsExisted = """
+				{"aggregated":{"status":"pass","reasoning":"ok","checks":[],"metadata":{}},
+				 "individual":[],"individualByName":{},"weights":{},"compositeAttempts":[]}
+				""";
+
+		RecordedVerdict restored = mapper.readValue(storedBeforeSeatsExisted, RecordedVerdict.class);
+
+		// Reading an old file must not upgrade "seats were never recorded" into
+		// "recorded as none", which is what saving an empty list would claim.
+		assertThat(restored.seats()).isNull();
+		assertThat(mapper.writeValueAsString(restored)).doesNotContain("seats");
+	}
+
+	@Test
 	void roundTripsPath() throws Exception {
 		Path original = Path.of("/tmp/experiments/run-1");
 

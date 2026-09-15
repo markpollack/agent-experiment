@@ -26,6 +26,18 @@ public enum SubjectOutcome {
 	EXCLUDED,
 
 	/** The item never reached a jury. */
-	NOT_JUDGED
+	NOT_JUDGED,
+
+	/**
+	 * What the jury decided cannot be established from what was recorded: no stopping
+	 * decision, a decision naming a stage the file does not contain, a stage whose
+	 * disposition was never recorded, or a status this version cannot read.
+	 *
+	 * <p>
+	 * Excluded from the denominator and counted, never resolved by reading an aggregate's
+	 * shape. Inferring an outcome from a missing fact is the defect this whole record
+	 * exists to prevent.
+	 */
+	UNATTESTABLE
 
 }

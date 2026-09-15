@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import io.github.markpollack.experiment.result.RecordedCheck;
 import io.github.markpollack.experiment.result.RecordedJudgment;
 import io.github.markpollack.experiment.result.RecordedJudgmentStatus;
 import org.jspecify.annotations.Nullable;
@@ -28,11 +27,11 @@ import org.jspecify.annotations.Nullable;
  * @param label classification label, or null
  * @param reasonCode why the status was reached, or null
  * @param reasoning human-readable explanation
- * @param checks recorded check evidence
+ * @param checks recorded check evidence, each with its own absences
  * @param metadata portable judgment metadata
  */
 public record HistoricalJudgment(@Nullable RecordedJudgmentStatus status, @Nullable Double score,
-		@Nullable String label, @Nullable String reasonCode, String reasoning, List<RecordedCheck> checks,
+		@Nullable String label, @Nullable String reasonCode, String reasoning, List<HistoricalCheck> checks,
 		Map<String, Object> metadata) {
 
 	public HistoricalJudgment {
@@ -51,6 +50,9 @@ public record HistoricalJudgment(@Nullable RecordedJudgmentStatus status, @Nulla
 		if (this.status == RecordedJudgmentStatus.ERROR && (this.reasonCode == null || this.reasonCode.isBlank())) {
 			missing.add(path + ".reasonCode");
 		}
+		for (int i = 0; i < this.checks.size(); i++) {
+			missing.addAll(this.checks.get(i).unrecorded(path + ".checks[" + i + "]"));
+		}
 		return missing;
 	}
 
@@ -64,8 +66,8 @@ public record HistoricalJudgment(@Nullable RecordedJudgmentStatus status, @Nulla
 		if (!missing.isEmpty()) {
 			throw new IllegalStateException("cannot convert a judgment with unrecorded required facts: " + missing);
 		}
-		return new RecordedJudgment(this.status, this.score, this.label, this.reasonCode, this.reasoning, this.checks,
-				this.metadata);
+		return new RecordedJudgment(this.status, this.score, this.label, this.reasonCode, this.reasoning,
+				this.checks.stream().map(HistoricalCheck::toLive).toList(), this.metadata);
 	}
 
 }

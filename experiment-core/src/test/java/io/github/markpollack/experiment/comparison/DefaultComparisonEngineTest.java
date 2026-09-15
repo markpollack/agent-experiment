@@ -171,7 +171,7 @@ class DefaultComparisonEngineTest {
 			.items(List.of(item("ITEM-1", Map.of("build", 1.0)), item("ITEM-2", Map.of("build", 0.0))))
 			.metadata(Map.of())
 			.aggregateScores(Map.of("build", 0.5))
-			.counts(new io.github.markpollack.experiment.result.ItemCounts(1, 1, 0, 0, 0))
+			.counts(new io.github.markpollack.experiment.result.ItemCounts(1, 1, 0, 0, 0, 0))
 			.totalCostUsd(3.50)
 			.totalTokens(1000)
 			.totalDurationMs(60000)

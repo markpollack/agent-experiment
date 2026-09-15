@@ -158,6 +158,22 @@ class RosterAttestationTest {
 		assertThat(attestation.count(Attestability.NOT_JUDGED)).isEqualTo(1);
 	}
 
+	@Test
+	void aProvenMismatchIsNotSuppressedByAnUnrelatedMissingCount() {
+		Map<String, Object> partial = Map.of("aggregation", Map.of("inputCount", 2));
+		RecordedVerdict verdict = new RecordedVerdict(
+				new RecordedJudgment(RecordedJudgmentStatus.PASS, null, null, null, "recorded", List.of(), partial),
+				List.of(), Map.of(), Map.of(), List.of(), null, List.of(), "hash");
+		Map<String, Object> roster = Map.of("kind", "SIMPLE", "seats", List.of(Map.of(), Map.of(), Map.of()));
+		InstrumentRecord instrument = new InstrumentRecord(1, "hash", roster, null, Map.of(), Map.of());
+
+		ItemAttestation attestation = ItemAttestation.of(item("a").verdict(verdict).build(), instrument);
+
+		// The jury recorded three seats and two submitted judgments. That contradiction
+		// stands whether or not it also recorded how many errored.
+		assertThat(attestation.attestability()).isEqualTo(Attestability.ROSTER_MISMATCH);
+	}
+
 	private static ItemResult scored(String id, Jury jury, InstrumentRecord instrument) {
 		return item(id).success(true).verdict(RecordedVerdict.from(jury.vote(CONTEXT), instrument.specHash())).build();
 	}

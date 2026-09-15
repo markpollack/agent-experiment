@@ -233,10 +233,15 @@ final class ResultObjectMapper {
 						mapper.treeToValue(subVerdict, RecordedVerdict.class)));
 			}
 
-			List<RecordedSeat> seats = new ArrayList<>();
-			for (JsonNode seat : node.path("seats")) {
-				seats.add(new RecordedSeat(seat.path("position").asInt(), requiredText(seat, "verdictKey"),
-						nullableText(seat.get("keySource"))));
+			// A file with no seats property recorded none; that is not a verdict whose
+			// seats were recorded as empty, and reading it back must not say it was.
+			List<RecordedSeat> seats = null;
+			if (node.hasNonNull("seats")) {
+				seats = new ArrayList<>();
+				for (JsonNode seat : node.get("seats")) {
+					seats.add(new RecordedSeat(seat.path("position").asInt(), requiredText(seat, "verdictKey"),
+							nullableText(seat.get("keySource"))));
+				}
 			}
 			JsonNode decisionNode = node.get("decision");
 			RecordedDecision decision = decisionNode == null || decisionNode.isNull() ? null

@@ -14,7 +14,8 @@ import org.jspecify.annotations.Nullable;
  * @param policy tier policy, when recorded
  * @param disposition whether the parent could use what the stage returned; null means the
  * file recorded none, which is a required fact missing
- * @param dispositionReason why a stage failed, when it did
+ * @param dispositionReason why a stage failed; required once a stage is marked failed,
+ * because "it failed" without a reason cannot be counted by cause
  * @param verdict what the stage returned, when it returned one
  * @param failureCode why the stage produced no verdict, when it produced none
  */
@@ -27,11 +28,19 @@ public record HistoricalCompositeAttempt(String name, String relation, @Nullable
 		java.util.Objects.requireNonNull(relation, "relation must not be null");
 	}
 
+	/** True when the parent could not use what this stage returned. */
+	public boolean stageFailed() {
+		return "stage_failed".equalsIgnoreCase(this.disposition) || "STAGE_FAILED".equals(this.disposition);
+	}
+
 	/** Required facts this attempt and its verdict did not record. */
 	public List<String> unrecorded(String path) {
 		List<String> missing = new ArrayList<>();
 		if (this.disposition == null || this.disposition.isBlank()) {
 			missing.add(path + ".disposition");
+		}
+		else if (stageFailed() && (this.dispositionReason == null || this.dispositionReason.isBlank())) {
+			missing.add(path + ".dispositionReason");
 		}
 		if (this.verdict != null) {
 			missing.addAll(this.verdict.unrecorded(path + ".verdict"));

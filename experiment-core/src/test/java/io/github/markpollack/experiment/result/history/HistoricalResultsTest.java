@@ -124,6 +124,82 @@ class HistoricalResultsTest {
 		assertThat(historical.unrecorded("v")).containsExactly("v.aggregated.status");
 	}
 
+	@Test
+	void aSeatWithoutItsPositionOrKeyIsUnrecordedRatherThanSeatZero() throws Exception {
+		String json = """
+				{"aggregated":{"status":"pass","reasoning":"ok","checks":[],"metadata":{}},
+				 "individual":[],"individualByName":{},"weights":{},
+				 "seats":[{"keySource":"positional"}],
+				 "decision":{"kind":"own"},"compositeAttempts":[]}
+				""";
+
+		HistoricalVerdict historical = HistoricalResults.verdict(new ObjectMapper().readTree(json));
+
+		// Defaulting a missing position to 0 would attach a judgment to a slot nobody
+		// wrote down.
+		assertThat(historical.seats().get(0).position()).isNull();
+		assertThat(historical.unrecorded("v")).containsExactlyInAnyOrder("v.seats[0].position",
+				"v.seats[0].verdictKey");
+	}
+
+	@Test
+	void aCheckWithNoRecordedOutcomeIsUnrecordedRatherThanFailed() throws Exception {
+		String json = """
+				{"aggregated":{"status":"pass","reasoning":"ok","checks":[{"name":"build","message":"?"}],"metadata":{}},
+				 "individual":[],"individualByName":{},"weights":{},"seats":[],
+				 "decision":{"kind":"own"},"compositeAttempts":[]}
+				""";
+
+		HistoricalVerdict historical = HistoricalResults.verdict(new ObjectMapper().readTree(json));
+
+		assertThat(historical.aggregated().checks().get(0).passed()).isNull();
+		assertThat(historical.unrecorded("v")).containsExactly("v.aggregated.checks[0].passed");
+	}
+
+	@Test
+	void aDecisionThatNamesATierWithoutSayingWhatDecidedItIsIncomplete() throws Exception {
+		String json = """
+				{"aggregated":{"status":"pass","reasoning":"ok","checks":[],"metadata":{}},
+				 "individual":[],"individualByName":{},"weights":{},"seats":[],
+				 "decision":{"kind":"tier"},"compositeAttempts":[]}
+				""";
+
+		// Present is not the same as complete: a decision that cannot be followed is a
+		// required fact missing.
+		assertThat(HistoricalResults.verdict(new ObjectMapper().readTree(json)).unrecorded("v"))
+			.containsExactlyInAnyOrder("v.decision.tier", "v.decision.basis");
+	}
+
+	@Test
+	void aFactMissingOnlyInTheNamedMapStillBlocksConversion() throws Exception {
+		String json = """
+				{"aggregated":{"status":"pass","reasoning":"ok","checks":[],"metadata":{}},
+				 "individual":[],
+				 "individualByName":{"build":{"status":"error","reasoning":"broke","checks":[],"metadata":{}}},
+				 "weights":{},"seats":[],"decision":{"kind":"own"},"compositeAttempts":[]}
+				""";
+
+		HistoricalVerdict historical = HistoricalResults.verdict(new ObjectMapper().readTree(json));
+
+		// attestable() must not promise a conversion that toLive() then refuses.
+		assertThat(historical.unrecorded("v")).containsExactly("v.individualByName[build].reasonCode");
+		assertThat(historical.attestable()).isFalse();
+		assertThatThrownBy(historical::toLive).isInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
+	void aStageMarkedFailedWithoutAReasonIsUnrecorded() throws Exception {
+		String json = """
+				{"aggregated":{"status":"pass","reasoning":"ok","checks":[],"metadata":{}},
+				 "individual":[],"individualByName":{},"weights":{},"seats":[],
+				 "decision":{"kind":"own"},
+				 "compositeAttempts":[{"name":"guardrail","relation":"cascade_tier","disposition":"stage_failed"}]}
+				""";
+
+		assertThat(HistoricalResults.verdict(new ObjectMapper().readTree(json)).unrecorded("v"))
+			.containsExactly("v.attempt[guardrail].dispositionReason");
+	}
+
 	private static HistoricalVerdict only(Map<String, HistoricalVerdict> verdicts) {
 		assertThat(verdicts).hasSize(1);
 		return verdicts.values().iterator().next();

@@ -24,7 +24,7 @@ import org.jspecify.annotations.Nullable;
  * @param aggregated the aggregate judgment
  * @param individual each judgment, as stored
  * @param individualByName each judgment under its verdict key
- * @param weights weight per seat
+ * @param weights weight per seat, each as recorded
  * @param seats the seats, or null when none were recorded
  * @param decision what produced the aggregate, or null when none was recorded
  * @param compositeAttempts the stages entered, as stored
@@ -32,7 +32,7 @@ import org.jspecify.annotations.Nullable;
  */
 public record HistoricalVerdict(HistoricalJudgment aggregated, List<HistoricalJudgment> individual,
 		Map<String, HistoricalJudgment> individualByName, Map<String, Double> weights,
-		@Nullable List<RecordedSeat> seats, @Nullable RecordedDecision decision,
+		@Nullable List<HistoricalSeat> seats, @Nullable RecordedDecision decision,
 		List<HistoricalCompositeAttempt> compositeAttempts, @Nullable String instrumentHash) {
 
 	public HistoricalVerdict {
@@ -50,14 +50,47 @@ public record HistoricalVerdict(HistoricalJudgment aggregated, List<HistoricalJu
 		if (this.seats == null) {
 			missing.add(path + ".seats");
 		}
-		if (this.decision == null) {
-			missing.add(path + ".decision");
+		else {
+			for (int i = 0; i < this.seats.size(); i++) {
+				missing.addAll(this.seats.get(i).unrecorded(path + ".seats[" + i + "]"));
+			}
 		}
+		missing.addAll(decisionUnrecorded(path));
 		for (int i = 0; i < this.individual.size(); i++) {
 			missing.addAll(this.individual.get(i).unrecorded(path + ".individual[" + i + "]"));
 		}
+		// The named map is what callers read a judge's verdict from, so a fact missing
+		// only there still blocks conversion. Checking just the list would advertise a
+		// conversion that then throws.
+		this.individualByName
+			.forEach((name, judgment) -> missing.addAll(judgment.unrecorded(path + ".individualByName[" + name + "]")));
 		for (HistoricalCompositeAttempt attempt : this.compositeAttempts) {
 			missing.addAll(attempt.unrecorded(path + ".attempt[" + attempt.name() + "]"));
+		}
+		return missing;
+	}
+
+	/**
+	 * A decision must say enough to be followed. Its presence is not enough: a decision
+	 * that names a deciding tier without saying what decided it, or names none at all,
+	 * leaves the outcome unreadable.
+	 */
+	private List<String> decisionUnrecorded(String path) {
+		if (this.decision == null) {
+			return List.of(path + ".decision");
+		}
+		List<String> missing = new ArrayList<>();
+		if (this.decision.kind() == null || this.decision.kind().isBlank()) {
+			missing.add(path + ".decision.kind");
+		}
+		boolean tierKind = "tier".equalsIgnoreCase(this.decision.kind()) || "TIER".equals(this.decision.kind());
+		if (tierKind) {
+			if (this.decision.tier() == null || this.decision.tier().isBlank()) {
+				missing.add(path + ".decision.tier");
+			}
+			if (this.decision.basis() == null || this.decision.basis().isBlank()) {
+				missing.add(path + ".decision.basis");
+			}
 		}
 		return missing;
 	}
@@ -81,8 +114,10 @@ public record HistoricalVerdict(HistoricalJudgment aggregated, List<HistoricalJu
 		}
 		Map<String, RecordedJudgment> byName = new LinkedHashMap<>();
 		this.individualByName.forEach((name, judgment) -> byName.put(name, judgment.toLive()));
+		List<RecordedSeat> liveSeats = this.seats == null ? null
+				: this.seats.stream().map(HistoricalSeat::toLive).toList();
 		return new RecordedVerdict(this.aggregated.toLive(),
-				this.individual.stream().map(HistoricalJudgment::toLive).toList(), byName, this.weights, this.seats,
+				this.individual.stream().map(HistoricalJudgment::toLive).toList(), byName, this.weights, liveSeats,
 				this.decision, this.compositeAttempts.stream().map(HistoricalCompositeAttempt::toLive).toList(),
 				this.instrumentHash);
 	}

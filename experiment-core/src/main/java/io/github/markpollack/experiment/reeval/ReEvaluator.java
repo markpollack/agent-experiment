@@ -115,7 +115,7 @@ public final class ReEvaluator {
 			.passed(VerdictExtractor.passed(verdict))
 			.scores(VerdictExtractor.extractScores(verdict))
 			.verdict(RecordedVerdict.from(verdict, instrumentHash))
-			.metadata(merge(original.metadata(),
+			.metadata(merge(withoutInstrumentFailure(original.metadata()),
 					Map.of("reEvaluated", "true", "systemReinvoked", "false", "originalCostUsd",
 							String.valueOf(original.costUsd()), "reEvaluationJury", jury.getClass().getSimpleName())))
 			.build();
@@ -127,6 +127,22 @@ public final class ReEvaluator {
 					Map.of("reEvaluated", "false", "reEvaluationSkipped", "true", "reEvaluationSkipReason",
 							"missing execution detail or failed original item")))
 			.build();
+	}
+
+	/**
+	 * Drop the previous verdict's instrument-failure marks.
+	 *
+	 * <p>
+	 * Re-judging is how a run whose jury did not convene is repaired: the agent's work is
+	 * kept and a working jury scores it again. Carrying the old marks forward would keep
+	 * counting the repaired item as an instrument failure and keep failing the run, so
+	 * the repair could never take effect. The marks belong to the verdict being replaced.
+	 */
+	private static Map<String, Object> withoutInstrumentFailure(Map<String, Object> metadata) {
+		Map<String, Object> kept = new HashMap<>(metadata);
+		kept.remove(InstrumentRecord.ITEM_INSTRUMENT_FAILURE);
+		kept.remove(InstrumentRecord.ITEM_INSTRUMENT_FAILURE_DETAIL);
+		return kept;
 	}
 
 	private static Map<String, Object> merge(Map<String, Object> base, Map<String, String> overlay) {

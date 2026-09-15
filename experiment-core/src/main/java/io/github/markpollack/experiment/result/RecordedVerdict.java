@@ -27,14 +27,15 @@ import org.jspecify.annotations.Nullable;
  * @param individual each judgment in seat order
  * @param individualByName each judgment under its verdict key
  * @param weights weight per seat position
- * @param seats where each judgment sat and under what key
+ * @param seats where each judgment sat and under what key; null when the verdict recorded
+ * no seats at all, which is not the same as recording that there were none
  * @param decision what produced the aggregate, and which tier decided it
  * @param compositeAttempts every stage entered, with its disposition
  * @param instrumentHash the jury that produced this verdict
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record RecordedVerdict(RecordedJudgment aggregated, List<RecordedJudgment> individual,
-		Map<String, RecordedJudgment> individualByName, Map<String, Double> weights, List<RecordedSeat> seats,
+		Map<String, RecordedJudgment> individualByName, Map<String, Double> weights, @Nullable List<RecordedSeat> seats,
 		@Nullable RecordedDecision decision, List<RecordedCompositeAttempt> compositeAttempts,
 		@Nullable String instrumentHash) {
 
@@ -43,7 +44,9 @@ public record RecordedVerdict(RecordedJudgment aggregated, List<RecordedJudgment
 		individual = List.copyOf(individual);
 		individualByName = Collections.unmodifiableMap(new LinkedHashMap<>(individualByName));
 		weights = Collections.unmodifiableMap(new LinkedHashMap<>(weights));
-		seats = seats == null ? List.of() : List.copyOf(seats);
+		// An absent seat list stays absent. Coercing it to empty would say "nobody voted"
+		// where the file says only "this was never recorded".
+		seats = seats == null ? null : List.copyOf(seats);
 		compositeAttempts = List.copyOf(compositeAttempts);
 	}
 
@@ -51,14 +54,14 @@ public record RecordedVerdict(RecordedJudgment aggregated, List<RecordedJudgment
 	public RecordedVerdict(RecordedJudgment aggregated, List<RecordedJudgment> individual,
 			Map<String, RecordedJudgment> individualByName, Map<String, Double> weights,
 			List<RecordedCompositeAttempt> compositeAttempts) {
-		this(aggregated, individual, individualByName, weights, List.of(), null, compositeAttempts, null);
+		this(aggregated, individual, individualByName, weights, null, null, compositeAttempts, null);
 	}
 
 	/** A verdict recorded before seats and decisions existed. */
 	public RecordedVerdict(RecordedJudgment aggregated, List<RecordedJudgment> individual,
 			Map<String, RecordedJudgment> individualByName, Map<String, Double> weights,
 			List<RecordedCompositeAttempt> compositeAttempts, @Nullable String instrumentHash) {
-		this(aggregated, individual, individualByName, weights, List.of(), null, compositeAttempts, instrumentHash);
+		this(aggregated, individual, individualByName, weights, null, null, compositeAttempts, instrumentHash);
 	}
 
 	public static RecordedVerdict from(Verdict verdict) {

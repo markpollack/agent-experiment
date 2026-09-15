@@ -210,6 +210,31 @@ class ReEvaluatorTest {
 			.isEqualTo(io.github.markpollack.experiment.attestation.Attestability.VOTES_WITHOUT_ROSTER);
 	}
 
+	@Test
+	void reJudgingClearsThePreviousVerdictsInstrumentFailure() {
+		ItemResult brokenInstrument = createOriginalResult(true).items()
+			.get(0)
+			.toBuilder()
+			.metadata(Map.of(io.github.markpollack.experiment.result.InstrumentRecord.ITEM_INSTRUMENT_FAILURE,
+					"rosterMismatch",
+					io.github.markpollack.experiment.result.InstrumentRecord.ITEM_INSTRUMENT_FAILURE_DETAIL,
+					"jury: lists 3, voted 2"))
+			.build();
+		ExperimentResult original = experimentWith(List.of(brokenInstrument));
+		resultStore.save(original);
+
+		// Re-judging with a working jury is how such a run is repaired. If the old mark
+		// travelled with the item, the repair could never take effect: the run would keep
+		// counting an instrument failure and keep failing.
+		ExperimentResult repaired = ReEvaluator.agentDefaults(resultStore)
+			.reEvaluate(original, juryWith(passingJudge()));
+
+		assertThat(repaired.items().get(0).metadata())
+			.doesNotContainKey(io.github.markpollack.experiment.result.InstrumentRecord.ITEM_INSTRUMENT_FAILURE)
+			.doesNotContainKey(io.github.markpollack.experiment.result.InstrumentRecord.ITEM_INSTRUMENT_FAILURE_DETAIL);
+		assertThat(repaired.counts().instrumentFailures()).isZero();
+	}
+
 	// --- Helpers ---
 
 	private ExperimentResult createOriginalResult(boolean passing) {

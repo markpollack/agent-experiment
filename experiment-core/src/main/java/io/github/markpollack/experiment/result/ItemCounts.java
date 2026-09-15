@@ -24,11 +24,14 @@ import java.util.OptionalDouble;
  * instrument could not score them
  * @param instrumentFailures items whose instrument failed, whatever the subject outcome
  * @param notJudged items that never reached a jury
+ * @param unattestable items whose outcome cannot be established from what was recorded
  */
-public record ItemCounts(int passes, int nonPasses, int excluded, int instrumentFailures, int notJudged) {
+public record ItemCounts(int passes, int nonPasses, int excluded, int instrumentFailures, int notJudged,
+		int unattestable) {
 
 	public ItemCounts {
-		if (passes < 0 || nonPasses < 0 || excluded < 0 || instrumentFailures < 0 || notJudged < 0) {
+		if (passes < 0 || nonPasses < 0 || excluded < 0 || instrumentFailures < 0 || notJudged < 0
+				|| unattestable < 0) {
 			throw new IllegalArgumentException("counts must not be negative");
 		}
 	}
@@ -40,7 +43,7 @@ public record ItemCounts(int passes, int nonPasses, int excluded, int instrument
 
 	/** Every item the run produced. */
 	public int total() {
-		return this.passes + this.nonPasses + this.excluded + this.notJudged;
+		return this.passes + this.nonPasses + this.excluded + this.notJudged + this.unattestable;
 	}
 
 	/**

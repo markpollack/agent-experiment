@@ -58,9 +58,16 @@ public record VoteCount(String scope, @Nullable String relation, @Nullable Recor
 	/**
 	 * True when this jury counted a different number of submitted judgments than its
 	 * roster lists — the counted twin disagreeing with the configuration it describes.
+	 *
+	 * <p>
+	 * This needs only the roster and the submitted count. It deliberately does not
+	 * require the rest of the evidence block: a jury that recorded {@code inputCount 2}
+	 * against a roster of three has contradicted itself whether or not it also recorded
+	 * how many errored, and a proven contradiction must not be suppressed by an unrelated
+	 * absence.
 	 */
 	public boolean contradictsRoster() {
-		return hasEvidence() && hasRoster() && !this.rosterCount.equals(this.inputCount);
+		return this.inputCount != null && hasRoster() && !this.rosterCount.equals(this.inputCount);
 	}
 
 	static VoteCount of(String scope, @Nullable String relation, RecordedJudgment aggregated,
