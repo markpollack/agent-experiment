@@ -20,13 +20,22 @@ import io.github.markpollack.judge.result.Judgment;
  * @param status stable outcome
  * @param score normalized measured score, or null when the judge made no measurement
  * @param label classification label, or null
+ * @param reasonCode why this judgment reached its status, as a wire name; recorded as
+ * text rather than a closed enum so a code this version has never heard of is preserved
+ * rather than throwing, which is the failure this migration exists to fix
  * @param reasoning human-readable explanation
  * @param checks recorded check evidence
  * @param metadata portable judgment metadata
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record RecordedJudgment(RecordedJudgmentStatus status, @Nullable Double score, @Nullable String label,
-		String reasoning, List<RecordedCheck> checks, Map<String, Object> metadata) {
+		@Nullable String reasonCode, String reasoning, List<RecordedCheck> checks, Map<String, Object> metadata) {
+
+	/** A judgment recorded before reason codes existed. */
+	public RecordedJudgment(RecordedJudgmentStatus status, @Nullable Double score, @Nullable String label,
+			String reasoning, List<RecordedCheck> checks, Map<String, Object> metadata) {
+		this(status, score, label, null, reasoning, checks, metadata);
+	}
 
 	public RecordedJudgment {
 		java.util.Objects.requireNonNull(status, "status must not be null");
@@ -40,8 +49,13 @@ public record RecordedJudgment(RecordedJudgmentStatus status, @Nullable Double s
 
 	public static RecordedJudgment from(Judgment judgment) {
 		return new RecordedJudgment(RecordedJudgmentStatus.from(judgment.status()), judgment.score(), judgment.label(),
-				judgment.reasoning(), judgment.checks().stream().map(RecordedCheck::from).toList(),
-				judgment.metadata());
+				judgment.reasonCode() != null ? judgment.reasonCode().wireName() : null, judgment.reasoning(),
+				judgment.checks().stream().map(RecordedCheck::from).toList(), judgment.metadata());
+	}
+
+	/** True when the criterion did not apply, so this judgment measured nothing. */
+	public boolean notApplicable() {
+		return this.status == RecordedJudgmentStatus.NOT_APPLICABLE;
 	}
 
 	public boolean pass() {
@@ -55,7 +69,9 @@ public record RecordedJudgment(RecordedJudgmentStatus status, @Nullable Double s
 		return switch (this.status) {
 			case PASS -> OptionalDouble.of(1.0);
 			case FAIL -> OptionalDouble.of(0.0);
-			case ABSTAIN, ERROR -> OptionalDouble.empty();
+			// Nothing was measured: an abstention and an error made no measurement, and a
+			// not-applicable criterion was never assessed at all. None of them is a zero.
+			case ABSTAIN, NOT_APPLICABLE, ERROR -> OptionalDouble.empty();
 		};
 	}
 

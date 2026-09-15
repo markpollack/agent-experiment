@@ -23,6 +23,7 @@ import io.github.markpollack.judge.jury.CompositeFailure;
 import io.github.markpollack.judge.jury.CompositeFailureCode;
 import io.github.markpollack.judge.jury.CompositeRelation;
 import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.jury.Decision;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
@@ -138,12 +139,7 @@ class ResultObjectMapperTest {
 			.reasoning("All checks passed")
 			.check(Check.pass("build", "compiled successfully"))
 			.build();
-		RecordedVerdict original = RecordedVerdict.from(Verdict.builder()
-			.aggregated(judgment)
-			.individual(List.of(judgment))
-			.individualByName(Map.of("build_judge", judgment))
-			.weights(Map.of("build_judge", 1.0))
-			.build());
+		RecordedVerdict original = RecordedVerdict.from(Verdict.of(judgment, Map.of("build_judge", judgment)));
 
 		String json = mapper.writeValueAsString(original);
 		RecordedVerdict restored = mapper.readValue(json, RecordedVerdict.class);
@@ -159,8 +155,9 @@ class ResultObjectMapperTest {
 		Judgment failure = Judgment.error("tier did not return a verdict");
 		Verdict live = Verdict.builder()
 			.aggregated(failure)
-			.compositeAttempts(List.of(new CompositeAttempt("tier-1", CompositeRelation.CASCADE_TIER,
-					TierPolicy.FINAL_TIER, null, new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED))))
+			.compositeAttempts(List.of(CompositeAttempt.executionFailed("tier-1", CompositeRelation.CASCADE_TIER,
+					TierPolicy.FINAL_TIER, new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED))))
+			.decision(Decision.own())
 			.build();
 
 		RecordedVerdict restored = mapper.readValue(mapper.writeValueAsString(RecordedVerdict.from(live)),
@@ -253,10 +250,7 @@ class ResultObjectMapperTest {
 	void roundTripsItemResultWithInvocationAndVerdict() throws Exception {
 		InvocationResult invocation = InvocationResult.completed(List.of(), 100, 200, 50, 0.05, 5000, "session-1",
 				Map.of("model", "opus"));
-		Verdict verdict = Verdict.builder()
-			.aggregated(Judgment.pass("OK"))
-			.individualByName(Map.of("build", Judgment.pass("compiled")))
-			.build();
+		Verdict verdict = Verdict.of(Judgment.pass("OK"), Map.of("build", Judgment.pass("compiled")));
 
 		ItemResult original = ItemResult.builder()
 			.itemId("ITEM-001")

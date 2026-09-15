@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
  * Agent Experiment-owned persisted jury verdict.
  *
  * <p>
- * The representation follows Judge 0.14's complete composite-attempt tree while keeping
+ * The representation follows Agent Judge's complete composite-attempt tree while keeping
  * result files independent from Agent Judge implementation classes.
  *
  * <p>
@@ -22,25 +22,43 @@ import org.jspecify.annotations.Nullable;
  * verdict rather than only on the run because a re-evaluation replaces verdicts after the
  * fact: an item a re-evaluation skipped keeps its original verdict, scored by a different
  * jury from the one its new run records. Null when no instrument was recorded.
+ *
+ * @param aggregated the jury's aggregate judgment
+ * @param individual each judgment in seat order
+ * @param individualByName each judgment under its verdict key
+ * @param weights weight per seat position
+ * @param seats where each judgment sat and under what key
+ * @param decision what produced the aggregate, and which tier decided it
+ * @param compositeAttempts every stage entered, with its disposition
+ * @param instrumentHash the jury that produced this verdict
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record RecordedVerdict(RecordedJudgment aggregated, List<RecordedJudgment> individual,
-		Map<String, RecordedJudgment> individualByName, Map<String, Double> weights,
-		List<RecordedCompositeAttempt> compositeAttempts, @Nullable String instrumentHash) {
+		Map<String, RecordedJudgment> individualByName, Map<String, Double> weights, List<RecordedSeat> seats,
+		@Nullable RecordedDecision decision, List<RecordedCompositeAttempt> compositeAttempts,
+		@Nullable String instrumentHash) {
 
 	public RecordedVerdict {
 		java.util.Objects.requireNonNull(aggregated, "aggregated must not be null");
 		individual = List.copyOf(individual);
 		individualByName = Collections.unmodifiableMap(new LinkedHashMap<>(individualByName));
 		weights = Collections.unmodifiableMap(new LinkedHashMap<>(weights));
+		seats = seats == null ? List.of() : List.copyOf(seats);
 		compositeAttempts = List.copyOf(compositeAttempts);
 	}
 
-	/** A verdict whose instrument was not recorded. */
+	/** A verdict recorded before seats, decisions and instrument hashes existed. */
 	public RecordedVerdict(RecordedJudgment aggregated, List<RecordedJudgment> individual,
 			Map<String, RecordedJudgment> individualByName, Map<String, Double> weights,
 			List<RecordedCompositeAttempt> compositeAttempts) {
-		this(aggregated, individual, individualByName, weights, compositeAttempts, null);
+		this(aggregated, individual, individualByName, weights, List.of(), null, compositeAttempts, null);
+	}
+
+	/** A verdict recorded before seats and decisions existed. */
+	public RecordedVerdict(RecordedJudgment aggregated, List<RecordedJudgment> individual,
+			Map<String, RecordedJudgment> individualByName, Map<String, Double> weights,
+			List<RecordedCompositeAttempt> compositeAttempts, @Nullable String instrumentHash) {
+		this(aggregated, individual, individualByName, weights, List.of(), null, compositeAttempts, instrumentHash);
 	}
 
 	public static RecordedVerdict from(Verdict verdict) {
@@ -55,6 +73,7 @@ public record RecordedVerdict(RecordedJudgment aggregated, List<RecordedJudgment
 		verdict.individualByName().forEach((name, judgment) -> byName.put(name, RecordedJudgment.from(judgment)));
 		return new RecordedVerdict(RecordedJudgment.from(verdict.aggregated()),
 				verdict.individual().stream().map(RecordedJudgment::from).toList(), byName, verdict.weights(),
+				verdict.seats().stream().map(RecordedSeat::from).toList(), RecordedDecision.from(verdict.decision()),
 				verdict.compositeAttempts().stream().map(RecordedCompositeAttempt::from).toList(), instrumentHash);
 	}
 

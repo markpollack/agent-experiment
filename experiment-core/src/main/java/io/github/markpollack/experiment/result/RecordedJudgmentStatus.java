@@ -13,6 +13,16 @@ public enum RecordedJudgmentStatus {
 
 	ABSTAIN("abstain"),
 
+	/**
+	 * The criterion does not apply to this subject, so nothing about it was assessed.
+	 *
+	 * <p>
+	 * Distinct from {@link #ABSTAIN}, which means the criterion applies and the judge
+	 * could not decide. An abstention counts against the subject; a not-applicable leaves
+	 * the denominator entirely and is counted on its own.
+	 */
+	NOT_APPLICABLE("not_applicable"),
+
 	ERROR("error");
 
 	private final String wireName;

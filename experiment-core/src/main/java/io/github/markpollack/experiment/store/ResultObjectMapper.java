@@ -27,8 +27,10 @@ import io.github.markpollack.experiment.judge.JudgeExecutionDetail;
 import io.github.markpollack.experiment.result.ExecutionDetail;
 import io.github.markpollack.experiment.result.RecordedCheck;
 import io.github.markpollack.experiment.result.RecordedCompositeAttempt;
+import io.github.markpollack.experiment.result.RecordedDecision;
 import io.github.markpollack.experiment.result.RecordedJudgment;
 import io.github.markpollack.experiment.result.RecordedJudgmentStatus;
+import io.github.markpollack.experiment.result.RecordedSeat;
 import io.github.markpollack.experiment.result.RecordedVerdict;
 
 /**
@@ -160,7 +162,8 @@ final class ResultObjectMapper {
 			}
 			Map<String, Object> metadata = node.hasNonNull("metadata")
 					? mapper.convertValue(node.get("metadata"), OBJECT_MAP) : Map.of();
-			return new RecordedJudgment(status, score, label, reasoning, checks, metadata);
+			return new RecordedJudgment(status, score, label, nullableText(node.get("reasonCode")), reasoning, checks,
+					metadata);
 		}
 
 		private static Double normalizedScore(JsonNode score) throws IOException {
@@ -229,7 +232,18 @@ final class ResultObjectMapper {
 				attempts.add(RecordedCompositeAttempt.legacy(legacyIndex++,
 						mapper.treeToValue(subVerdict, RecordedVerdict.class)));
 			}
-			return new RecordedVerdict(aggregated, individual, individualByName, weights, attempts,
+
+			List<RecordedSeat> seats = new ArrayList<>();
+			for (JsonNode seat : node.path("seats")) {
+				seats.add(new RecordedSeat(seat.path("position").asInt(), requiredText(seat, "verdictKey"),
+						nullableText(seat.get("keySource"))));
+			}
+			JsonNode decisionNode = node.get("decision");
+			RecordedDecision decision = decisionNode == null || decisionNode.isNull() ? null
+					: new RecordedDecision(requiredText(decisionNode, "kind"), nullableText(decisionNode.get("tier")),
+							nullableText(decisionNode.get("basis")));
+
+			return new RecordedVerdict(aggregated, individual, individualByName, weights, seats, decision, attempts,
 					nullableText(node.get("instrumentHash")));
 		}
 
