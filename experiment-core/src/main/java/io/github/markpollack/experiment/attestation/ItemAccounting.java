@@ -42,7 +42,7 @@ public final class ItemAccounting {
 				case NOT_JUDGED -> notJudged++;
 				case UNATTESTABLE -> unattestable++;
 			}
-			if (instrumentFailed(item)) {
+			if (instrumentHealth(item) == InstrumentHealth.FAILED) {
 				instrumentFailures++;
 			}
 		}
@@ -99,25 +99,36 @@ public final class ItemAccounting {
 	}
 
 	/**
-	 * Whether this item's instrument failed, independently of the subject outcome.
+	 * What this item says about the instrument that scored it, independently of the
+	 * subject outcome.
 	 *
 	 * <p>
-	 * True when the deciding aggregate errored, when any stage the jury entered failed —
-	 * which stays true even if a later tier passed — or when the jury did not convene
-	 * with the judges it lists.
+	 * Three states, not two. A record that never said whether a stage was usable cannot
+	 * report that the instrument was fine, so it reports {@link InstrumentHealth#UNKNOWN}
+	 * rather than a comfortable false. Two states here would rebuild, one level along,
+	 * the defect this whole record exists to remove.
 	 */
-	public static boolean instrumentFailed(ItemResult item) {
+	public static InstrumentHealth instrumentHealth(ItemResult item) {
 		RecordedVerdict verdict = item.verdict();
 		if (verdict == null) {
-			return false;
+			return InstrumentHealth.UNKNOWN; // no jury ran; nothing says it was fine
 		}
 		if (item.metadata().containsKey(InstrumentRecord.ITEM_INSTRUMENT_FAILURE)) {
-			return true;
+			return InstrumentHealth.FAILED;
 		}
-		if (selectedDetermination(verdict).aggregated().status() == RecordedJudgmentStatus.ERROR) {
-			return true;
+		if (anyStageFailed(verdict)) {
+			return InstrumentHealth.FAILED;
 		}
-		return anyStageFailed(verdict);
+		if (!attestable(verdict)) {
+			return InstrumentHealth.UNKNOWN;
+		}
+		return selectedDetermination(verdict).aggregated().status() == RecordedJudgmentStatus.ERROR
+				? InstrumentHealth.FAILED : InstrumentHealth.OK;
+	}
+
+	/** True only when the instrument is known to have failed. */
+	public static boolean instrumentFailed(ItemResult item) {
+		return instrumentHealth(item) == InstrumentHealth.FAILED;
 	}
 
 	/**
@@ -132,11 +143,8 @@ public final class ItemAccounting {
 	 */
 	public static boolean attestable(RecordedVerdict verdict) {
 		RecordedDecision decision = verdict.decision();
-		if (decision == null || decision.kind().isBlank()) {
+		if (decision == null || decision.kind() == null || decision.kind().isBlank()) {
 			return false;
-		}
-		if (decision.tier() != null && decision.basis() == null) {
-			return false; // names the deciding stage but not what decided it
 		}
 		for (RecordedCompositeAttempt attempt : verdict.compositeAttempts()) {
 			if (attempt.disposition() == null || attempt.disposition().isBlank()) {
@@ -146,10 +154,26 @@ public final class ItemAccounting {
 				return false;
 			}
 		}
-		if (decision.tierOutcome()) {
-			return decision.tier() != null && namedAttempt(verdict, decision.tier()) != null;
+		String kind = decision.kind();
+		if ("own".equalsIgnoreCase(kind) || "undecided".equalsIgnoreCase(kind)) {
+			return true;
 		}
-		return true;
+		if (!"tier".equalsIgnoreCase(kind)) {
+			// A kind this version cannot read is not a kind it may assume is harmless.
+			return false;
+		}
+		// A tier decision must say which stage and on what basis, and that stage must be
+		// in the file. This holds for BOTH bases: an individual rejection whose tier is
+		// missing is as unreadable as a tier outcome whose tier is missing, and treating
+		// it as a rejection would assert a finding no stored stage supports.
+		if (decision.tier() == null || decision.tier().isBlank() || decision.basis() == null
+				|| decision.basis().isBlank()) {
+			return false;
+		}
+		if (!decision.tierOutcome() && !decision.individualRejection()) {
+			return false; // a basis this version cannot read
+		}
+		return namedAttempt(verdict, decision.tier()) != null;
 	}
 
 	/**

@@ -157,7 +157,7 @@ final class ResultObjectMapper {
 
 			List<RecordedCheck> checks = new ArrayList<>();
 			for (JsonNode check : node.path("checks")) {
-				checks.add(new RecordedCheck(requiredText(check, "name"), check.path("passed").asBoolean(),
+				checks.add(new RecordedCheck(requiredText(check, "name"), requiredBoolean(check, "passed"),
 						check.path("message").asText("")));
 			}
 			Map<String, Object> metadata = node.hasNonNull("metadata")
@@ -239,7 +239,7 @@ final class ResultObjectMapper {
 			if (node.hasNonNull("seats")) {
 				seats = new ArrayList<>();
 				for (JsonNode seat : node.get("seats")) {
-					seats.add(new RecordedSeat(seat.path("position").asInt(), requiredText(seat, "verdictKey"),
+					seats.add(new RecordedSeat(requiredInt(seat, "position"), requiredText(seat, "verdictKey"),
 							nullableText(seat.get("keySource"))));
 				}
 			}
@@ -264,6 +264,37 @@ final class ResultObjectMapper {
 
 	private static String nullableText(JsonNode value) {
 		return value == null || value.isNull() ? null : value.asText();
+	}
+
+	/**
+	 * A required fact this strict reader will not invent.
+	 *
+	 * <p>
+	 * The live types hold every fact the contract demands, so a file missing one is not
+	 * something to read into them with a default: {@code asBoolean()} on an absent field
+	 * returns false, which records a check as failed that nobody ever ran. A file like
+	 * that belongs to the historical reader, which keeps the absence. Failing here is
+	 * what sends it there instead of quietly manufacturing a measurement.
+	 */
+	private static boolean requiredBoolean(JsonNode node, String field) throws IOException {
+		JsonNode value = node.get(field);
+		if (value == null || !value.isBoolean()) {
+			throw new IOException("Required boolean field is missing: " + field
+					+ " — read this file with the historical reader, which keeps the absence");
+		}
+		return value.booleanValue();
+	}
+
+	/**
+	 * A required number this strict reader will not invent; see {@link #requiredBoolean}.
+	 */
+	private static int requiredInt(JsonNode node, String field) throws IOException {
+		JsonNode value = node.get(field);
+		if (value == null || !value.isInt()) {
+			throw new IOException("Required integer field is missing: " + field
+					+ " — read this file with the historical reader, which keeps the absence");
+		}
+		return value.intValue();
 	}
 
 }

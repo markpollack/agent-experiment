@@ -56,8 +56,15 @@ class ItemAccountingTest {
 		// The mixed case: a tier stopped on one judge's established violation, and that
 		// tier's own reduction then failed, so the aggregate is ERROR on top of a real
 		// rejection. Excluding every ERROR would silently lose the rejection.
+		// The deciding tier must be present. An earlier version of this test named a tier
+		// the record did not contain and still expected a rejection — asserting a finding
+		// no stored stage supported. That record is unattestable, not a rejection.
+		RecordedVerdict guardrail = new RecordedVerdict(judgment(RecordedJudgmentStatus.ERROR), List.of(), Map.of(),
+				Map.of(), List.of(), new RecordedDecision("own", null, null), List.of(), null);
 		RecordedVerdict mixed = new RecordedVerdict(judgment(RecordedJudgmentStatus.ERROR), List.of(), Map.of(),
-				Map.of(), List.of(), new RecordedDecision("tier", "guardrail", "individual_rejection"), List.of(),
+				Map.of(), List.of(), new RecordedDecision("tier", "guardrail", "individual_rejection"),
+				List.of(new RecordedCompositeAttempt("guardrail", "cascade_tier", "REJECT_ON_ANY_FAIL", "used", null,
+						guardrail, null)),
 				null);
 
 		ItemCounts counts = ItemAccounting.count(List.of(item("a", mixed)));
@@ -132,7 +139,10 @@ class ItemAccountingTest {
 		// Without a decision the outcome is not recoverable. Classifying it from the
 		// aggregate would turn an absence into a definite answer.
 		assertThat(ItemAccounting.outcomeOf(item("a", noDecision))).isEqualTo(SubjectOutcome.UNATTESTABLE);
-		assertThat(ItemAccounting.count(List.of(item("a", noDecision)))).isEqualTo(new ItemCounts(0, 0, 0, 1, 0, 1));
+		// Nor may it claim the instrument was fine, or that it failed. The record does
+		// not say, and "not known to have failed" is not a clean bill of health.
+		assertThat(ItemAccounting.instrumentHealth(item("a", noDecision))).isEqualTo(InstrumentHealth.UNKNOWN);
+		assertThat(ItemAccounting.count(List.of(item("a", noDecision)))).isEqualTo(new ItemCounts(0, 0, 0, 0, 0, 1));
 	}
 
 	@Test
@@ -154,6 +164,26 @@ class ItemAccountingTest {
 
 		// Missing stage evidence must not certify that the instrument was fine.
 		assertThat(ItemAccounting.outcomeOf(item("a", root))).isEqualTo(SubjectOutcome.UNATTESTABLE);
+		assertThat(ItemAccounting.instrumentHealth(item("a", root))).isEqualTo(InstrumentHealth.UNKNOWN);
+	}
+
+	@Test
+	void aDecisionNamingAStageOnAnIndividualRejectionMustAlsoContainThatStage() {
+		RecordedVerdict namesAMissingStage = new RecordedVerdict(judgment(RecordedJudgmentStatus.ERROR), List.of(),
+				Map.of(), Map.of(), List.of(), new RecordedDecision("tier", "guardrail", "individual_rejection"),
+				List.of(), null);
+
+		// Both bases are validated, not just tier outcomes. Reading this as a rejection
+		// would assert a finding no stored stage supports.
+		assertThat(ItemAccounting.outcomeOf(item("a", namesAMissingStage))).isEqualTo(SubjectOutcome.UNATTESTABLE);
+	}
+
+	@Test
+	void aDecisionKindThisVersionCannotReadIsUnattestable() {
+		RecordedVerdict unknownKind = new RecordedVerdict(judgment(RecordedJudgmentStatus.PASS), List.of(), Map.of(),
+				Map.of(), List.of(), new RecordedDecision("invented_later", null, null), List.of(), null);
+
+		assertThat(ItemAccounting.outcomeOf(item("a", unknownKind))).isEqualTo(SubjectOutcome.UNATTESTABLE);
 	}
 
 	private static ItemResult item(String id, RecordedVerdict verdict) {

@@ -196,8 +196,10 @@ class HistoricalResultsTest {
 				 "compositeAttempts":[{"name":"guardrail","relation":"cascade_tier","disposition":"stage_failed"}]}
 				""";
 
+		// It also recorded neither what the stage returned nor why it returned nothing,
+		// which the live type requires exactly one of.
 		assertThat(HistoricalResults.verdict(new ObjectMapper().readTree(json)).unrecorded("v"))
-			.containsExactly("v.attempt[guardrail].dispositionReason");
+			.containsExactlyInAnyOrder("v.attempt[guardrail].dispositionReason", "v.attempt[guardrail].outcome");
 	}
 
 	private static HistoricalVerdict only(Map<String, HistoricalVerdict> verdicts) {

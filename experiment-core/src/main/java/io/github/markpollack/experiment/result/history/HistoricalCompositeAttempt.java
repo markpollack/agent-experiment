@@ -42,6 +42,12 @@ public record HistoricalCompositeAttempt(String name, String relation, @Nullable
 		else if (stageFailed() && (this.dispositionReason == null || this.dispositionReason.isBlank())) {
 			missing.add(path + ".dispositionReason");
 		}
+		// A stage recorded neither what it returned nor why it returned nothing. The live
+		// type requires exactly one; saying nothing is missing here would promise a
+		// conversion that then throws.
+		if ((this.verdict == null) == (this.failureCode == null)) {
+			missing.add(path + ".outcome");
+		}
 		if (this.verdict != null) {
 			missing.addAll(this.verdict.unrecorded(path + ".verdict"));
 		}

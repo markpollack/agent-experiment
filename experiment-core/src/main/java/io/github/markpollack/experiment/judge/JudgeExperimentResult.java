@@ -2,7 +2,10 @@ package io.github.markpollack.experiment.judge;
 
 import java.util.List;
 
+import io.github.markpollack.experiment.attestation.ItemAccounting;
+import io.github.markpollack.experiment.attestation.SubjectOutcome;
 import io.github.markpollack.experiment.result.ExperimentResult;
+import io.github.markpollack.experiment.result.ItemCounts;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -27,17 +30,20 @@ public record JudgeExperimentResult(ExperimentResult experimentResult, @Nullable
 	 * @return a judge-typed result with computed agreement rate and disagreement list
 	 */
 	public static JudgeExperimentResult from(ExperimentResult result) {
+		// Read from the recorded verdict, not from the stored flag. A stored flag can
+		// contradict its own evidence — an old item can carry passed=false with no
+		// verdict
+		// at all — and trusting it here is how an item nobody scored became a
+		// disagreement and dragged the rate down with it.
 		List<JudgeDisagreement> disagreements = result.items()
 			.stream()
-			// An item the judge did not decide is not a disagreement with it.
-			.filter(item -> Boolean.FALSE.equals(item.passed()))
+			.filter(item -> ItemAccounting.outcomeOf(item) == SubjectOutcome.NON_PASS)
 			.filter(item -> item.executionDetail() instanceof JudgeExecutionDetail)
 			.map(item -> new JudgeDisagreement(item.itemId(), (JudgeExecutionDetail) item.executionDetail()))
 			.toList();
 
-		long scored = result.items().stream().filter(item -> item.passed() != null).count();
-		Double agreement = scored == 0 ? null
-				: (double) result.items().stream().filter(item -> Boolean.TRUE.equals(item.passed())).count() / scored;
+		ItemCounts counts = ItemAccounting.count(result.items());
+		Double agreement = counts.passRate().isPresent() ? counts.passRate().getAsDouble() : null;
 
 		return new JudgeExperimentResult(result, agreement, disagreements);
 	}
