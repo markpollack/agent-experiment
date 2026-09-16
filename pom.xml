@@ -64,7 +64,7 @@
             repository declared above and never from a local `mvn install`, which can
             replace a version in ~/.m2 with different code under the same name.
         -->
-        <agent-judge.version>0.17.0-SNAPSHOT</agent-judge.version>
+        <agent-judge.version>0.17.0</agent-judge.version>
         <claude-code-sdk.version>1.6.0</claude-code-sdk.version>
         <agent-workflow.version>0.12.2</agent-workflow.version>
         <agent-client.version>0.30.0</agent-client.version>
