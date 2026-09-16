@@ -59,6 +59,8 @@ import org.slf4j.LoggerFactory;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.jury.interpretation.Interpretation;
+import io.github.markpollack.judge.jury.interpretation.Verdicts;
 
 /**
  * Orchestrates a full agent experiment: load dataset, iterate items, invoke agent, judge
@@ -392,8 +394,9 @@ public class AgentExperiment {
 
 			Map<String, Double> scores = new LinkedHashMap<>(VerdictExtractor.extractScores(verdict));
 			RecordedVerdict recorded = RecordedVerdict.from(verdict, instrument.specHash());
+			Interpretation interpretation = Verdicts.interpret(verdict);
 			// Null when the jury decided nothing about the subject, never false.
-			Boolean passed = ItemAccounting.passedFlag(recorded);
+			Boolean passed = ItemAccounting.passedFlag(interpretation);
 
 			@Nullable Path preservedPath = preserveWorkspace(workspace, experimentId, item.slug(), activeSession);
 			return InstrumentFailures.mark(ItemResult.builder()
@@ -408,6 +411,7 @@ public class AgentExperiment {
 				.metrics(buildMetrics(invocationResult))
 				.executionDetail(invocationResult)
 				.verdict(recorded)
+				.interpretation(interpretation)
 				.workspacePath(preservedPath)
 				.metadata(Map.of())
 				.build(), instrument);

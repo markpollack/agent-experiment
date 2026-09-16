@@ -34,9 +34,4 @@ public record RecordedSeat(int position, String verdictKey, @Nullable String key
 				seat.keySource() != null ? seat.keySource().wireName() : null);
 	}
 
-	/** True when this seat's key is its slot rather than a declared identity. */
-	public boolean positional() {
-		return "positional".equalsIgnoreCase(this.keySource) || "POSITIONAL".equals(this.keySource);
-	}
-
 }

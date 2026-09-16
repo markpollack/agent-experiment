@@ -3,6 +3,8 @@ package io.github.markpollack.experiment.result;
 import java.nio.file.Path;
 import java.util.Map;
 
+import io.github.markpollack.judge.jury.interpretation.Interpretation;
+import io.github.markpollack.judge.jury.interpretation.Verdicts;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -26,13 +28,17 @@ import org.jspecify.annotations.Nullable;
  * agent experiments)
  * @param verdict Agent Experiment-owned recorded verdict (nullable if invocation failed
  * before judging)
+ * @param interpretation what the verdict says, as the library that produced it reads it:
+ * which stage decided, what it says about the subject, and what the record is missing.
+ * Written here rather than derived by readers, so that no consumer has to re-derive a
+ * meaning this project does not own. Null exactly when there is no verdict
  * @param metadata item-level metadata
  * @param workspacePath path to preserved workspace (null when not preserved)
  */
 public record ItemResult(String itemId, String itemSlug, boolean success, @Nullable Boolean passed, double costUsd,
 		int totalTokens, long durationMs, Map<String, Double> scores, Map<String, Object> metrics,
-		@Nullable ExecutionDetail executionDetail, @Nullable RecordedVerdict verdict, Map<String, Object> metadata,
-		@Nullable Path workspacePath) {
+		@Nullable ExecutionDetail executionDetail, @Nullable RecordedVerdict verdict,
+		@Nullable Interpretation interpretation, Map<String, Object> metadata, @Nullable Path workspacePath) {
 
 	public ItemResult {
 		java.util.Objects.requireNonNull(itemId, "itemId must not be null");
@@ -62,6 +68,7 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 			.metrics(metrics)
 			.executionDetail(executionDetail)
 			.verdict(verdict)
+			.interpretation(interpretation)
 			.metadata(metadata)
 			.workspacePath(workspacePath);
 	}
@@ -89,6 +96,8 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 		private @Nullable ExecutionDetail executionDetail;
 
 		private @Nullable RecordedVerdict verdict;
+
+		private @Nullable Interpretation interpretation;
 
 		private Map<String, Object> metadata = Map.of();
 
@@ -158,7 +167,27 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 
 		/** Record a live jury verdict using the stable Agent Experiment projection. */
 		public Builder verdict(io.github.markpollack.judge.jury.Verdict verdict) {
-			this.verdict = RecordedVerdict.from(verdict);
+			return verdict(verdict, null);
+		}
+
+		/**
+		 * Record a live jury verdict, and with it the library's reading of that verdict.
+		 * <p>
+		 * Taken here, where the live verdict still exists, rather than parsed back out of
+		 * the stored projection afterwards.
+		 */
+		public Builder verdict(io.github.markpollack.judge.jury.Verdict verdict, @Nullable String instrumentHash) {
+			this.verdict = RecordedVerdict.from(verdict, instrumentHash);
+			this.interpretation = Verdicts.interpret(verdict);
+			return this;
+		}
+
+		/**
+		 * The library's reading of this item's verdict. Set automatically when a live
+		 * verdict is recorded.
+		 */
+		public Builder interpretation(@Nullable Interpretation interpretation) {
+			this.interpretation = interpretation;
 			return this;
 		}
 
@@ -174,7 +203,7 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 
 		public ItemResult build() {
 			return new ItemResult(itemId, itemSlug, success, passed, costUsd, totalTokens, durationMs, scores, metrics,
-					executionDetail, verdict, metadata, workspacePath);
+					executionDetail, verdict, interpretation, metadata, workspacePath);
 		}
 
 	}

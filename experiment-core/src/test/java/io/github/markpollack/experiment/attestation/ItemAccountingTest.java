@@ -6,11 +6,14 @@ import java.util.Map;
 import io.github.markpollack.experiment.result.InstrumentRecord;
 import io.github.markpollack.experiment.result.ItemCounts;
 import io.github.markpollack.experiment.result.ItemResult;
-import io.github.markpollack.experiment.result.RecordedCompositeAttempt;
-import io.github.markpollack.experiment.result.RecordedDecision;
 import io.github.markpollack.experiment.result.RecordedJudgment;
 import io.github.markpollack.experiment.result.RecordedJudgmentStatus;
 import io.github.markpollack.experiment.result.RecordedVerdict;
+import io.github.markpollack.judge.jury.interpretation.Interpretation;
+import io.github.markpollack.judge.jury.interpretation.ReadingSupport;
+import io.github.markpollack.judge.jury.interpretation.Stage;
+import io.github.markpollack.judge.jury.interpretation.VerdictReading;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,13 +21,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * The counting rules, pinned. These are the numeric oracles for how an item counts; every
  * pass rate anyone computes rests on them.
+ *
+ * <p>
+ * They are written in terms of a <em>reading</em>, because that is now the input: what
+ * the verdict says is the library's answer, and what it means for a measurement is the
+ * only part decided here. Nothing in this class constructs a decision, a stage
+ * disposition or an aggregate status to be interpreted — when those rules were pinned
+ * here, they were a copy of someone else's.
  */
 class ItemAccountingTest {
 
 	@Test
-	void passFailAndAbstainAreAllScored() {
-		ItemCounts counts = ItemAccounting.count(List.of(item("a", verdict(RecordedJudgmentStatus.PASS)),
-				item("b", verdict(RecordedJudgmentStatus.FAIL)), item("c", verdict(RecordedJudgmentStatus.ABSTAIN))));
+	void acceptedRejectedAndUndecidedAreAllScored() {
+		ItemCounts counts = ItemAccounting.count(List.of(item("a", VerdictReading.ACCEPTED),
+				item("b", VerdictReading.REJECTED), item("c", VerdictReading.UNDECIDED)));
 
 		// An abstention is about a criterion that applied, so it counts against the
 		// subject.
@@ -34,8 +44,8 @@ class ItemAccountingTest {
 
 	@Test
 	void notApplicableLeavesTheDenominatorAndAnAllExcludedRunHasNoRate() {
-		ItemCounts counts = ItemAccounting.count(List.of(item("a", verdict(RecordedJudgmentStatus.NOT_APPLICABLE)),
-				item("b", verdict(RecordedJudgmentStatus.NOT_APPLICABLE))));
+		ItemCounts counts = ItemAccounting
+			.count(List.of(item("a", VerdictReading.NOT_APPLICABLE), item("b", VerdictReading.NOT_APPLICABLE)));
 
 		assertThat(counts).isEqualTo(new ItemCounts(0, 0, 2, 0, 0, 0));
 		// Nothing was scored, so there is no rate. Reporting 0.0 would say the subject
@@ -44,74 +54,37 @@ class ItemAccountingTest {
 	}
 
 	@Test
-	void anErrorIsExcludedFromTheSubjectAndCountedAsAnInstrumentFailure() {
-		ItemCounts counts = ItemAccounting.count(List.of(item("a", verdict(RecordedJudgmentStatus.ERROR))));
+	void anUnassessedSubjectIsExcludedAndCountedAsAnInstrumentFailure() {
+		ItemCounts counts = ItemAccounting.count(List.of(item("a", VerdictReading.NOT_ASSESSED)));
 
+		// The jury could not assess the subject. That is the instrument's failure, and
+		// counting it against the subject is the defect this whole record exists to
+		// remove.
 		assertThat(counts).isEqualTo(new ItemCounts(0, 0, 1, 1, 0, 0));
 		assertThat(counts.passRate()).isEmpty();
 	}
 
 	@Test
-	void aRejectionWhoseAggregationAlsoFailedCountsAgainstTheSubjectAndAsAnInstrumentFailure() {
-		// The mixed case: a tier stopped on one judge's established violation, and that
-		// tier's own reduction then failed, so the aggregate is ERROR on top of a real
-		// rejection. Excluding every ERROR would silently lose the rejection.
-		// The deciding tier must be present. An earlier version of this test named a tier
-		// the record did not contain and still expected a rejection — asserting a finding
-		// no stored stage supported. That record is unattestable, not a rejection.
-		RecordedVerdict guardrail = new RecordedVerdict(judgment(RecordedJudgmentStatus.ERROR), List.of(), Map.of(),
-				Map.of(), List.of(), new RecordedDecision("own", null, null), List.of(), null);
-		RecordedVerdict mixed = new RecordedVerdict(judgment(RecordedJudgmentStatus.ERROR), List.of(), Map.of(),
-				Map.of(), List.of(), new RecordedDecision("tier", "guardrail", "individual_rejection"),
-				List.of(new RecordedCompositeAttempt("guardrail", "cascade_tier", "REJECT_ON_ANY_FAIL", "used", null,
-						guardrail, null)),
-				null);
+	void aRejectionWhoseStageAlsoFailedCountsAgainstTheSubjectAndAsAnInstrumentFailure() {
+		// The mixed case: the subject was rejected and a stage of the jury also failed to
+		// run. One number cannot say both, so both are recorded.
+		ItemResult mixed = item("a", VerdictReading.REJECTED, ReadingSupport.SUPPORTED, stageThatFailedToRun());
 
-		ItemCounts counts = ItemAccounting.count(List.of(item("a", mixed)));
-
-		assertThat(ItemAccounting.outcomeOf(item("a", mixed))).isEqualTo(SubjectOutcome.NON_PASS);
-		assertThat(counts).isEqualTo(new ItemCounts(0, 1, 0, 1, 0, 0));
-		assertThat(counts.passRate()).hasValue(0.0);
+		assertThat(ItemAccounting.outcomeOf(mixed)).isEqualTo(SubjectOutcome.NON_PASS);
+		assertThat(ItemAccounting.count(List.of(mixed))).isEqualTo(new ItemCounts(0, 1, 0, 1, 0, 0));
 	}
 
 	@Test
-	void theOutcomeComesFromTheNamedTierTheDecisionPointsAt() {
-		RecordedVerdict tier = new RecordedVerdict(judgment(RecordedJudgmentStatus.PASS), List.of(), Map.of(), Map.of(),
-				List.of(), new RecordedDecision("own", null, null), List.of(), null);
-		RecordedVerdict root = new RecordedVerdict(judgment(RecordedJudgmentStatus.ERROR), List.of(), Map.of(),
-				Map.of(), List.of(), new RecordedDecision("tier", "quality", "tier_outcome"),
-				List.of(new RecordedCompositeAttempt("quality", "cascade_tier", "FINAL_TIER", "used", null, tier,
-						null)),
-				null);
-
-		// The root aggregate is ERROR, but the decision names the tier that decided, and
-		// that tier passed. Reading the root's shape would invent a failure.
-		assertThat(ItemAccounting.outcomeOf(item("a", root))).isEqualTo(SubjectOutcome.PASS);
-	}
-
-	@Test
-	void aStageThatFailedIsCountedEvenWhenALaterTierPassed() {
-		RecordedVerdict quality = new RecordedVerdict(judgment(RecordedJudgmentStatus.PASS), List.of(), Map.of(),
-				Map.of(), List.of(), new RecordedDecision("own", null, null), List.of(), null);
-		RecordedVerdict guardrail = new RecordedVerdict(judgment(RecordedJudgmentStatus.ERROR), List.of(), Map.of(),
-				Map.of(), List.of(), new RecordedDecision("own", null, null), List.of(), null);
-		RecordedVerdict root = new RecordedVerdict(judgment(RecordedJudgmentStatus.PASS), List.of(), Map.of(), Map.of(),
-				List.of(), new RecordedDecision("tier", "quality", "tier_outcome"),
-				List.of(new RecordedCompositeAttempt("guardrail", "cascade_tier", "REJECT_ON_ANY_FAIL", "stage_failed",
-						"execution_failed", guardrail, null),
-						new RecordedCompositeAttempt("quality", "cascade_tier", "FINAL_TIER", "used", null, quality,
-								null)),
-				null);
-
-		ItemCounts counts = ItemAccounting.count(List.of(item("a", root)));
+	void aStageThatFailedIsCountedEvenWhenTheSubjectPassed() {
+		ItemResult item = item("a", VerdictReading.ACCEPTED, ReadingSupport.SUPPORTED, stageThatFailedToRun());
 
 		// The subject passed and the instrument still failed. One number cannot say both.
-		assertThat(counts).isEqualTo(new ItemCounts(1, 0, 0, 1, 0, 0));
+		assertThat(ItemAccounting.count(List.of(item))).isEqualTo(new ItemCounts(1, 0, 0, 1, 0, 0));
 	}
 
 	@Test
 	void aJuryThatDidNotConveneIsAnInstrumentFailureWhateverItDecided() {
-		ItemResult marked = item("a", verdict(RecordedJudgmentStatus.PASS)).toBuilder()
+		ItemResult marked = item("a", VerdictReading.ACCEPTED).toBuilder()
 			.metadata(Map.of(InstrumentRecord.ITEM_INSTRUMENT_FAILURE, "rosterMismatch"))
 			.build();
 
@@ -132,71 +105,88 @@ class ItemAccountingTest {
 	}
 
 	@Test
-	void aVerdictWithNoRecordedDecisionIsUnattestableRatherThanReadFromItsAggregate() {
-		RecordedVerdict noDecision = new RecordedVerdict(judgment(RecordedJudgmentStatus.ERROR), List.of(), Map.of(),
-				Map.of(), List.of(), null, List.of(), null);
+	void aStoredVerdictWithNoReadingBesideItIsUnattestableRatherThanReadHere() {
+		// Written before the reading existed and not yet re-exported. Deriving an outcome
+		// from the verdict's own shape is exactly what this project stopped doing.
+		ItemResult notReExported = ItemResult.builder()
+			.itemId("a")
+			.itemSlug("a")
+			.success(true)
+			.verdict(recordedVerdict())
+			.build();
 
-		// Without a decision the outcome is not recoverable. Classifying it from the
-		// aggregate would turn an absence into a definite answer.
-		assertThat(ItemAccounting.outcomeOf(item("a", noDecision))).isEqualTo(SubjectOutcome.UNATTESTABLE);
+		assertThat(ItemAccounting.outcomeOf(notReExported)).isEqualTo(SubjectOutcome.UNATTESTABLE);
 		// Nor may it claim the instrument was fine, or that it failed. The record does
-		// not say, and "not known to have failed" is not a clean bill of health.
-		assertThat(ItemAccounting.instrumentHealth(item("a", noDecision))).isEqualTo(InstrumentHealth.UNKNOWN);
-		assertThat(ItemAccounting.count(List.of(item("a", noDecision)))).isEqualTo(new ItemCounts(0, 0, 0, 0, 0, 1));
+		// not
+		// say, and "not known to have failed" is not a clean bill of health.
+		assertThat(ItemAccounting.instrumentHealth(notReExported)).isEqualTo(InstrumentHealth.UNKNOWN);
+		assertThat(ItemAccounting.count(List.of(notReExported))).isEqualTo(new ItemCounts(0, 0, 0, 0, 0, 1));
 	}
 
 	@Test
-	void aDecisionNamingAStageTheFileDoesNotContainIsUnattestable() {
-		RecordedVerdict brokenEdge = new RecordedVerdict(judgment(RecordedJudgmentStatus.PASS), List.of(), Map.of(),
-				Map.of(), List.of(), new RecordedDecision("tier", "quality", "tier_outcome"), List.of(), null);
+	void aReadingTheRecordsOwnFactsContradictIsNeverCounted() {
+		ItemResult contradicted = item("a", VerdictReading.ACCEPTED, ReadingSupport.CONTRADICTED);
 
-		assertThat(ItemAccounting.outcomeOf(item("a", brokenEdge))).isEqualTo(SubjectOutcome.UNATTESTABLE);
+		// The file disputes its own reading. Counting it would publish a number the
+		// record
+		// itself argues with.
+		assertThat(ItemAccounting.outcomeOf(contradicted)).isEqualTo(SubjectOutcome.UNATTESTABLE);
+		assertThat(ItemAccounting.instrumentHealth(contradicted)).isEqualTo(InstrumentHealth.UNKNOWN);
+		assertThat(ItemAccounting.count(List.of(contradicted))).isEqualTo(new ItemCounts(0, 0, 0, 0, 0, 1));
 	}
 
 	@Test
-	void aStageWhoseDispositionWasNeverRecordedIsUnattestable() {
-		RecordedVerdict tier = new RecordedVerdict(judgment(RecordedJudgmentStatus.PASS), List.of(), Map.of(), Map.of(),
-				List.of(), new RecordedDecision("own", null, null), List.of(), null);
-		RecordedVerdict root = new RecordedVerdict(judgment(RecordedJudgmentStatus.PASS), List.of(), Map.of(), Map.of(),
-				List.of(), new RecordedDecision("tier", "quality", "tier_outcome"),
-				List.of(new RecordedCompositeAttempt("quality", "cascade_tier", "FINAL_TIER", null, null, tier, null)),
-				null);
+	void aReadingTheRecordCouldNotConfirmIsStillCounted() {
+		// Almost every stored verdict predates aggregation evidence. Refusing these would
+		// discard the archive rather than measure it.
+		assertThat(ItemAccounting.COUNT_UNVERIFIED).isTrue();
+		ItemResult unverified = item("a", VerdictReading.ACCEPTED, ReadingSupport.UNDETERMINED);
 
-		// Missing stage evidence must not certify that the instrument was fine.
-		assertThat(ItemAccounting.outcomeOf(item("a", root))).isEqualTo(SubjectOutcome.UNATTESTABLE);
-		assertThat(ItemAccounting.instrumentHealth(item("a", root))).isEqualTo(InstrumentHealth.UNKNOWN);
+		assertThat(ItemAccounting.outcomeOf(unverified)).isEqualTo(SubjectOutcome.PASS);
+		assertThat(ItemAccounting.count(List.of(unverified))).isEqualTo(new ItemCounts(1, 0, 0, 0, 0, 0));
 	}
 
 	@Test
-	void aDecisionNamingAStageOnAnIndividualRejectionMustAlsoContainThatStage() {
-		RecordedVerdict namesAMissingStage = new RecordedVerdict(judgment(RecordedJudgmentStatus.ERROR), List.of(),
-				Map.of(), Map.of(), List.of(), new RecordedDecision("tier", "guardrail", "individual_rejection"),
-				List.of(), null);
+	void aVerdictWithNoReadableStatusIsUnattestableRatherThanDefaulted() {
+		ItemResult noReading = item("a", null, ReadingSupport.UNDETERMINED);
 
-		// Both bases are validated, not just tier outcomes. Reading this as a rejection
-		// would assert a finding no stored stage supports.
-		assertThat(ItemAccounting.outcomeOf(item("a", namesAMissingStage))).isEqualTo(SubjectOutcome.UNATTESTABLE);
+		assertThat(ItemAccounting.outcomeOf(noReading)).isEqualTo(SubjectOutcome.UNATTESTABLE);
+		assertThat(ItemAccounting.instrumentHealth(noReading)).isEqualTo(InstrumentHealth.UNKNOWN);
 	}
 
-	@Test
-	void aDecisionKindThisVersionCannotReadIsUnattestable() {
-		RecordedVerdict unknownKind = new RecordedVerdict(judgment(RecordedJudgmentStatus.PASS), List.of(), Map.of(),
-				Map.of(), List.of(), new RecordedDecision("invented_later", null, null), List.of(), null);
-
-		assertThat(ItemAccounting.outcomeOf(item("a", unknownKind))).isEqualTo(SubjectOutcome.UNATTESTABLE);
+	private static ItemResult item(String id, @Nullable VerdictReading reading) {
+		return item(id, reading, ReadingSupport.SUPPORTED);
 	}
 
-	private static ItemResult item(String id, RecordedVerdict verdict) {
-		return ItemResult.builder().itemId(id).itemSlug(id).success(true).verdict(verdict).build();
+	private static ItemResult item(String id, @Nullable VerdictReading reading, ReadingSupport support,
+			Stage... stages) {
+		Interpretation interpretation = new Interpretation(Interpretation.SCHEMA_VERSION, 1, reading, support, null,
+				stage(null), List.of(stages), List.of(), "for the counting rules");
+		return ItemResult.builder()
+			.itemId(id)
+			.itemSlug(id)
+			.success(true)
+			.verdict(recordedVerdict())
+			.interpretation(interpretation)
+			.build();
 	}
 
-	private static RecordedVerdict verdict(RecordedJudgmentStatus status) {
-		return new RecordedVerdict(judgment(status), List.of(), Map.of(), Map.of(), List.of(),
-				new RecordedDecision("own", null, null), List.of(), null);
+	private static Stage stageThatFailedToRun() {
+		return stage("jury_execution_failed");
 	}
 
-	private static RecordedJudgment judgment(RecordedJudgmentStatus status) {
-		return new RecordedJudgment(status, null, null, null, "recorded", List.of(), Map.of());
+	private static Stage stage(@Nullable String failure) {
+		return new Stage("s", List.of(), null, null, null, null, failure, null, null, null, null, null, List.of());
+	}
+
+	/**
+	 * The stored projection still exists and is still written; it is simply no longer
+	 * what an outcome is read from.
+	 */
+	private static RecordedVerdict recordedVerdict() {
+		return new RecordedVerdict(
+				new RecordedJudgment(RecordedJudgmentStatus.PASS, null, null, null, "recorded", List.of(), Map.of()),
+				List.of(), Map.of(), Map.of(), List.of(), null, List.of(), null);
 	}
 
 }

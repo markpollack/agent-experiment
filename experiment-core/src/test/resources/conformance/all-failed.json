@@ -24,14 +24,69 @@
         "checks" : [ ],
         "metadata" : { }
       },
-      "individual" : [ ],
-      "individualByName" : { },
+      "individual" : [ {
+        "status" : "fail",
+        "reasoning" : "recorded",
+        "checks" : [ ],
+        "metadata" : { }
+      } ],
+      "individualByName" : {
+        "recorded" : {
+          "status" : "fail",
+          "reasoning" : "recorded",
+          "checks" : [ ],
+          "metadata" : { }
+        }
+      },
       "weights" : { },
-      "seats" : [ ],
+      "seats" : [ {
+        "position" : 0,
+        "verdictKey" : "recorded",
+        "keySource" : "DECLARED"
+      } ],
       "decision" : {
         "kind" : "own"
       },
       "compositeAttempts" : [ ]
+    },
+    "interpretation" : {
+      "schemaVersion" : 1,
+      "sourceVersion" : 1,
+      "reading" : "REJECTED",
+      "readingSupport" : "UNDETERMINED",
+      "decidedBy" : null,
+      "root" : {
+        "stage" : null,
+        "path" : [ ],
+        "relation" : null,
+        "policy" : null,
+        "disposition" : null,
+        "reason" : null,
+        "failure" : null,
+        "usedByParent" : null,
+        "status" : "fail",
+        "reasonCode" : null,
+        "reasoning" : "recorded",
+        "evidence" : null,
+        "judges" : [ {
+          "position" : 0,
+          "name" : "recorded",
+          "keySource" : "DECLARED",
+          "status" : "fail",
+          "reasonCode" : null,
+          "score" : null,
+          "reasoning" : "recorded",
+          "checks" : [ ]
+        } ]
+      },
+      "stages" : [ ],
+      "defects" : [ {
+        "path" : "verdict.aggregated",
+        "field" : "metadata.aggregation",
+        "kind" : "ABSENT",
+        "note" : "No aggregation evidence; the recorded status cannot be checked against the reduction that produced it, so the reading is taken from the recorded status alone and not re-derived from prose."
+      } ],
+      "summary" : "No composite stage ran; the root seated 1 judge(s) directly. The root failed (recorded); its judges: 'recorded' failed (recorded). The root's own reduction decided; no stage is named. Reading: REJECTED — the subject was judged and rejected. Support: UNDETERMINED — the facts needed to check the reading are absent or their rule is not closed-form. Source: the seven-component form 0.17 writes (sourceVersion 1). 1 defect(s): verdict.aggregated.metadata.aggregation ABSENT."
     },
     "metadata" : { },
     "workspacePath" : null
@@ -53,14 +108,69 @@
         "checks" : [ ],
         "metadata" : { }
       },
-      "individual" : [ ],
-      "individualByName" : { },
+      "individual" : [ {
+        "status" : "fail",
+        "reasoning" : "recorded",
+        "checks" : [ ],
+        "metadata" : { }
+      } ],
+      "individualByName" : {
+        "recorded" : {
+          "status" : "fail",
+          "reasoning" : "recorded",
+          "checks" : [ ],
+          "metadata" : { }
+        }
+      },
       "weights" : { },
-      "seats" : [ ],
+      "seats" : [ {
+        "position" : 0,
+        "verdictKey" : "recorded",
+        "keySource" : "DECLARED"
+      } ],
       "decision" : {
         "kind" : "own"
       },
       "compositeAttempts" : [ ]
+    },
+    "interpretation" : {
+      "schemaVersion" : 1,
+      "sourceVersion" : 1,
+      "reading" : "REJECTED",
+      "readingSupport" : "UNDETERMINED",
+      "decidedBy" : null,
+      "root" : {
+        "stage" : null,
+        "path" : [ ],
+        "relation" : null,
+        "policy" : null,
+        "disposition" : null,
+        "reason" : null,
+        "failure" : null,
+        "usedByParent" : null,
+        "status" : "fail",
+        "reasonCode" : null,
+        "reasoning" : "recorded",
+        "evidence" : null,
+        "judges" : [ {
+          "position" : 0,
+          "name" : "recorded",
+          "keySource" : "DECLARED",
+          "status" : "fail",
+          "reasonCode" : null,
+          "score" : null,
+          "reasoning" : "recorded",
+          "checks" : [ ]
+        } ]
+      },
+      "stages" : [ ],
+      "defects" : [ {
+        "path" : "verdict.aggregated",
+        "field" : "metadata.aggregation",
+        "kind" : "ABSENT",
+        "note" : "No aggregation evidence; the recorded status cannot be checked against the reduction that produced it, so the reading is taken from the recorded status alone and not re-derived from prose."
+      } ],
+      "summary" : "No composite stage ran; the root seated 1 judge(s) directly. The root failed (recorded); its judges: 'recorded' failed (recorded). The root's own reduction decided; no stage is named. Reading: REJECTED — the subject was judged and rejected. Support: UNDETERMINED — the facts needed to check the reading are absent or their rule is not closed-form. Source: the seven-component form 0.17 writes (sourceVersion 1). 1 defect(s): verdict.aggregated.metadata.aggregation ABSENT."
     },
     "metadata" : { },
     "workspacePath" : null

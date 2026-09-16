@@ -18,6 +18,7 @@
     "metrics" : { },
     "executionDetail" : null,
     "verdict" : null,
+    "interpretation" : null,
     "metadata" : { },
     "workspacePath" : null
   } ],

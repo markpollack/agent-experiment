@@ -34,22 +34,4 @@ public record RecordedDecision(String kind, @Nullable String tier, @Nullable Str
 				decision.basis() != null ? decision.basis().wireName() : null);
 	}
 
-	/** True when a tier decided this verdict because one judge rejected the subject. */
-	public boolean individualRejection() {
-		return "individual_rejection".equalsIgnoreCase(this.basis) || "INDIVIDUAL_REJECTION".equals(this.basis);
-	}
-
-	/**
-	 * True when a tier's own outcome decided this verdict, so the chain continues into
-	 * it.
-	 */
-	public boolean tierOutcome() {
-		return "tier_outcome".equalsIgnoreCase(this.basis) || "TIER_OUTCOME".equals(this.basis);
-	}
-
-	/** True when nothing decided the verdict. */
-	public boolean undecided() {
-		return "undecided".equalsIgnoreCase(this.kind) || "UNDECIDED".equals(this.kind);
-	}
-
 }

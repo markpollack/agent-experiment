@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.github.markpollack.judge.jury.interpretation.Interpretation;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -127,6 +128,19 @@ public final class InterpretationReExport {
 
 	private final ObjectMapper mapper;
 
+	/**
+	 * A re-export that asks the library what each stored verdict says.
+	 * @return one wired to {@code Verdicts.interpret} at the library's current schema
+	 * version
+	 */
+	public static InterpretationReExport asking() {
+		ObjectMapper mapper = new ObjectMapper();
+		mapper.registerModule(new JavaTimeModule());
+		mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+		mapper.enable(SerializationFeature.INDENT_OUTPUT);
+		return new InterpretationReExport(new StoredVerdictInterpreter(mapper), Interpretation.SCHEMA_VERSION);
+	}
+
 	public InterpretationReExport(VerdictInterpreter interpreter, int schemaVersion) {
 		this.interpreter = interpreter;
 		this.schemaVersion = schemaVersion;
@@ -196,9 +210,9 @@ public final class InterpretationReExport {
 				return new FileOutcome(file, items, 0, 0, 0, false, "interpreter produced schemaVersion " + written
 						+ " where " + this.schemaVersion + " was expected; nothing written");
 			}
-			// set() rather than put-then-populate: the key is replaced wholesale, so a
-			// stale interpretation cannot leave a field behind in the new one.
-			itemNode.set(INTERPRETATION, interpretation);
+			// Directly after the verdict it reads, so a re-exported file and one the
+			// recorder wrote have the same shape rather than two orders for one format.
+			insertAfterVerdict(itemNode, interpretation);
 			countDefects(interpretation, defects);
 			if (existing != null) {
 				replaced++;
@@ -229,6 +243,28 @@ public final class InterpretationReExport {
 			}
 		}
 		return new FileOutcome(file, items, added, replaced, upToDate, !dryRun, null);
+	}
+
+	/**
+	 * Rebuild the item with {@code interpretation} immediately after {@code verdict},
+	 * every other field keeping its place and its value.
+	 */
+	private static void insertAfterVerdict(ObjectNode item, ObjectNode interpretation) {
+		List<Map.Entry<String, JsonNode>> fields = new ArrayList<>();
+		item.properties().forEach(fields::add);
+		item.removeAll();
+		for (Map.Entry<String, JsonNode> field : fields) {
+			if (INTERPRETATION.equals(field.getKey())) {
+				continue;
+			}
+			item.set(field.getKey(), field.getValue());
+			if ("verdict".equals(field.getKey())) {
+				item.set(INTERPRETATION, interpretation);
+			}
+		}
+		if (!item.has(INTERPRETATION)) {
+			item.set(INTERPRETATION, interpretation);
+		}
 	}
 
 	private static void countDefects(JsonNode interpretation, Map<String, Integer> defects) {

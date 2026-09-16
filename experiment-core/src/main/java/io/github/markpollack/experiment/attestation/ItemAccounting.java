@@ -5,10 +5,10 @@ import java.util.List;
 import io.github.markpollack.experiment.result.InstrumentRecord;
 import io.github.markpollack.experiment.result.ItemCounts;
 import io.github.markpollack.experiment.result.ItemResult;
-import io.github.markpollack.experiment.result.RecordedCompositeAttempt;
-import io.github.markpollack.experiment.result.RecordedDecision;
-import io.github.markpollack.experiment.result.RecordedJudgmentStatus;
-import io.github.markpollack.experiment.result.RecordedVerdict;
+import io.github.markpollack.judge.jury.interpretation.Interpretation;
+import io.github.markpollack.judge.jury.interpretation.ReadingSupport;
+import io.github.markpollack.judge.jury.interpretation.Stage;
+import io.github.markpollack.judge.jury.interpretation.VerdictReading;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -20,13 +20,26 @@ import org.jspecify.annotations.Nullable;
  * the same answer by construction.
  *
  * <p>
- * <b>The subject outcome is read from the recorded decision, never inferred from the
- * shape of an aggregate.</b> A cascade that stopped because one judge rejected the
- * subject can carry an ERROR aggregate if that tier's reduction also failed. Reading
- * ERROR as "could not score" would lose a real rejection; reading it as a failure would
- * invent one. The decision says which happened, so the decision is what is read.
+ * <b>What a verdict says is not decided here.</b> The library that produced the verdict
+ * reads it — which stage decided, what it says about the subject, what the record is
+ * missing — and this maps that reading onto a measurement. The mapping is the only part
+ * that is this project's to own, and it is the whole of what follows: an abstention
+ * counts against the subject, a not-applicable criterion leaves the denominator, an
+ * instrument failure is counted apart from the subject, and nothing is ever defaulted to
+ * a pass or a failure.
  */
 public final class ItemAccounting {
+
+	/**
+	 * A reading the record's own facts could not confirm is still counted.
+	 *
+	 * <p>
+	 * Almost every stored verdict predates aggregation evidence, so refusing to count an
+	 * unconfirmed reading would discard the archive rather than measure it. What is
+	 * refused is a reading the facts <em>contradict</em>: that is a record whose parts
+	 * disagree, and counting it would publish a number the file itself disputes.
+	 */
+	public static final boolean COUNT_UNVERIFIED = true;
 
 	private ItemAccounting() {
 	}
@@ -57,8 +70,8 @@ public final class ItemAccounting {
 	 * judged and a run that failed everything are different results; recording false for
 	 * both is how they came to render identically.
 	 */
-	public static @Nullable Boolean passedFlag(@Nullable RecordedVerdict verdict) {
-		return switch (outcomeOf(ItemResult.builder().itemId("x").itemSlug("x").verdict(verdict).build())) {
+	public static @Nullable Boolean passedFlag(@Nullable Interpretation interpretation) {
+		return switch (outcomeOf(interpretation, false)) {
 			case PASS -> Boolean.TRUE;
 			case NON_PASS -> Boolean.FALSE;
 			case EXCLUDED, UNATTESTABLE, NOT_JUDGED -> null;
@@ -67,34 +80,35 @@ public final class ItemAccounting {
 
 	/** What this item says about the subject. */
 	public static SubjectOutcome outcomeOf(ItemResult item) {
-		RecordedVerdict verdict = item.verdict();
-		if (verdict == null) {
+		return outcomeOf(item.interpretation(), item.verdict() == null);
+	}
+
+	private static SubjectOutcome outcomeOf(@Nullable Interpretation interpretation, boolean noVerdict) {
+		if (noVerdict) {
 			return SubjectOutcome.NOT_JUDGED;
 		}
-		if (!attestable(verdict)) {
-			// The facts needed to read an outcome were never recorded. Falling back to
-			// the aggregate's status here would manufacture a definite answer out of an
-			// absence, which is the defect this record exists to prevent.
+		if (interpretation == null) {
+			// A verdict with no reading beside it. Stored before the reading existed and
+			// not yet re-exported: its outcome is not recoverable here, and deriving one
+			// from the verdict's shape is the thing this record exists to stop.
 			return SubjectOutcome.UNATTESTABLE;
 		}
-		RecordedDecision decision = verdict.decision();
-		if (decision != null && decision.individualRejection()) {
-			// One judge established a violation and the cascade stopped on it. That is a
-			// rejection of the subject even when the tier's own reduction then failed.
-			return SubjectOutcome.NON_PASS;
+		if (interpretation.readingSupport() == ReadingSupport.CONTRADICTED) {
+			return SubjectOutcome.UNATTESTABLE;
 		}
-		RecordedVerdict determination = selectedDetermination(verdict);
-		if (determination.decision() != null && determination.decision().individualRejection()) {
-			return SubjectOutcome.NON_PASS;
+		VerdictReading reading = interpretation.reading();
+		if (reading == null) {
+			return SubjectOutcome.UNATTESTABLE;
 		}
-		return switch (determination.aggregated().status()) {
-			case PASS -> SubjectOutcome.PASS;
+		return switch (reading) {
+			case ACCEPTED -> SubjectOutcome.PASS;
 			// An abstention is about a criterion that applied and could not be decided,
 			// so
 			// it counts against the subject. A not-applicable criterion was never
-			// assessed.
-			case FAIL, ABSTAIN -> SubjectOutcome.NON_PASS;
-			case NOT_APPLICABLE, ERROR -> SubjectOutcome.EXCLUDED;
+			// assessed,
+			// and an unassessed subject is the instrument's failure, not the subject's.
+			case REJECTED, UNDECIDED -> SubjectOutcome.NON_PASS;
+			case NOT_APPLICABLE, NOT_ASSESSED -> SubjectOutcome.EXCLUDED;
 		};
 	}
 
@@ -109,21 +123,26 @@ public final class ItemAccounting {
 	 * the defect this whole record exists to remove.
 	 */
 	public static InstrumentHealth instrumentHealth(ItemResult item) {
-		RecordedVerdict verdict = item.verdict();
-		if (verdict == null) {
+		if (item.verdict() == null) {
 			return InstrumentHealth.UNKNOWN; // no jury ran; nothing says it was fine
 		}
 		if (item.metadata().containsKey(InstrumentRecord.ITEM_INSTRUMENT_FAILURE)) {
 			return InstrumentHealth.FAILED;
 		}
-		if (anyStageFailed(verdict)) {
-			return InstrumentHealth.FAILED;
-		}
-		if (!attestable(verdict)) {
+		Interpretation interpretation = item.interpretation();
+		if (interpretation == null) {
 			return InstrumentHealth.UNKNOWN;
 		}
-		return selectedDetermination(verdict).aggregated().status() == RecordedJudgmentStatus.ERROR
-				? InstrumentHealth.FAILED : InstrumentHealth.OK;
+		if (anyStageFailedToRun(interpretation)) {
+			return InstrumentHealth.FAILED;
+		}
+		if (interpretation.reading() == VerdictReading.NOT_ASSESSED) {
+			return InstrumentHealth.FAILED;
+		}
+		if (interpretation.reading() == null || interpretation.readingSupport() == ReadingSupport.CONTRADICTED) {
+			return InstrumentHealth.UNKNOWN;
+		}
+		return InstrumentHealth.OK;
 	}
 
 	/** True only when the instrument is known to have failed. */
@@ -132,102 +151,16 @@ public final class ItemAccounting {
 	}
 
 	/**
-	 * Whether this verdict recorded the facts an outcome must be read from.
-	 *
-	 * <p>
-	 * Required, per the result-format contract: a stopping decision, complete enough to
-	 * follow; a disposition on every stage the jury entered; and, where the decision
-	 * names a stage, that stage actually present. A verdict written before those existed
-	 * is unattestable rather than wrong — its outcome is not recoverable, and guessing it
-	 * from the aggregate is what this refuses to do.
+	 * A stage that entered and never produced a verdict: the jury could not be run there.
+	 * The library reports it; this only has to decide that it counts against the
+	 * instrument rather than against the subject.
 	 */
-	public static boolean attestable(RecordedVerdict verdict) {
-		RecordedDecision decision = verdict.decision();
-		if (decision == null || decision.kind() == null || decision.kind().isBlank()) {
-			return false;
-		}
-		for (RecordedCompositeAttempt attempt : verdict.compositeAttempts()) {
-			// Not merely present: readable. A disposition this version does not recognise
-			// — a value from a later format — says nothing about whether the parent could
-			// use the stage, and treating it as usable would be a guess dressed as a
-			// fact.
-			if (!used(attempt) && !attempt.stageFailed()) {
-				return false;
-			}
-			if (attempt.verdict() != null && !attestable(attempt.verdict())) {
-				return false;
-			}
-		}
-		String kind = decision.kind();
-		if ("own".equalsIgnoreCase(kind) || "undecided".equalsIgnoreCase(kind)) {
+	private static boolean anyStageFailedToRun(Interpretation interpretation) {
+		if (interpretation.root().failure() != null) {
 			return true;
 		}
-		if (!"tier".equalsIgnoreCase(kind)) {
-			// A kind this version cannot read is not a kind it may assume is harmless.
-			return false;
-		}
-		// A tier decision must say which stage and on what basis, and that stage must be
-		// in the file. This holds for BOTH bases: an individual rejection whose tier is
-		// missing is as unreadable as a tier outcome whose tier is missing, and treating
-		// it as a rejection would assert a finding no stored stage supports.
-		if (decision.tier() == null || decision.tier().isBlank() || decision.basis() == null
-				|| decision.basis().isBlank()) {
-			return false;
-		}
-		if (!decision.tierOutcome() && !decision.individualRejection()) {
-			return false; // a basis this version cannot read
-		}
-		return namedAttempt(verdict, decision.tier()) != null;
-	}
-
-	/**
-	 * The verdict that actually determined the outcome.
-	 *
-	 * <p>
-	 * Follows only named copy edges: while a verdict says a tier decided it on that
-	 * tier's own outcome, the determination is inside that named tier. A decision of its
-	 * own, no decision at all, or a stop on one judge's rejection ends the walk.
-	 */
-	public static RecordedVerdict selectedDetermination(RecordedVerdict verdict) {
-		RecordedVerdict current = verdict;
-		// A cascade of cascades terminates because each step descends one level.
-		while (true) {
-			RecordedDecision decision = current.decision();
-			if (decision == null || !decision.tierOutcome() || decision.tier() == null) {
-				return current;
-			}
-			RecordedVerdict next = namedAttempt(current, decision.tier());
-			if (next == null) {
-				return current; // the named edge is missing; do not guess which stage
-								// meant it
-			}
-			current = next;
-		}
-	}
-
-	/**
-	 * True when the record says, in a word this version knows, that the parent used the
-	 * stage.
-	 */
-	private static boolean used(RecordedCompositeAttempt attempt) {
-		return "used".equalsIgnoreCase(attempt.disposition()) || "USED".equals(attempt.disposition());
-	}
-
-	private static @Nullable RecordedVerdict namedAttempt(RecordedVerdict verdict, String name) {
-		for (RecordedCompositeAttempt attempt : verdict.compositeAttempts()) {
-			if (name.equals(attempt.name())) {
-				return attempt.verdict();
-			}
-		}
-		return null;
-	}
-
-	private static boolean anyStageFailed(RecordedVerdict verdict) {
-		for (RecordedCompositeAttempt attempt : verdict.compositeAttempts()) {
-			if (attempt.stageFailed() || attempt.failureCode() != null) {
-				return true;
-			}
-			if (attempt.verdict() != null && anyStageFailed(attempt.verdict())) {
+		for (Stage stage : interpretation.stages()) {
+			if (stage.failure() != null) {
 				return true;
 			}
 		}

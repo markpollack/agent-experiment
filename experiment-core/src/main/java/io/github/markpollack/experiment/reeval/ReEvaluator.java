@@ -19,6 +19,8 @@ import io.github.markpollack.experiment.store.ResultStore;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.jury.interpretation.Interpretation;
+import io.github.markpollack.judge.jury.interpretation.Verdicts;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -112,10 +114,12 @@ public final class ReEvaluator {
 		Verdict verdict = jury.vote(context.get());
 
 		RecordedVerdict recorded = RecordedVerdict.from(verdict, instrumentHash);
+		Interpretation interpretation = Verdicts.interpret(verdict);
 		return original.toBuilder()
-			.passed(ItemAccounting.passedFlag(recorded))
+			.passed(ItemAccounting.passedFlag(interpretation))
 			.scores(VerdictExtractor.extractScores(verdict))
 			.verdict(recorded)
+			.interpretation(interpretation)
 			.metadata(merge(withoutInstrumentFailure(original.metadata()),
 					Map.of("reEvaluated", "true", "systemReinvoked", "false", "originalCostUsd",
 							String.valueOf(original.costUsd()), "reEvaluationJury", jury.getClass().getSimpleName())))

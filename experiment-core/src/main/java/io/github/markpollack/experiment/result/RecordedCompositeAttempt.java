@@ -53,9 +53,4 @@ public record RecordedCompositeAttempt(String name, String relation, @Nullable S
 		return new RecordedCompositeAttempt("legacy-sub-verdict-" + index, "legacy_sub_verdict", null, verdict, null);
 	}
 
-	/** True when the parent could not use what this stage returned. */
-	public boolean stageFailed() {
-		return "stage_failed".equalsIgnoreCase(this.disposition) || "STAGE_FAILED".equals(this.disposition);
-	}
-
 }

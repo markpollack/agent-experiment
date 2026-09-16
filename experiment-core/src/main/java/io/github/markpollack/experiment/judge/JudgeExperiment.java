@@ -19,6 +19,8 @@ import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentReasonCode;
 import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.jury.interpretation.Interpretation;
+import io.github.markpollack.judge.jury.interpretation.Verdicts;
 
 /**
  * Runs a structured experiment where the system-under-test is a Judge. Iterates a labeled
@@ -93,16 +95,19 @@ public final class JudgeExperiment {
 
 		JudgeScorerResult scorerResult = scorer.score(new JudgeScoringInput(item, actual, expectedLabel));
 
-		RecordedVerdict recorded = RecordedVerdict.from(toVerdict(scorerResult, actual));
+		Verdict verdict = toVerdict(scorerResult, actual);
+		RecordedVerdict recorded = RecordedVerdict.from(verdict);
+		Interpretation interpretation = Verdicts.interpret(verdict);
 
 		return ItemResult.builder()
 			.itemId(item.id())
 			.itemSlug(item.slug())
 			// Null when nothing was decided about the candidate, never false.
-			.passed(ItemAccounting.passedFlag(recorded))
+			.passed(ItemAccounting.passedFlag(interpretation))
 			// An unscored comparison records no agreement score rather than a zero one.
 			.scores(scorerResult.scored() ? Map.of("agreement", scorerResult.score()) : Map.<String, Double>of())
 			.verdict(recorded)
+			.interpretation(interpretation)
 			.executionDetail(new JudgeExecutionDetail(RecordedJudgment.from(actual), expectedLabel, scorerResult))
 			.metadata(Map.of("experimentType", "judge", "expectedLabel", expectedLabel))
 			.build();

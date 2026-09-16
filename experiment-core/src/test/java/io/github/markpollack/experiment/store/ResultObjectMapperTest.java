@@ -17,6 +17,8 @@ import io.github.markpollack.experiment.result.RecordedJudgmentStatus;
 import io.github.markpollack.experiment.result.RecordedVerdict;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.markpollack.judge.jury.interpretation.Verdicts;
+import io.github.markpollack.judge.jury.interpretation.Interpretation;
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.jury.CompositeAttempt;
 import io.github.markpollack.judge.jury.CompositeFailure;
@@ -423,6 +425,31 @@ class ResultObjectMapperTest {
 			.totalTokens(350)
 			.totalDurationMs(5000)
 			.build();
+	}
+
+	@Test
+	void anItemsInterpretationSurvivesTheRoundTrip() throws Exception {
+		// The reading is what every consumer now counts from. If it were silently dropped
+		// on the way back in, every item would read as unattestable and the run would
+		// look
+		// unmeasured rather than broken.
+		Verdict verdict = Verdict.single("gate", Judgment.fail("no bounded contexts"));
+		Interpretation interpretation = Verdicts.interpret(verdict);
+		ItemResult item = ItemResult.builder()
+			.itemId("a")
+			.itemSlug("a")
+			.success(true)
+			.verdict(RecordedVerdict.from(verdict))
+			.interpretation(interpretation)
+			.build();
+		ObjectMapper mapper = ResultObjectMapper.create();
+
+		ItemResult readBack = mapper.readValue(mapper.writeValueAsString(item), ItemResult.class);
+
+		assertThat(readBack.interpretation()).isNotNull();
+		assertThat(readBack.interpretation().reading()).isEqualTo(interpretation.reading());
+		assertThat(readBack.interpretation().readingSupport()).isEqualTo(interpretation.readingSupport());
+		assertThat(readBack.interpretation().defects()).hasSameSizeAs(interpretation.defects());
 	}
 
 }

@@ -9,6 +9,11 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentReasonCode;
+import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.jury.interpretation.Interpretation;
+import io.github.markpollack.judge.jury.interpretation.Verdicts;
 import io.github.markpollack.experiment.attestation.ItemAccounting;
 import io.github.markpollack.experiment.store.FileSystemResultStore;
 import org.junit.jupiter.api.Test;
@@ -135,20 +140,28 @@ class ConformanceFixturesTest {
 	}
 
 	private static ItemResult item(String id, RecordedJudgmentStatus status) {
-		RecordedVerdict verdict = new RecordedVerdict(
-				new RecordedJudgment(status, null, null, status == RecordedJudgmentStatus.ERROR ? "judge_failed" : null,
-						"recorded", List.of(), Map.of()),
-				List.of(), Map.of(), Map.of(), List.of(), new RecordedDecision("own", null, null), List.of(), null);
+		// Built from a live verdict, because that is what a run has when it records one.
+		// The fixture then shows what a real run writes, interpretation included, rather
+		// than a shape assembled only for the test.
+		Judgment judgment = switch (status) {
+			case PASS -> Judgment.pass("recorded");
+			case FAIL -> Judgment.fail("recorded");
+			case ABSTAIN -> Judgment.abstain("recorded");
+			case NOT_APPLICABLE -> Judgment.notApplicable("recorded");
+			case ERROR -> Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "recorded");
+		};
+		Verdict verdict = Verdict.single("recorded", judgment);
+		Interpretation interpretation = Verdicts.interpret(verdict);
 		// Derived the same way the runner derives it, so the fixture shows what a real
-		// run
-		// writes: absent when the jury decided nothing, false only when it decided
+		// run writes: absent when the jury decided nothing, false only when it decided
 		// against.
 		return ItemResult.builder()
 			.itemId(id)
 			.itemSlug(id)
 			.success(true)
-			.passed(ItemAccounting.passedFlag(verdict))
-			.verdict(verdict)
+			.passed(ItemAccounting.passedFlag(interpretation))
+			.verdict(RecordedVerdict.from(verdict))
+			.interpretation(interpretation)
 			.build();
 	}
 
