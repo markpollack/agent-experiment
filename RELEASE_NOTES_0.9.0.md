@@ -20,6 +20,8 @@ the code that used to reconstruct it.
 - Adds `InterpretationReExport`, which adds an interpretation to results written before the reading
   existed. It parses as a tree, compares every verdict to the one it read before writing anything,
   and is idempotent by schema version.
+- Pins Agent Workflow to **0.12.3**, its Agent Judge 0.17.0 compatibility release, for
+  `experiment-workflow`.
 - Retains the three published modules: `experiment-core`, `experiment-claude`, and
   `experiment-workflow`.
 
