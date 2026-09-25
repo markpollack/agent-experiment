@@ -32,9 +32,9 @@ public final class JudgeScorers {
 	/** Judgment label must match expected label (case-insensitive). */
 	public static JudgeScorer exactCategoryMatch() {
 		return identified("legacy-category-agreement:v1", "1", "CATEGORY", input -> {
-			if (input.actual().label() == null && !classified(input.actual())) {
-				// No label, and a status that classifies nothing. Comparing the status
-				// name here would invent a disagreement the candidate never expressed.
+			if (!classified(input.actual())) {
+				// Raw labels can survive withholding or policy failure. They do not
+				// make an operationally ineligible judgment a category vote.
 				return JudgeScorerResult.unscored("Candidate produced no category (" + input.actual().status()
 						+ "); nothing to compare with '" + input.expectedLabel() + "'");
 			}

@@ -363,6 +363,8 @@ final class ResultObjectMapper {
 		@Override
 		public Object deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
 			JsonNode tree = p.getCodec().readTree(p);
+			if (p.getParsingContext().inRoot() && p.nextToken() != null)
+				throw new IOException("Trailing Experiment recording content");
 			if (tree.has("recordingSchemaVersion")) {
 				if (!tree.get("recordingSchemaVersion").isInt() || tree.get("recordingSchemaVersion").intValue() != 2)
 					throw new IOException("Unsupported Experiment recording schema");

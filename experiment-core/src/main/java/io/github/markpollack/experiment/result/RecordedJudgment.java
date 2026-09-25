@@ -143,6 +143,8 @@ public final class RecordedJudgment {
 	}
 
 	public OptionalDouble effectiveScore() {
+		if (modern())
+			return live().effectiveScore();
 		Double score = score();
 		if (score != null)
 			return OptionalDouble.of(score);

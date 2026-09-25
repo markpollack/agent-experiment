@@ -63,6 +63,9 @@ public final class JudgeExperiment {
 	 * population.
 	 */
 	public JudgeExperimentResult run() {
+		// Resolve required identities before executing any candidate callback.
+		RuntimeIdentity writer = RuntimeIdentity.writer();
+		RuntimeIdentity judgeRuntime = RuntimeIdentity.judge();
 		String runId = config.runId == null ? UUID.randomUUID().toString() : config.runId;
 		Instant start = Instant.now();
 		long nanos = System.nanoTime();
@@ -74,18 +77,45 @@ public final class JudgeExperiment {
 				config.scorerRevision, config.truthKind, config.replicateCount, "scored-comparisons:v1",
 				"candidate-outcome:v1", declaration);
 		List<ItemResult> results = new ArrayList<>();
+		for (int index = 0; index < declaration.size(); index++)
+			results.add(unattempted(config.items.get(index / config.replicateCount), declaration.get(index)));
 		boolean cancelled = false;
+		FailureFact orchestrationFailure = null;
 		try {
 			for (int index = 0; index < declaration.size(); index++) {
 				RowIdentity row = declaration.get(index);
 				DatasetItem item = config.items.get(index / config.replicateCount);
-				if (cancelled || Thread.currentThread().isInterrupted()) {
-					cancelled = true;
-					results.add(unattempted(item, row));
+				if (orchestrationFailure != null || cancelled || Thread.currentThread().isInterrupted()) {
+					cancelled = cancelled || Thread.currentThread().isInterrupted();
 					continue;
 				}
-				ItemResult result = runItem(item, row);
-				results.add(result);
+				RowAttempt attempt = new RowAttempt(item, row, judgeRuntime);
+				ItemResult result;
+				try {
+					result = attempt.run();
+				}
+				catch (RuntimeException failure) {
+					// An ordinary orchestration/finalization failure preserves the active
+					// row's captured facts. If even this envelope cannot be built, fail
+					// visibly rather than returning an apparently saved run.
+					orchestrationFailure = FailureFact.of("ORCHESTRATION", failure);
+					attempt.failures.add(orchestrationFailure);
+					attempt.rowState = "FAILED";
+					attempt.comparison = unscored(attempt.captured, attempt.truth, "ORCHESTRATION_FAILED",
+							orchestrationFailure.message());
+					result = attempt.finish();
+				}
+				results.set(index, result);
+				try {
+					if (orchestrationFailure == null)
+						config.afterRow.accept(result);
+				}
+				catch (RuntimeException failure) {
+					if (failure instanceof java.util.concurrent.CancellationException)
+						cancelled = true;
+					else
+						orchestrationFailure = FailureFact.of("ORCHESTRATION", failure);
+				}
 				if (((JudgeExecutionDetail) result.executionDetail()).rowState().equals("CANCELLED")
 						|| Thread.currentThread().isInterrupted())
 					cancelled = true;
@@ -98,18 +128,24 @@ public final class JudgeExperiment {
 				.filter(Objects::nonNull)
 				.toList();
 			MeasurementSummary measurements = MeasurementSummary.of(observations);
+			Map<String, String> metadata = new LinkedHashMap<>(
+					Map.of("experimentType", "judge", "candidateId", config.candidateId, "candidateJudge",
+							config.candidate.getClass().getName(), "scorer", config.scorer.getClass().getName(),
+							"comparisonRule", "scored-comparisons:v1", "countRule", "candidate-outcome:v1"));
+			if (orchestrationFailure != null)
+				metadata.put("orchestratorFailure", ProducerDocument.json(orchestrationFailure));
 			ExperimentResult result = ExperimentResult.builder()
 				.experimentId(runId)
 				.experimentName(config.name)
 				.experimentKind("JUDGE")
 				.judgeRun(declared)
-				.runState(cancelled ? "CANCELLED" : "COMPLETE")
+				.runState(orchestrationFailure != null ? "FAILED" : cancelled ? "CANCELLED" : "COMPLETE")
+				.writer(writer)
+				.judgeRuntime(judgeRuntime)
 				.datasetSemanticVersion(config.datasetVersion)
 				.timestamp(start)
 				.items(results)
-				.metadata(Map.of("experimentType", "judge", "candidateId", config.candidateId, "candidateJudge",
-						config.candidate.getClass().getName(), "scorer", config.scorer.getClass().getName(),
-						"comparisonRule", "scored-comparisons:v1", "countRule", "candidate-outcome:v1"))
+				.metadata(metadata)
 				.counts(ItemAccounting.count(results))
 				.aggregateScores(aggregate(results))
 				.measurements(measurements)
@@ -137,137 +173,178 @@ public final class JudgeExperiment {
 			.build();
 	}
 
-	private ItemResult runItem(DatasetItem item, RowIdentity row) {
+	private final class RowAttempt {
+
+		private final DatasetItem item;
+
+		private final RowIdentity row;
+
+		private final RuntimeIdentity runtime;
+
+		private RowAttempt(DatasetItem item, RowIdentity row, RuntimeIdentity runtime) {
+			this.item = item;
+			this.row = row;
+			this.runtime = runtime;
+		}
+
 		Judgment actual = null;
+
 		RecordedJudgment captured = null;
+
 		RecordedVerdict verdict = null;
+
 		CaseInputIdentity identity = null;
+
 		JudgeTruth truth = null;
+
 		InvocationObservation observation = null;
+
 		String invocation = "NOT_ATTEMPTED", rowState = "COMPLETED", phase = "INPUT";
+
 		List<FailureFact> failures = new ArrayList<>();
+
 		JudgeComparison comparison = null;
-		try {
-			JudgmentContext context = Objects.requireNonNull(config.input.apply(item), "Input supplier returned null");
-			if (config.identity != null)
-				identity = config.identity.apply(context, row);
-			if (Thread.currentThread().isInterrupted())
-				throw new java.util.concurrent.CancellationException("Interrupted before invocation");
-			phase = "INVOCATION";
-			Instant started = Instant.now();
-			long before = System.nanoTime();
+
+		private ItemResult run() {
 			try {
-				actual = config.candidate.judge(context);
-				invocation = actual == null ? "NULL_RETURN" : "RETURNED";
-			}
-			catch (RuntimeException error) {
-				invocation = "THREW";
-				if (error instanceof java.util.concurrent.CancellationException)
-					Thread.currentThread().interrupt();
-				failures.add(FailureFact.of("INVOCATION", error));
-				rowState = "FAILED";
-				comparison = unscored(null, null, "INVOCATION_FAILED", "Candidate threw before returning a Judgment");
-			}
-			finally {
-				observation = new InvocationObservation(row.runId() + ":" + row.rowId(), config.captureMode,
-						config.captureMode.equals("RETAINED") ? null : started,
-						config.captureMode.equals("RETAINED") ? null : Instant.now(),
-						config.captureMode.equals("RETAINED") ? null : Math.max(0, System.nanoTime() - before), null,
-						null, null, List.of(), List.of());
-			}
-			if (actual == null && invocation.equals("NULL_RETURN")) {
-				failures.add(FailureFact.of(phase, "NULL_RETURN", "Candidate returned null"));
-				rowState = "FAILED";
-			}
-			else if (actual != null) {
-				phase = "RECORDING";
-				captured = config.recorder.apply(actual);
-				if (captured == null)
-					throw new IllegalStateException("Recorder returned no source");
-				verdict = RecordedVerdict.from(Verdict.single("candidate", actual));
-			}
-			phase = "OBSERVATION";
-			InvocationObservation basic = observation;
-			try {
-				if (captured != null)
-					observation = JevObservations.extract(captured, observation);
-				if (config.observationExtractor != null)
-					observation = Objects.requireNonNull(
-							config.observationExtractor.extract(row, captured, List.copyOf(failures), observation),
-							"Observation extractor returned null");
-				if (!observation.invocationId().equals(row.runId() + ":" + row.rowId()))
-					throw new IllegalArgumentException("Observation belongs to another invocation");
-			}
-			catch (RuntimeException error) {
-				failures.add(FailureFact.of("OBSERVATION", error));
-				if (error instanceof java.util.concurrent.CancellationException)
-					Thread.currentThread().interrupt();
-				observation = new InvocationObservation(row.runId() + ":" + row.rowId(), config.captureMode,
-						basic.startedAt(), basic.endedAt(), basic.elapsedNanos(), null, null, null, List.of(),
-						List.of());
-			}
-			if (Thread.currentThread().isInterrupted())
-				throw new java.util.concurrent.CancellationException("Interrupted after invocation");
-			if (captured != null) {
-				phase = "TRUTH";
-				truth = config.truth != null ? config.truth.apply(item) : legacyTruth(config.expected.apply(item));
+				JudgmentContext context = Objects.requireNonNull(config.input.apply(item),
+						"Input supplier returned null");
+				if (config.identity != null)
+					identity = config.identity.apply(context, row);
 				if (Thread.currentThread().isInterrupted())
-					throw new java.util.concurrent.CancellationException("Interrupted during truth lookup");
-				String invalid = invalidTruth(truth);
-				if (invalid != null)
-					comparison = unscored(captured, truth, invalid, "Supplied truth is absent or incompatible");
-				else {
-					phase = "SCORING";
-					var reading = io.github.markpollack.judge.jury.interpretation.Verdicts
-						.interpret(verdict.document().producerMap());
-					if (reading.readingSupport() != ReadingSupport.SUPPORTED)
-						comparison = unscored(captured, truth, "UNSUPPORTED_CANDIDATE",
-								"Candidate has no supported reading");
+					throw new java.util.concurrent.CancellationException("Interrupted before invocation");
+				phase = "INVOCATION";
+				Instant started = Instant.now();
+				long before = System.nanoTime();
+				try {
+					actual = config.candidate.judge(context);
+					invocation = actual == null ? "NULL_RETURN" : "RETURNED";
+				}
+				catch (RuntimeException error) {
+					invocation = "THREW";
+					if (error instanceof java.util.concurrent.CancellationException)
+						Thread.currentThread().interrupt();
+					failures.add(FailureFact.of("INVOCATION", error));
+					rowState = "FAILED";
+					comparison = unscored(null, null, "INVOCATION_FAILED",
+							"Candidate threw before returning a Judgment");
+				}
+				finally {
+					observation = new InvocationObservation(row.runId() + ":" + row.rowId(), config.captureMode,
+							config.captureMode.equals("RETAINED") ? null : started,
+							config.captureMode.equals("RETAINED") ? null : Instant.now(),
+							config.captureMode.equals("RETAINED") ? null : Math.max(0, System.nanoTime() - before),
+							null, null, null, List.of(), List.of());
+				}
+				if (actual == null && invocation.equals("NULL_RETURN")) {
+					failures.add(FailureFact.of(phase, "NULL_RETURN", "Candidate returned null"));
+					rowState = "FAILED";
+				}
+				else if (actual != null) {
+					phase = "RECORDING";
+					captured = config.recorder.apply(actual);
+					if (captured == null)
+						throw new IllegalStateException("Recorder returned no source");
+					verdict = RecordedVerdict.from(Verdict.single("candidate", actual));
+				}
+				phase = "OBSERVATION";
+				InvocationObservation basic = observation;
+				try {
+					if (captured != null)
+						observation = JevObservations.extract(captured, observation);
+					if (config.observationExtractor != null)
+						observation = Objects.requireNonNull(
+								config.observationExtractor.extract(row, captured, List.copyOf(failures), observation),
+								"Observation extractor returned null");
+					if (!observation.invocationId().equals(row.runId() + ":" + row.rowId()))
+						throw new IllegalArgumentException("Observation belongs to another invocation");
+				}
+				catch (RuntimeException error) {
+					failures.add(FailureFact.of("OBSERVATION", error));
+					if (error instanceof java.util.concurrent.CancellationException)
+						Thread.currentThread().interrupt();
+					observation = new InvocationObservation(row.runId() + ":" + row.rowId(), config.captureMode,
+							basic.startedAt(), basic.endedAt(), basic.elapsedNanos(), null, null, null, List.of(),
+							List.of());
+				}
+				if (Thread.currentThread().isInterrupted())
+					throw new java.util.concurrent.CancellationException("Interrupted after invocation");
+				if (captured != null) {
+					phase = "TRUTH";
+					truth = config.truth != null ? config.truth.apply(item) : legacyTruth(config.expected.apply(item));
+					if (Thread.currentThread().isInterrupted())
+						throw new java.util.concurrent.CancellationException("Interrupted during truth lookup");
+					String invalid = invalidTruth(truth);
+					if (invalid != null)
+						comparison = unscored(captured, truth, invalid, "Supplied truth is absent or incompatible");
 					else {
-						JudgeScorerResult score = Objects.requireNonNull(
-								config.scorer.score(new JudgeScoringInput(item, actual, truth.label())),
-								"Scorer returned null");
-						if (Thread.currentThread().isInterrupted())
-							throw new java.util.concurrent.CancellationException("Interrupted during scoring");
-						comparison = score.scored()
-								? new JudgeComparison(config.measureId, config.scorerRevision, config.truthKind,
-										captured.sha256(), truth, true, score.match(), score.score(), null,
-										score.reasoning())
-								: unscored(captured, truth, unscoredCandidateReason(actual), score.reasoning());
+						phase = "SCORING";
+						var reading = io.github.markpollack.judge.jury.interpretation.Verdicts
+							.interpret(verdict.document().producerMap());
+						if (reading.readingSupport() != ReadingSupport.SUPPORTED)
+							comparison = unscored(captured, truth, "UNSUPPORTED_CANDIDATE",
+									"Candidate has no supported reading");
+						else if (!config.truthKind.equals("STATUS_LABEL")
+								&& actual.status() != io.github.markpollack.judge.result.JudgmentStatus.PASS
+								&& actual.status() != io.github.markpollack.judge.result.JudgmentStatus.FAIL)
+							comparison = unscored(captured, truth, unscoredCandidateReason(actual),
+									"Candidate is not eligible for semantic comparison");
+						else {
+							JudgeScorerResult score = Objects.requireNonNull(
+									config.scorer.score(new JudgeScoringInput(item, actual, truth.label())),
+									"Scorer returned null");
+							if (Thread.currentThread().isInterrupted())
+								throw new java.util.concurrent.CancellationException("Interrupted during scoring");
+							comparison = score.scored()
+									? new JudgeComparison(config.measureId, config.scorerRevision, config.truthKind,
+											captured.sha256(), truth, true, score.match(), score.score(), null,
+											score.reasoning())
+									: unscored(captured, truth, unscoredCandidateReason(actual), score.reasoning());
+						}
 					}
 				}
 			}
+			catch (RuntimeException failure) {
+				boolean cancelled = Thread.currentThread().isInterrupted()
+						|| failure instanceof java.util.concurrent.CancellationException;
+				rowState = cancelled ? "CANCELLED" : "FAILED";
+				failures.add(FailureFact.of(phase, failure));
+				comparison = unscored(captured, truth, cancelled ? "CANCELLED" : phase + "_FAILED",
+						failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
+			}
+			return finish();
 		}
-		catch (RuntimeException failure) {
-			boolean cancelled = Thread.currentThread().isInterrupted()
-					|| failure instanceof java.util.concurrent.CancellationException;
-			rowState = cancelled ? "CANCELLED" : "FAILED";
-			failures.add(FailureFact.of(phase, failure));
-			comparison = unscored(captured, truth, cancelled ? "CANCELLED" : phase + "_FAILED",
-					failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
+
+		private ItemResult finish() {
+			if (comparison == null)
+				comparison = unscored(captured, truth,
+						invocation.equals("NULL_RETURN") ? "NULL_RETURN" : "NO_CANDIDATE",
+						"No captured candidate available for comparison");
+			if (!failures.isEmpty() && !rowState.equals("CANCELLED"))
+				rowState = "FAILED";
+			var detail = JudgeExecutionDetail.current(row, identity, rowState, invocation, captured, truth, comparison,
+					observation, failures);
+			MeasurementSummary measure = MeasurementSummary.of(observation == null ? List.of() : List.of(observation));
+			InterpretationSnapshot snapshot = verdict == null ? null
+					: InterpretationSnapshot.capture(verdict.document(), runtime);
+			ItemResult value = ItemResult.builder()
+				.itemId(row.rowId())
+				.itemSlug(item.slug())
+				.success(captured != null && verdict != null)
+				.verdict(verdict)
+				.verdictRole(verdict == null ? null : "CANDIDATE")
+				.interpretationSnapshot(snapshot)
+				.interpretation(snapshot == null ? null : snapshot.reading())
+				.executionDetail(detail)
+				.scores(comparison.scored() ? Map.of(config.measureId, comparison.score()) : Map.of())
+				.totalTokens(measure.tokens().total())
+				.costUsd(measure.costUsd().total())
+				.durationMs(observation == null || observation.elapsedNanos() == null ? null
+						: observation.elapsedNanos() / 1_000_000)
+				.build();
+			return value.toBuilder().passed(ItemAccounting.passedFlagCurrent(value.interpretation())).build();
 		}
-		if (comparison == null)
-			comparison = unscored(captured, truth, invocation.equals("NULL_RETURN") ? "NULL_RETURN" : "NO_CANDIDATE",
-					"No captured candidate available for comparison");
-		if (!failures.isEmpty() && !rowState.equals("CANCELLED"))
-			rowState = "FAILED";
-		var detail = JudgeExecutionDetail.current(row, identity, rowState, invocation, captured, truth, comparison,
-				observation, failures);
-		MeasurementSummary measure = MeasurementSummary.of(observation == null ? List.of() : List.of(observation));
-		ItemResult value = ItemResult.builder()
-			.itemId(row.rowId())
-			.itemSlug(item.slug())
-			.success(captured != null && verdict != null)
-			.verdict(verdict)
-			.verdictRole(verdict == null ? null : "CANDIDATE")
-			.executionDetail(detail)
-			.scores(comparison.scored() ? Map.of(config.measureId, comparison.score()) : Map.of())
-			.totalTokens(measure.tokens().total())
-			.costUsd(measure.costUsd().total())
-			.durationMs(observation == null || observation.elapsedNanos() == null ? null
-					: observation.elapsedNanos() / 1_000_000)
-			.build();
-		return value.toBuilder().passed(ItemAccounting.passedFlagCurrent(value.interpretation())).build();
+
 	}
 
 	private JudgeTruth legacyTruth(String label) {
@@ -305,6 +382,8 @@ public final class JudgeExperiment {
 	}
 
 	private String unscoredCandidateReason(Judgment actual) {
+		if (actual.policyApplication() instanceof io.github.markpollack.judge.result.PolicyFailure)
+			return "POLICY_FAILED";
 		if (actual.policyApplication() != null && actual.status() != actual.producerStatus())
 			return "WITHHELD_ASSESSMENT";
 		return switch (actual.status()) {
@@ -367,6 +446,9 @@ public final class JudgeExperiment {
 
 		private Function<Judgment, RecordedJudgment> recorder = RecordedJudgment::from;
 
+		private java.util.function.Consumer<ItemResult> afterRow = result -> {
+		};
+
 		private Builder() {
 		}
 
@@ -391,6 +473,7 @@ public final class JudgeExperiment {
 			b.identity = identity;
 			b.observationExtractor = observationExtractor;
 			b.recorder = recorder;
+			b.afterRow = afterRow;
 			return b;
 		}
 
@@ -481,6 +564,12 @@ public final class JudgeExperiment {
 
 		public Builder observationExtractor(ObservationExtractor v) {
 			observationExtractor = v;
+			return this;
+		}
+
+		// Package-private deterministic orchestration failure seam.
+		Builder afterRow(java.util.function.Consumer<ItemResult> value) {
+			afterRow = Objects.requireNonNull(value);
 			return this;
 		}
 

@@ -95,11 +95,12 @@ public final class RecordingValidation {
 				require(!item.historical(), "Judge candidate must have a verified current snapshot");
 				var verdict = item.verdict().document().node();
 				var candidate = detail.candidateJudgment().document().node();
-				require(candidate.equals(verdict.path("aggregated")) && verdict.path("individual").size() == 1
-						&& candidate.equals(verdict.path("individual").path(0))
-						&& verdict.path("individualByName").size() == 1
-						&& candidate.equals(verdict.path("individualByName").path("candidate")),
-						"Candidate and single-verdict source differ");
+				var expectedSingle = ProducerDocument.from("VERDICT", io.github.markpollack.judge.jury.Verdict.single(
+						"candidate",
+						detail.candidateJudgment().document().value(io.github.markpollack.judge.result.Judgment.class)))
+					.node();
+				require(candidate.equals(verdict.path("aggregated")) && expectedSingle.equals(verdict),
+						"Candidate and producer single-verdict source differ");
 			}
 			else
 				require(item.verdict() == null, "Verdict without captured candidate");
@@ -113,8 +114,16 @@ public final class RecordingValidation {
 					"Comparison/candidate binding mismatch");
 			require(item.scores().equals(comparison.scored() ? Map.of(run.measureId(), comparison.score()) : Map.of()),
 					"Public scores differ from comparison");
-			if (comparison.scored())
+			if (comparison.scored()) {
+				require(detail.candidateJudgment() != null && item.interpretation() != null && item.interpretation()
+					.readingSupport() == io.github.markpollack.judge.jury.interpretation.ReadingSupport.SUPPORTED,
+						"Scored comparison requires a supported candidate");
+				require(comparison.kind().equals("STATUS_LABEL")
+						|| List.of(RecordedJudgmentStatus.PASS, RecordedJudgmentStatus.FAIL)
+							.contains(detail.candidateJudgment().status()),
+						"Ineligible candidate cannot enter semantic comparison");
 				scores.computeIfAbsent(run.measureId(), k -> new ArrayList<>()).add(comparison.score());
+			}
 			if (detail.observation() != null) {
 				require(!detail.invocationState().equals("NOT_ATTEMPTED"),
 						"Unattempted row has invocation observation");

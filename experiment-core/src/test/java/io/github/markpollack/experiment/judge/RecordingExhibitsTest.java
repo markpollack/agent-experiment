@@ -123,6 +123,119 @@ class RecordingExhibitsTest {
 	}
 
 	@Test
+	void reviewedPolicyFactsNeverBecomeSemanticScores() throws Exception {
+		for (String id : List.of("withheld-rich-negative", "policy-failure")) {
+			Judgment candidate = ProducerDocument.text("VERDICT", RecordingVectorsTest.vectorSource(id))
+				.value(Verdict.class)
+				.aggregated();
+			assertThat(candidate.effectiveScore()).isEmpty();
+			assertThat(RecordedJudgment.from(candidate).effectiveScore()).isEmpty();
+			assertThat(JudgeScorers.exactCategoryMatch()
+				.score(new JudgeScoringInput(cases(1).getFirst(), candidate, "violated"))
+				.scored()).isFalse();
+			for (JudgeScorer scorer : List.of(JudgeScorers.exactCategoryMatch(), JudgeScorers.identified(
+					"custom-category:v1", "1", "CATEGORY", input -> new JudgeScorerResult(true, 1.0, "raw label")))) {
+				var result = run(builder(id, context -> candidate, 1).scorer(scorer)
+					.truth(item -> scorer.truthKind().equals("PROPOSITION") ? JudgeTruth.proposition(false)
+							: JudgeTruth.simple("CATEGORY", "violated")));
+				assertThat(result.agreementRate()).isNull();
+				assertThat(result.meanScore()).isNull();
+				assertThat(detail(result, 0).comparison().unscoredReason())
+					.isEqualTo(id.equals("policy-failure") ? "POLICY_FAILED" : "WITHHELD_ASSESSMENT");
+				assertThat(detail(result, 0).candidateJudgment().label()).isEqualTo("violated");
+				assertThat(detail(result, 0).candidateJudgment().score()).isEqualTo(0.25);
+				assertThat(detail(result, 0).candidateJudgment().effectiveScore()).isEmpty();
+			}
+			var status = run(builder(id, context -> candidate, 1).scorer(JudgeScorers.exactVerdictMatch())
+				.truth(item -> JudgeTruth.simple("STATUS_LABEL", candidate.status().name())));
+			assertThat(status.agreementRate()).isEqualTo(1.0);
+		}
+	}
+
+	@Test
+	void reviewedSingleWrapperMutationIsRejectedOnWriteReadAndReport() throws Exception {
+		var original = run(builder("single", context -> nativeFinding(true, "yes"), 1)).experimentResult();
+		var item = original.items().getFirst();
+		for (Consumer<ObjectNode> mutate : List.<Consumer<ObjectNode>>of(node -> node.put("declaredCardinality", 2),
+				node -> ((ObjectNode) node.path("seats").path(0)).put("verdictKey", "other"),
+				node -> ((ObjectNode) node.path("seats").path(0)).put("execution", "CONTAINED_FAILURE"),
+				node -> ((ObjectNode) node.path("decision")).put("kind", "unknown"))) {
+			ObjectNode node = (ObjectNode) item.verdict().document().node();
+			mutate.accept(node);
+			var changed = item.toBuilder()
+				.verdict(RecordedVerdict.fromProducerJson(node.toString()))
+				.interpretation(null)
+				.passed(null)
+				.build();
+			var invalid = copyRecord(original, Map.of("items", List.of(changed), "counts",
+					io.github.markpollack.experiment.attestation.ItemAccounting.count(List.of(changed))));
+			assertThatThrownBy(() -> store.save(invalid)).hasMessageContaining("single-verdict");
+			assertThatThrownBy(() -> JudgeExperimentResult.from(invalid)).hasMessageContaining("single-verdict");
+			ObjectNode wire = (ObjectNode) mapper.valueToTree(original);
+			((ObjectNode) wire.path("items").path(0)).set("verdict", mapper.valueToTree(changed.verdict()));
+			((ObjectNode) wire.path("items").path(0)).set("interpretation",
+					mapper.valueToTree(changed.interpretationSnapshot()));
+			((ObjectNode) wire.path("items").path(0)).putNull("passed");
+			wire.set("counts", mapper.valueToTree(invalid.counts()));
+			assertThatThrownBy(() -> mapper.readValue(wire.toString(), ExperimentResult.class))
+				.hasStackTraceContaining("single-verdict");
+		}
+	}
+
+	@Test
+	void requiredWriterIdentityFailsBeforeAnyCandidateCall() {
+		String writer = System.getProperty("experiment.writer.revision");
+		AtomicInteger calls = new AtomicInteger();
+		try {
+			System.clearProperty("experiment.writer.revision");
+			assertThatThrownBy(() -> builder("preflight", context -> {
+				calls.incrementAndGet();
+				return nativeFinding(true, "yes");
+			}, 2).build().run()).hasMessageContaining("experiment.writer.revision");
+			assertThat(calls).hasValue(0);
+			assertThat(store.listByName("exhibits")).isEmpty();
+		}
+		finally {
+			if (writer != null)
+				System.setProperty("experiment.writer.revision", writer);
+		}
+	}
+
+	@Test
+	void orchestratorFailureRetainsCompletedRowsAndSavesOnePartialRun() throws Exception {
+		AtomicInteger calls = new AtomicInteger();
+		var result = run(builder("orchestration", context -> {
+			calls.incrementAndGet();
+			return nativeFinding(true, "yes");
+		}, 3).afterRow(item -> {
+			throw new IllegalStateException("post-row failure", new IllegalArgumentException("cause"));
+		}));
+		assertThat(calls).hasValue(1);
+		assertThat(result.experimentResult().runState()).isEqualTo("FAILED");
+		assertThat(result.experimentResult().declaredRows()).isEqualTo(3);
+		assertThat(result.experimentResult().attemptedRows()).isEqualTo(1);
+		assertThat(detail(result, 0).invocationState()).isEqualTo("RETURNED");
+		assertThat(detail(result, 0).candidateJudgment()).isNotNull();
+		assertThat(detail(result, 1).rowState()).isEqualTo("NOT_ATTEMPTED");
+		assertThat(detail(result, 2).rowState()).isEqualTo("NOT_ATTEMPTED");
+		assertThat(result.agreementRate()).isNull();
+		assertThat(result.meanScore()).isNull();
+		assertThat(result.partialAgreementRate()).isEqualTo(1.0);
+		assertThat(ProducerDocument.parse(result.experimentResult().metadata().get("orchestratorFailure"))
+			.path("phase")
+			.asText()).isEqualTo("ORCHESTRATION");
+		assertThat(store.listByName("exhibits")).hasSize(1);
+	}
+
+	@Test
+	void outerEnvelopeRejectsTrailingJson() throws Exception {
+		var original = run(builder("trailing", context -> nativeFinding(true, "yes"), 1)).experimentResult();
+		String json = mapper.writeValueAsString(original);
+		assertThatThrownBy(() -> mapper.readValue(json + " {}", ExperimentResult.class))
+			.hasMessageContaining("Trailing");
+	}
+
+	@Test
 	void E01_associationsRemainOutsideStrictProducerDocuments() throws Exception {
 		String source = RecordingVectorsTest.vectorSource("escalation-accepted-negative");
 		var verdict = RecordedVerdict.fromProducerJson(source)

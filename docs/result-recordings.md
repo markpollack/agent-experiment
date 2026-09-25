@@ -10,7 +10,8 @@ A new writer requires an explicit source revision in `experiment.writer.revision
 including optional Judge adapters present on the classpath. A class-directory development build
 is labeled `classes:<sha256>`. The source declarations are caller assertions; archive signatures
 and custody verification are outside this API. The reader requires the same Judge interpreter
-artifact and revision before trusting an E2 interpretation.
+artifact and revision before trusting an E2 interpretation. Judge runs resolve required writer and
+producer identities before invoking candidates and retain those identities for the run.
 
 The current source requires the Judge portable-v2 API. During unpublished snapshot development,
 override `agent-judge.version` with the matching candidate version and use an isolated Maven
@@ -48,7 +49,10 @@ A negative candidate can match negative truth while its operational `passed` fla
 `proposition-match:v1` compares eligible native boolean propositions. A status-only convenience
 such as `Judgment.pass(...)` does not manufacture a native proposition. The legacy status adapter
 is `status-agreement:v1`; legacy category and normalized numerical adapters remain explicitly
-named. Custom scorers require a measure ID, revision and truth kind.
+named. Custom scorers require a measure ID, revision and truth kind. Semantic comparisons refuse
+operational ABSTAIN, NOT_APPLICABLE and ERROR even when raw category/quality facts remain present.
+Policy failure and withholding have distinct unscored reasons; explicit status agreement may
+still match an expected ERROR. The modern recorded effective-score view follows the producer.
 
 `agreementRate` is matches / scored comparisons. `meanScore` is separately named; both are null
 when no comparison was scored. Unscored rows have reasons and do not become disagreements.
@@ -68,7 +72,10 @@ Ordinary failures retain the declared population and permit later rows to execut
 ERROR stays RETURNED; thrown and null calls never receive manufactured ERROR judgments. `success`
 means a non-null return was captured, independently of its outcome or comparison. Cancellation
 retains captured returns, marks the interrupted row and leaves later declarations NOT_ATTEMPTED.
-The interrupt flag is restored. Incomplete runs expose partial diagnostics without final rates.
+The interrupt flag is restored. An ordinary orchestration failure retains available rows, marks
+the run FAILED and records bounded failure facts in `metadata.orchestratorFailure` as JSON text.
+Unentered rows remain NOT_ATTEMPTED. Incomplete runs expose partial diagnostics without final rates.
+If a valid final envelope cannot be constructed or saved, the call fails visibly.
 
 Timing describes the observed logical call; optional transport timing and attempt counts are
 separate. Retained observations keep original timestamps when supplied. Missing tokens, cost and

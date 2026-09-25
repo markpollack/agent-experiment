@@ -107,9 +107,12 @@ public class RecordingVectorsTest {
 	void constructibleVectorsAlsoUseActualLiveFactory(Vector vector) throws Exception {
 		Verdict live = JSON.readValue(vector.source(), Verdict.class);
 		RecordedVerdict recorded = RecordedVerdict.from(live);
+		assertThat(recorded.aggregated().effectiveScore()).isEqualTo(live.aggregated().effectiveScore());
 		FileSystemResultStore store = new FileSystemResultStore(root);
 		store.save(subject(vector.id(), recorded));
 		var loaded = store.load(vector.id()).orElseThrow();
+		assertThat(loaded.items().getFirst().verdict().aggregated().effectiveScore())
+			.isEqualTo(live.aggregated().effectiveScore());
 		assertThat(ProducerDocument.parse(loaded.items().getFirst().verdict().producerJson()))
 			.isEqualTo(ProducerDocument.parse(vector.source()));
 		assertThat(loaded.items().getFirst().interpretation().reading().name())
