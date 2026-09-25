@@ -133,8 +133,9 @@ class RecordingExhibitsTest {
 			assertThat(JudgeScorers.exactCategoryMatch()
 				.score(new JudgeScoringInput(cases(1).getFirst(), candidate, "violated"))
 				.scored()).isFalse();
-			for (JudgeScorer scorer : List.of(JudgeScorers.exactCategoryMatch(), JudgeScorers.identified(
-					"custom-category:v1", "1", "CATEGORY", input -> new JudgeScorerResult(true, 1.0, "raw label")))) {
+			for (JudgeScorer scorer : List.of(JudgeScorers.exactCategoryMatch(), JudgeScorers.propositionMatch(),
+					JudgeScorers.identified("custom-category:v1", "1", "CATEGORY",
+							input -> new JudgeScorerResult(true, 1.0, "raw label")))) {
 				var result = run(builder(id, context -> candidate, 1).scorer(scorer)
 					.truth(item -> scorer.truthKind().equals("PROPOSITION") ? JudgeTruth.proposition(false)
 							: JudgeTruth.simple("CATEGORY", "violated")));
