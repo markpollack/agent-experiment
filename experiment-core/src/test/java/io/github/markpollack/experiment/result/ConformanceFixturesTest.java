@@ -42,9 +42,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <b>Every assertion here is made against the JSON as written, item by item.</b> An
  * earlier version asserted that the text contained one {@code "passed" : null} somewhere,
  * which a regression could satisfy by leaving one item right and breaking another.
- * Regeneration ({@code -Dconformance.regenerate=true}) rewrites the committed file, so
- * the assertions must be able to catch a regression on their own rather than relying on
- * the snapshot.
+ * Historical fixtures are immutable. New writer assertions compare the named public
+ * facts, not the obsolete historical envelope.
  */
 class ConformanceFixturesTest {
 
@@ -114,12 +113,10 @@ class ConformanceFixturesTest {
 		String written = Files.readString(dir.resolve("conformance").resolve(name + ".json"));
 
 		Path committed = FIXTURES.resolve(name + ".json");
-		if (Boolean.getBoolean("conformance.regenerate")) {
-			Files.createDirectories(FIXTURES);
-			Files.writeString(committed, written);
-		}
-		assertThat(committed).as("committed fixture; regenerate with -Dconformance.regenerate=true").exists();
-		assertThat(written).isEqualTo(Files.readString(committed));
+		assertThat(committed).as("immutable supported historical fixture").exists();
+		assertThat(passedByItem(written)).isEqualTo(passedByItem(Files.readString(committed)));
+		assertThat(JSON.readTree(written).path("recordingSchemaVersion").intValue()).isEqualTo(2);
+
 		// No stored rate anywhere: a reader has to derive one, and deriving forces it to
 		// handle a denominator of zero.
 		assertThat(written).doesNotContain("passRate");

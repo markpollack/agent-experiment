@@ -5,6 +5,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
+import io.github.markpollack.experiment.recording.RuntimeIdentity;
+import io.github.markpollack.experiment.recording.MeasurementSummary;
+import io.github.markpollack.experiment.judge.JudgeRunDeclaration;
 
 /**
  * Complete result of an experiment run.
@@ -35,21 +38,37 @@ import org.jspecify.annotations.Nullable;
  * when not recorded)
  */
 public record ExperimentResult(String experimentId, String experimentName, @Nullable String datasetVersion,
-		boolean datasetDirty, String datasetSemanticVersion, @Nullable KnowledgeManifest knowledgeManifest,
+		boolean datasetDirty, @Nullable String datasetSemanticVersion, @Nullable KnowledgeManifest knowledgeManifest,
 		Instant timestamp, List<ItemResult> items, Map<String, String> metadata, Map<String, Double> aggregateScores,
-		@Nullable ItemCounts counts, double totalCostUsd, int totalTokens, long totalDurationMs,
-		@Nullable String codeVersion, boolean codeDirty, RunConditions conditions,
-		@Nullable InstrumentRecord instrument) {
+		@Nullable ItemCounts counts, @Nullable Double totalCostUsd, @Nullable Long totalTokens,
+		@Nullable Long totalDurationMs, @Nullable String codeVersion, boolean codeDirty, RunConditions conditions,
+		@Nullable InstrumentRecord instrument, @Nullable Integer recordingSchemaVersion,
+		@Nullable String experimentKind, @Nullable RuntimeIdentity writer, @Nullable RuntimeIdentity judgeRuntime,
+		@Nullable JudgeRunDeclaration judgeRun, @Nullable String runState, @Nullable MeasurementSummary measurements) {
 
 	public ExperimentResult {
 		java.util.Objects.requireNonNull(experimentId, "experimentId must not be null");
 		java.util.Objects.requireNonNull(experimentName, "experimentName must not be null");
-		java.util.Objects.requireNonNull(datasetSemanticVersion, "datasetSemanticVersion must not be null");
 		java.util.Objects.requireNonNull(timestamp, "timestamp must not be null");
 		items = List.copyOf(items);
 		metadata = Map.copyOf(metadata);
 		aggregateScores = Map.copyOf(aggregateScores);
 		conditions = conditions == null ? RunConditions.undeclared() : conditions;
+	}
+
+	/** Number of declared Judge observations, absent for historical and agent runs. */
+	@com.fasterxml.jackson.annotation.JsonProperty
+	public @Nullable Integer declaredRows() {
+		return judgeRun == null ? null : judgeRun.rows().size();
+	}
+
+	/** Rows entered, including input construction failures; not just completed calls. */
+	@com.fasterxml.jackson.annotation.JsonProperty
+	public @Nullable Integer attemptedRows() {
+		return judgeRun == null ? null : (int) items.stream()
+			.filter(v -> v.executionDetail() instanceof io.github.markpollack.experiment.judge.JudgeExecutionDetail d
+					&& !"NOT_ATTEMPTED".equals(d.rowState()))
+			.count();
 	}
 
 	public static Builder builder() {
@@ -84,15 +103,29 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 
 		private @Nullable ItemCounts counts;
 
-		private double totalCostUsd;
+		private @Nullable Double totalCostUsd;
 
-		private int totalTokens;
+		private @Nullable Long totalTokens;
 
-		private long totalDurationMs;
+		private @Nullable Long totalDurationMs;
 
 		private @Nullable String codeVersion;
 
 		private boolean codeDirty;
+
+		private @Nullable Integer recordingSchemaVersion = 2;
+
+		private String experimentKind = "AGENT";
+
+		private @Nullable RuntimeIdentity writer;
+
+		private @Nullable RuntimeIdentity judgeRuntime;
+
+		private @Nullable JudgeRunDeclaration judgeRun;
+
+		private String runState = "COMPLETE";
+
+		private @Nullable MeasurementSummary measurements;
 
 		private Builder() {
 		}
@@ -117,7 +150,7 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 			return this;
 		}
 
-		public Builder datasetSemanticVersion(String datasetSemanticVersion) {
+		public Builder datasetSemanticVersion(@Nullable String datasetSemanticVersion) {
 			this.datasetSemanticVersion = datasetSemanticVersion;
 			return this;
 		}
@@ -144,9 +177,9 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 
 		/**
 		 * The conditions this run was executed under. Defaults to
-		 * {@link RunConditions#undeclared()} — a run that declares nothing is marked
-		 * incomplete and will not be compared, rather than silently looking like a run
-		 * with no conditions.
+		 * {@link RunConditions#undeclared(String...)} — a run that declares nothing is
+		 * marked incomplete and will not be compared, rather than silently looking like a
+		 * run with no conditions.
 		 */
 		public Builder conditions(RunConditions conditions) {
 			this.conditions = conditions;
@@ -176,17 +209,17 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 			return this;
 		}
 
-		public Builder totalCostUsd(double totalCostUsd) {
+		public Builder totalCostUsd(@Nullable Double totalCostUsd) {
 			this.totalCostUsd = totalCostUsd;
 			return this;
 		}
 
-		public Builder totalTokens(int totalTokens) {
+		public Builder totalTokens(@Nullable Long totalTokens) {
 			this.totalTokens = totalTokens;
 			return this;
 		}
 
-		public Builder totalDurationMs(long totalDurationMs) {
+		public Builder totalDurationMs(@Nullable Long totalDurationMs) {
 			this.totalDurationMs = totalDurationMs;
 			return this;
 		}
@@ -201,10 +234,64 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 			return this;
 		}
 
+		public Builder totalCostUsd(double value) {
+			return totalCostUsd(Double.valueOf(value));
+		}
+
+		public Builder totalTokens(long value) {
+			return totalTokens(Long.valueOf(value));
+		}
+
+		public Builder totalDurationMs(long value) {
+			return totalDurationMs(Long.valueOf(value));
+		}
+
+		public Builder recordingSchemaVersion(@Nullable Integer value) {
+			recordingSchemaVersion = value;
+			return this;
+		}
+
+		public Builder experimentKind(String value) {
+			experimentKind = value;
+			return this;
+		}
+
+		public Builder writer(RuntimeIdentity value) {
+			writer = value;
+			return this;
+		}
+
+		public Builder judgeRuntime(RuntimeIdentity value) {
+			judgeRuntime = value;
+			return this;
+		}
+
+		public Builder judgeRun(JudgeRunDeclaration value) {
+			judgeRun = value;
+			return this;
+		}
+
+		public Builder runState(String value) {
+			runState = value;
+			return this;
+		}
+
+		public Builder measurements(MeasurementSummary value) {
+			measurements = value;
+			return this;
+		}
+
 		public ExperimentResult build() {
+			if (recordingSchemaVersion != null) {
+				if (writer == null)
+					writer = RuntimeIdentity.writer();
+				if (judgeRuntime == null)
+					judgeRuntime = RuntimeIdentity.judge();
+			}
 			return new ExperimentResult(experimentId, experimentName, datasetVersion, datasetDirty,
 					datasetSemanticVersion, knowledgeManifest, timestamp, items, metadata, aggregateScores, counts,
-					totalCostUsd, totalTokens, totalDurationMs, codeVersion, codeDirty, conditions, instrument);
+					totalCostUsd, totalTokens, totalDurationMs, codeVersion, codeDirty, conditions, instrument,
+					recordingSchemaVersion, experimentKind, writer, judgeRuntime, judgeRun, runState, measurements);
 		}
 
 	}

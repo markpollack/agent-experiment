@@ -51,7 +51,7 @@ class ResultObjectMapperTest {
 	}
 
 	@Test
-	void readsCompleteExperiment05Judge013FixtureAndWritesNormalizedFormat() throws Exception {
+	void readsCompleteExperiment05Judge013FixtureWithLosslessSourceAndCompatibilityProjection() throws Exception {
 		ExperimentResult restored;
 		try (var fixture = getClass().getResourceAsStream("/compatibility/experiment-result-0.5-judge-0.13.json")) {
 			assertThat(fixture).isNotNull();
@@ -71,9 +71,12 @@ class ResultObjectMapperTest {
 		var judgeDetail = (io.github.markpollack.experiment.judge.JudgeExecutionDetail) item.executionDetail();
 		assertThat(judgeDetail.candidateJudgment().label()).isEqualTo("good");
 
-		String normalized = mapper.writeValueAsString(restored);
-		assertThat(normalized).contains("\"score\" : 0.75", "\"label\" : \"good\"", "\"compositeAttempts\"");
-		assertThat(normalized).doesNotContain("subVerdicts", "allowedValues", "\"min\"", "\"max\"");
+		assertThat(restored.recordingSchemaVersion()).isNull();
+		assertThat(item.verdict().document().node().has("subVerdicts")).isTrue();
+		assertThat(item.verdict().document().node().at("/individualByName/quality/score/max").asDouble())
+			.isEqualTo(10.0);
+		assertThat(item.interpretationSnapshot().state()).isEqualTo("LEGACY_UNVERIFIED");
+
 	}
 
 	@Test
@@ -118,8 +121,9 @@ class ResultObjectMapperTest {
 				{"score":{"value":7.5,"min":10.0,"max":10.0},"status":"PASS","reasoning":"bad","checks":[],"metadata":{}}
 				""";
 
-		assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> mapper.readValue(json, RecordedJudgment.class)))
-			.hasMessageContaining("non-positive range");
+		assertThat(org.assertj.core.api.Assertions
+			.catchThrowable(() -> mapper.readValue(json, RecordedJudgment.class).score()))
+			.hasMessageContaining("Invalid legacy numeric scale");
 	}
 
 	@Test

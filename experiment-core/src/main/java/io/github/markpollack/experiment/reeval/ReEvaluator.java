@@ -70,20 +70,22 @@ public final class ReEvaluator {
 		ExperimentResult result = ExperimentResult.builder()
 			.experimentId(UUID.randomUUID().toString())
 			.experimentName(original.experimentName())
+			.conditions(original.conditions())
 			.datasetVersion(original.datasetVersion())
 			.datasetDirty(original.datasetDirty())
 			.datasetSemanticVersion(original.datasetSemanticVersion())
 			.knowledgeManifest(original.knowledgeManifest())
 			.timestamp(Instant.now())
 			.items(items)
-			.metadata(
-					Map.of("reEvaluatedFrom", original.experimentId(), "systemReinvoked", "false", "originalTimestamp",
-							original.timestamp().toString(), "reEvaluationJury", jury.getClass().getSimpleName()))
+			.metadata(Map.of("reEvaluatedFrom", original.experimentId(), "systemReinvoked", "false",
+					"originalTimestamp", original.timestamp().toString(), "originalCostUsd",
+					String.valueOf(original.totalCostUsd()), "originalTokens", String.valueOf(original.totalTokens()),
+					"reEvaluationJury", jury.getClass().getSimpleName()))
 			.aggregateScores(aggregateScores)
 			.counts(ItemAccounting.count(items))
-			.totalCostUsd(original.totalCostUsd())
-			.totalTokens(original.totalTokens())
-			.totalDurationMs(0)
+			.totalCostUsd((Double) null)
+			.totalTokens((Long) null)
+			.totalDurationMs((Long) null)
 			.instrument(instrument)
 			.build();
 
@@ -119,6 +121,11 @@ public final class ReEvaluator {
 			.passed(ItemAccounting.passedFlag(interpretation))
 			.scores(VerdictExtractor.extractScores(verdict))
 			.verdict(recorded)
+			.historical(false)
+			.verdictRole("SUBJECT")
+			.costUsd((Double) null)
+			.totalTokens((Long) null)
+			.durationMs((Long) null)
 			.interpretation(interpretation)
 			.metadata(merge(withoutInstrumentFailure(original.metadata()),
 					Map.of("reEvaluated", "true", "systemReinvoked", "false", "originalCostUsd",
@@ -127,10 +134,22 @@ public final class ReEvaluator {
 	}
 
 	private ItemResult preserveAsSkipped(ItemResult original) {
+		Map<String, Object> provenance = new HashMap<>(original.metadata());
+		provenance.put("originalScores", original.scores());
+		if (original.executionDetail() instanceof io.github.markpollack.experiment.judge.JudgeExecutionDetail)
+			provenance.put("originalJudgeExecutionDetail", original.executionDetail());
 		return original.toBuilder()
-			.metadata(merge(original.metadata(),
-					Map.of("reEvaluated", "false", "reEvaluationSkipped", "true", "reEvaluationSkipReason",
-							"missing execution detail or failed original item")))
+			.scores(Map.of())
+			.executionDetail(
+					original.executionDetail() instanceof io.github.markpollack.experiment.judge.JudgeExecutionDetail
+							? null : original.executionDetail())
+			.verdictRole(original.verdict() == null ? null : "SUBJECT")
+			.costUsd((Double) null)
+			.totalTokens((Long) null)
+			.durationMs((Long) null)
+			.metadata(merge(provenance, Map.of("reEvaluated", "false", "reEvaluationSkipped", "true",
+					"reEvaluationSkipReason", "missing execution detail or failed original item", "originalCostUsd",
+					String.valueOf(original.costUsd()), "originalTokens", String.valueOf(original.totalTokens()))))
 			.build();
 	}
 

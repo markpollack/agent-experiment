@@ -71,7 +71,7 @@ public class FileSystemSessionStore implements SessionStore {
 
 		try {
 			Files.createDirectories(sessionDir);
-			atomicWrite(sessionFile, session);
+			writeNew(sessionFile, session);
 			updateSessionsIndex(experimentName, session);
 			logger.debug("Created session {} for experiment {}", sessionName, experimentName);
 			return session;
@@ -89,34 +89,34 @@ public class FileSystemSessionStore implements SessionStore {
 		Path variantFile = sessionDir.resolve(variantName + ".json");
 		Path sessionFile = sessionDir.resolve(SESSION_FILE);
 
+		io.github.markpollack.experiment.recording.RecordingValidation.validate(result);
+		if (result.recordingSchemaVersion() == null)
+			throw new ResultStoreException("Historical recordings are read-only", null);
 		try {
-			// Write variant result
-			atomicWrite(variantFile, result);
-
-			// Update session manifest
 			RunSession current = objectMapper.readValue(sessionFile.toFile(), RunSession.class);
-			VariantEntry entry = VariantEntry.of(variantName, result.experimentId(), variantName + ".json",
-					result.counts(), result.items().size(), result.totalCostUsd(), result.totalDurationMs());
-
-			// Replace existing entry for same variant or add new
-			List<VariantEntry> updatedVariants = new ArrayList<>();
-			boolean replaced = false;
-			for (VariantEntry existing : current.variants()) {
-				if (existing.variantName().equals(variantName)) {
-					updatedVariants.add(entry);
-					replaced = true;
-				}
-				else {
-					updatedVariants.add(existing);
-				}
-			}
-			if (!replaced) {
-				updatedVariants.add(entry);
-			}
+			if (current.variants()
+				.stream()
+				.anyMatch(v -> v.variantName().equals(variantName) || v.experimentId().equals(result.experimentId())))
+				throw new IOException("Variant or experiment ID already exists");
+			writeNew(variantFile, result);
+			VariantEntry entry = VariantEntry.of(variantName, variantName + ".json", result);
+			List<VariantEntry> updatedVariants = new ArrayList<>(current.variants());
+			updatedVariants.add(entry);
 
 			RunSession updated = new RunSession(current.sessionName(), current.experimentName(), current.createdAt(),
 					current.completedAt(), current.status(), updatedVariants, current.metadata());
-			atomicWrite(sessionFile, updated);
+			try {
+				atomicWrite(sessionFile, updated);
+			}
+			catch (IOException error) {
+				try {
+					Files.deleteIfExists(variantFile);
+				}
+				catch (IOException cleanup) {
+					error.addSuppressed(cleanup);
+				}
+				throw error;
+			}
 
 			logger.debug("Saved variant {} to session {}", variantName, sessionName);
 		}
@@ -222,6 +222,18 @@ public class FileSystemSessionStore implements SessionStore {
 
 	private Path sessionDir(String experimentName, String sessionName) {
 		return baseDir.resolve(experimentName).resolve(SESSIONS_DIR).resolve(sessionName);
+	}
+
+	private void writeNew(Path target, Object value) throws IOException {
+		Files.createDirectories(target.getParent());
+		Path temporary = Files.createTempFile(target.getParent(), ".session-", ".tmp");
+		try {
+			objectMapper.writeValue(temporary.toFile(), value);
+			Files.createLink(target, temporary);
+		}
+		finally {
+			Files.deleteIfExists(temporary);
+		}
 	}
 
 	private void atomicWrite(Path target, Object value) throws IOException {

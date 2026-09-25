@@ -30,6 +30,25 @@ public record JudgeExperimentResult(ExperimentResult experimentResult, @Nullable
 	 * @return a judge-typed result with computed agreement rate and disagreement list
 	 */
 	public static JudgeExperimentResult from(ExperimentResult result) {
+		if (result.recordingSchemaVersion() != null && "JUDGE".equals(result.experimentKind())) {
+			io.github.markpollack.experiment.recording.RecordingValidation.validate(result);
+			var comparisons = result.items()
+				.stream()
+				.map(i -> (JudgeExecutionDetail) i.executionDetail())
+				.map(JudgeExecutionDetail::comparison)
+				.filter(c -> c != null && c.scored())
+				.toList();
+			long matches = comparisons.stream().filter(c -> Boolean.TRUE.equals(c.match())).count();
+			Double agreement = comparisons.isEmpty() || !"COMPLETE".equals(result.runState()) ? null
+					: (double) matches / comparisons.size();
+			var disagreements = result.items()
+				.stream()
+				.filter(i -> i.executionDetail() instanceof JudgeExecutionDetail d && d.comparison() != null
+						&& d.comparison().scored() && Boolean.FALSE.equals(d.comparison().match()))
+				.map(i -> new JudgeDisagreement(i.itemId(), (JudgeExecutionDetail) i.executionDetail()))
+				.toList();
+			return new JudgeExperimentResult(result, agreement, disagreements);
+		}
 		// Read from the recorded verdict, not from the stored flag. A stored flag can
 		// contradict its own evidence — an old item can carry passed=false with no
 		// verdict
@@ -46,6 +65,41 @@ public record JudgeExperimentResult(ExperimentResult experimentResult, @Nullable
 		Double agreement = counts.passRate().isPresent() ? counts.passRate().getAsDouble() : null;
 
 		return new JudgeExperimentResult(result, agreement, disagreements);
+	}
+
+	/**
+	 * Mean comparison score, separate from Boolean agreement. Null for
+	 * incomplete/all-unscored runs.
+	 */
+	public @Nullable Double meanScore() {
+		if (!"COMPLETE".equals(experimentResult.runState()) || experimentResult.judgeRun() == null)
+			return null;
+		return experimentResult.aggregateScores().get(experimentResult.judgeRun().measureId());
+	}
+
+	/** Number of scored comparisons; unscored rows never enter the denominator. */
+	public long scoredCount() {
+		return experimentResult.items()
+			.stream()
+			.filter(i -> i.executionDetail() instanceof JudgeExecutionDetail d && d.comparison() != null
+					&& d.comparison().scored())
+			.count();
+	}
+
+	public long unscoredCount() {
+		return experimentResult.items().size() - scoredCount();
+	}
+
+	/** Explicitly partial diagnostic, without claiming a complete-run rate. */
+	public @Nullable Double partialAgreementRate() {
+		long scored = scoredCount();
+		if (scored == 0)
+			return null;
+		return (double) experimentResult.items()
+			.stream()
+			.filter(i -> i.executionDetail() instanceof JudgeExecutionDetail d && d.comparison() != null
+					&& d.comparison().scored() && Boolean.TRUE.equals(d.comparison().match()))
+			.count() / scored;
 	}
 
 	/** For {@code ComparisonEngine} and {@code ResultStore} compatibility. */

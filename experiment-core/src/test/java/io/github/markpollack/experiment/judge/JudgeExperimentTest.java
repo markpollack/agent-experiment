@@ -36,6 +36,10 @@ class JudgeExperimentTest {
 	void runProducesCorrectAgreementRate() {
 		// Judge that always passes
 		JudgeExperimentResult result = JudgeExperiment.builder()
+			.captureMode("FAKE")
+			.candidateId("fixture-candidate")
+			.caseInputIdentity((context, row) -> new io.github.markpollack.experiment.recording.CaseInputIdentity(
+					"fixture", row.caseId(), "1", null, "effective-case-input:v1"))
 			.name("test-judge-experiment")
 			.candidate(alwaysPassJudge())
 			.items(testItems)
@@ -54,6 +58,10 @@ class JudgeExperimentTest {
 	void disagreementsPopulatedForMismatches() {
 		// Judge that always passes, but expected is FAIL for second item
 		JudgeExperimentResult result = JudgeExperiment.builder()
+			.captureMode("FAKE")
+			.candidateId("fixture-candidate")
+			.caseInputIdentity((context, row) -> new io.github.markpollack.experiment.recording.CaseInputIdentity(
+					"fixture", row.caseId(), "1", null, "effective-case-input:v1"))
 			.name("mismatch-experiment")
 			.candidate(alwaysPassJudge())
 			.items(testItems)
@@ -66,7 +74,7 @@ class JudgeExperimentTest {
 
 		assertThat(result.agreementRate()).isEqualTo(0.5);
 		assertThat(result.disagreements()).hasSize(1);
-		assertThat(result.disagreements().get(0).itemId()).isEqualTo("neg-1");
+		assertThat(result.disagreements().get(0).detail().row().caseId()).isEqualTo("neg-1");
 	}
 
 	@Test
@@ -103,6 +111,10 @@ class JudgeExperimentTest {
 	@Test
 	void comparisonEngineWorksAcrossTwoJudgeResults() {
 		JudgeExperimentResult v1 = JudgeExperiment.builder()
+			.captureMode("FAKE")
+			.candidateId("fixture-candidate")
+			.caseInputIdentity((context, row) -> new io.github.markpollack.experiment.recording.CaseInputIdentity(
+					"fixture", row.caseId(), "1", null, "effective-case-input:v1"))
 			.name("compare-experiment")
 			.candidate(alwaysPassJudge())
 			.items(testItems)
@@ -114,6 +126,10 @@ class JudgeExperimentTest {
 			.run();
 
 		JudgeExperimentResult v2 = JudgeExperiment.builder()
+			.captureMode("FAKE")
+			.candidateId("fixture-candidate")
+			.caseInputIdentity((context, row) -> new io.github.markpollack.experiment.recording.CaseInputIdentity(
+					"fixture", row.caseId(), "1", null, "effective-case-input:v1"))
 			.name("compare-experiment")
 			.candidate(alwaysFailJudge())
 			.items(testItems)
@@ -136,6 +152,10 @@ class JudgeExperimentTest {
 
 	private JudgeExperimentResult runDefaultExperiment() {
 		return JudgeExperiment.builder()
+			.captureMode("FAKE")
+			.candidateId("fixture-candidate")
+			.caseInputIdentity((context, row) -> new io.github.markpollack.experiment.recording.CaseInputIdentity(
+					"fixture", row.caseId(), "1", null, "effective-case-input:v1"))
 			.name("default-experiment")
 			.candidate(alwaysPassJudge())
 			.items(testItems)

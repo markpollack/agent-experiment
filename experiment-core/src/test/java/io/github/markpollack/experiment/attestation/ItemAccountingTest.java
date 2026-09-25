@@ -93,7 +93,7 @@ class ItemAccountingTest {
 
 	@Test
 	void anItemThatNeverReachedAJuryIsNotJudgedAndNotAnInstrumentFailure() {
-		ItemResult unjudged = ItemResult.builder().itemId("a").itemSlug("a").success(false).build();
+		ItemResult unjudged = ItemResult.builder().historical(true).itemId("a").itemSlug("a").success(false).build();
 
 		assertThat(ItemAccounting.outcomeOf(unjudged)).isEqualTo(SubjectOutcome.NOT_JUDGED);
 		assertThat(ItemAccounting.count(List.of(unjudged))).isEqualTo(new ItemCounts(0, 0, 0, 0, 1, 0));
@@ -109,6 +109,7 @@ class ItemAccountingTest {
 		// Written before the reading existed and not yet re-exported. Deriving an outcome
 		// from the verdict's own shape is exactly what this project stopped doing.
 		ItemResult notReExported = ItemResult.builder()
+			.historical(true)
 			.itemId("a")
 			.itemSlug("a")
 			.success(true)
@@ -163,6 +164,7 @@ class ItemAccountingTest {
 		Interpretation interpretation = new Interpretation(Interpretation.SCHEMA_VERSION, 1, reading, support, null,
 				stage(null), List.of(stages), List.of(), "for the counting rules");
 		return ItemResult.builder()
+			.historical(true)
 			.itemId(id)
 			.itemSlug(id)
 			.success(true)

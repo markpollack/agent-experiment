@@ -1,23 +1,37 @@
 package io.github.markpollack.experiment.judge;
 
+import java.util.List;
 import io.github.markpollack.experiment.result.ExecutionDetail;
 import io.github.markpollack.experiment.result.RecordedJudgment;
+import io.github.markpollack.experiment.recording.*;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Execution detail for judge experiments. Preserves the domain evidence for each item:
- * what the candidate judged, what was expected, and the scoring result.
- *
- * @param candidateJudgment the candidate judge's judgment
- * @param expectedLabel the expected label from the dataset
- * @param scorerResult the result of scoring actual vs expected
- */
-public record JudgeExecutionDetail(RecordedJudgment candidateJudgment, String expectedLabel,
-		JudgeScorerResult scorerResult) implements ExecutionDetail {
-
-	/** Create recorded detail from a live Agent Judge judgment. */
-	public JudgeExecutionDetail(io.github.markpollack.judge.result.Judgment candidateJudgment, String expectedLabel,
-			JudgeScorerResult scorerResult) {
-		this(RecordedJudgment.from(candidateJudgment), expectedLabel, scorerResult);
+/** Current row evidence; legacy three-field constructors remain compatibility inputs. */
+public record JudgeExecutionDetail(String kind, int schemaVersion, @Nullable RowIdentity row,
+		@Nullable CaseInputIdentity caseInputIdentity, String rowState, String invocationState,
+		@Nullable RecordedJudgment candidateJudgment, @Nullable JudgeTruth truth, @Nullable JudgeComparison comparison,
+		@Nullable InvocationObservation observation, List<FailureFact> failures, @Nullable String expectedLabel,
+		@Nullable JudgeScorerResult scorerResult) implements ExecutionDetail {
+	public JudgeExecutionDetail {
+		failures = List.copyOf(failures);
 	}
 
+	public JudgeExecutionDetail(RecordedJudgment candidateJudgment, String expectedLabel,
+			JudgeScorerResult scorerResult) {
+		this("LEGACY_JUDGE", 0, null, null, "LEGACY", "LEGACY", candidateJudgment, null, null, null, List.of(),
+				expectedLabel, scorerResult);
+	}
+
+	public JudgeExecutionDetail(io.github.markpollack.judge.result.Judgment candidate, String expected,
+			JudgeScorerResult result) {
+		this(RecordedJudgment.from(candidate), expected, result);
+	}
+
+	public static JudgeExecutionDetail current(RowIdentity row, @Nullable CaseInputIdentity identity, String rowState,
+			String invocationState, @Nullable RecordedJudgment candidate, @Nullable JudgeTruth truth,
+			JudgeComparison comparison, @Nullable InvocationObservation observation, List<FailureFact> failures) {
+		return new JudgeExecutionDetail("JUDGE_EVALUATION", 1, row, identity, rowState, invocationState, candidate,
+				truth, comparison, observation, failures, truth == null ? null : truth.label(),
+				new JudgeScorerResult(comparison.match(), comparison.score(), comparison.reasoning()));
+	}
 }

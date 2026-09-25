@@ -13,7 +13,13 @@ import java.util.Map;
  * @param summary aggregate statistics for the current experiment
  */
 public record ComparisonResult(String currentExperimentId, String baselineExperimentId,
-		Map<String, ScoreComparison> scoreComparisons, List<ItemDiff> itemDiffs, ExperimentSummary summary) {
+		Map<String, ScoreComparison> scoreComparisons, List<ItemDiff> itemDiffs, ExperimentSummary summary,
+		String currentCandidateId, String baselineCandidateId, String measureId) {
+
+	public ComparisonResult(String currentExperimentId, String baselineExperimentId,
+			Map<String, ScoreComparison> scoreComparisons, List<ItemDiff> itemDiffs, ExperimentSummary summary) {
+		this(currentExperimentId, baselineExperimentId, scoreComparisons, itemDiffs, summary, null, null, null);
+	}
 
 	public ComparisonResult {
 		java.util.Objects.requireNonNull(currentExperimentId, "currentExperimentId must not be null");

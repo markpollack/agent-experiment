@@ -4,6 +4,7 @@ import java.util.Map;
 
 import io.github.markpollack.experiment.result.ItemCounts;
 import org.jspecify.annotations.Nullable;
+import io.github.markpollack.experiment.recording.ReportingMeasures;
 
 /**
  * Summary statistics for a single experiment run.
@@ -24,8 +25,8 @@ import org.jspecify.annotations.Nullable;
  * @param scoreAggregates per-judge mean score
  */
 public record ExperimentSummary(String experimentId, String experimentName, int totalItems, @Nullable ItemCounts counts,
-		@Nullable Double passRate, double totalCostUsd, int totalTokens, long totalDurationMs,
-		Map<String, Double> scoreAggregates) {
+		@Nullable Double passRate, @Nullable Double totalCostUsd, @Nullable Long totalTokens,
+		@Nullable Long totalDurationMs, Map<String, Double> scoreAggregates, @Nullable ReportingMeasures measures) {
 
 	public ExperimentSummary {
 		java.util.Objects.requireNonNull(experimentId, "experimentId must not be null");
@@ -33,13 +34,24 @@ public record ExperimentSummary(String experimentId, String experimentName, int 
 		scoreAggregates = Map.copyOf(scoreAggregates);
 	}
 
+	public static ExperimentSummary of(io.github.markpollack.experiment.result.ExperimentResult result) {
+		var measures = io.github.markpollack.experiment.recording.ReportingMeasures.of(result);
+		var counts = result.counts();
+		Double rate = counts == null || counts.passRate().isEmpty() ? null : counts.passRate().getAsDouble();
+		if (result.recordingSchemaVersion() != null && !"COMPLETE".equals(result.runState()))
+			rate = null;
+		return new ExperimentSummary(result.experimentId(), result.experimentName(), result.items().size(), counts,
+				rate, result.totalCostUsd(), result.totalTokens(), result.totalDurationMs(), result.aggregateScores(),
+				measures);
+	}
+
 	/** Summarize a run, deriving its rate from what it counted. */
 	public static ExperimentSummary of(String experimentId, String experimentName, int totalItems,
-			@Nullable ItemCounts counts, double totalCostUsd, int totalTokens, long totalDurationMs,
-			Map<String, Double> scoreAggregates) {
+			@Nullable ItemCounts counts, @Nullable Double totalCostUsd, @Nullable Long totalTokens,
+			@Nullable Long totalDurationMs, Map<String, Double> scoreAggregates) {
 		Double rate = counts == null ? null : counts.passRate().isPresent() ? counts.passRate().getAsDouble() : null;
 		return new ExperimentSummary(experimentId, experimentName, totalItems, counts, rate, totalCostUsd, totalTokens,
-				totalDurationMs, scoreAggregates);
+				totalDurationMs, scoreAggregates, null);
 	}
 
 }

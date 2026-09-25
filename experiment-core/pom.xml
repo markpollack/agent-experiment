@@ -79,6 +79,13 @@
             <artifactId>slf4j-api</artifactId>
         </dependency>
 
+        <!-- Adapter fixtures use only a local fake HTTP endpoint. -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>agent-judge-jev</artifactId>
+            <version>${agent-judge.version}</version>
+            <scope>test</scope>
+        </dependency>
         <!-- Test dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

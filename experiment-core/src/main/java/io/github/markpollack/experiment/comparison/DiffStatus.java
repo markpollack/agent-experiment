@@ -18,6 +18,9 @@ public enum DiffStatus {
 	NEW,
 
 	/** Item exists in baseline but not in current. */
-	REMOVED
+	REMOVED,
+
+	/** Neither row supplies a jointly scored comparison. */
+	UNSCORED
 
 }

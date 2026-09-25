@@ -150,7 +150,8 @@ class ReEvaluatorTest {
 		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
 		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(passingJudge()));
 
-		assertThat(reEvaluated.totalCostUsd()).isEqualTo(original.totalCostUsd());
+		assertThat(reEvaluated.totalCostUsd()).isNull();
+		assertThat(reEvaluated.metadata()).containsEntry("originalCostUsd", String.valueOf(original.totalCostUsd()));
 	}
 
 	@Test

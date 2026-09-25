@@ -9,6 +9,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import io.github.markpollack.experiment.judge.JudgeExecutionDetail;
+import io.github.markpollack.experiment.recording.CaseInputIdentity;
+import io.github.markpollack.experiment.recording.RecordingValidation;
 
 import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.result.ItemResult;
@@ -29,6 +32,9 @@ public class DefaultComparisonEngine implements ComparisonEngine {
 
 	@Override
 	public ComparisonResult compare(ExperimentResult current, ExperimentResult baseline) {
+		RecordingValidation.validate(current);
+		RecordingValidation.validate(baseline);
+		validateJudgeComparison(current, baseline);
 		// The conditions mark is load-bearing here or it is decorative everywhere. Two
 		// runs
 		// permitted different amounts of work did not measure the same thing, and two
@@ -57,25 +63,28 @@ public class DefaultComparisonEngine implements ComparisonEngine {
 		for (String itemId : allItemIds) {
 			ItemResult cur = currentByItem.get(itemId);
 			ItemResult base = baselineByItem.get(itemId);
-			itemDiffs.add(computeItemDiff(itemId, cur, base));
+			ItemDiff diff = computeItemDiff(itemId, cur, base);
+			itemDiffs.add(new ItemDiff(diff.itemId(), diff.currentScores(), diff.baselineScores(), diff.scoreDeltas(),
+					diff.status(), cur == null ? null : cur.itemId(), base == null ? null : base.itemId()));
 		}
 
 		Map<String, ScoreComparison> scoreComparisons = new LinkedHashMap<>();
 		for (String scorerName : allScorerNames) {
 			scoreComparisons.put(scorerName,
-					computeScoreComparison(scorerName, itemDiffs, currentByItem, baselineByItem));
+					computeScoreComparison(scorerName, itemDiffs, currentByItem, baselineByItem,
+							current.recordingSchemaVersion() != null || baseline.recordingSchemaVersion() != null));
 		}
 
 		ExperimentSummary summary = summarize(current);
 		return new ComparisonResult(current.experimentId(), baseline.experimentId(), scoreComparisons, itemDiffs,
-				summary);
+				summary, current.judgeRun() == null ? null : current.judgeRun().candidateId(),
+				baseline.judgeRun() == null ? null : baseline.judgeRun().candidateId(),
+				current.judgeRun() == null ? null : current.judgeRun().measureId());
 	}
 
 	@Override
 	public ExperimentSummary summarize(ExperimentResult experiment) {
-		return ExperimentSummary.of(experiment.experimentId(), experiment.experimentName(), experiment.items().size(),
-				experiment.counts(), experiment.totalCostUsd(), experiment.totalTokens(), experiment.totalDurationMs(),
-				experiment.aggregateScores());
+		return ExperimentSummary.of(experiment);
 	}
 
 	@Override
@@ -152,7 +161,10 @@ public class DefaultComparisonEngine implements ComparisonEngine {
 		}
 
 		DiffStatus status;
-		if (anyRegressed) {
+		if (deltas.isEmpty()) {
+			status = DiffStatus.UNSCORED;
+		}
+		else if (anyRegressed) {
 			status = DiffStatus.REGRESSED;
 		}
 		else if (anyImproved) {
@@ -166,7 +178,7 @@ public class DefaultComparisonEngine implements ComparisonEngine {
 	}
 
 	private ScoreComparison computeScoreComparison(String scorerName, List<ItemDiff> itemDiffs,
-			Map<String, ItemResult> currentByItem, Map<String, ItemResult> baselineByItem) {
+			Map<String, ItemResult> currentByItem, Map<String, ItemResult> baselineByItem, boolean currentFormat) {
 		double currentSum = 0;
 		int currentCount = 0;
 		double baselineSum = 0;
@@ -222,18 +234,60 @@ public class DefaultComparisonEngine implements ComparisonEngine {
 			}
 		}
 
-		double currentMean = currentCount > 0 ? currentSum / currentCount : 0.0;
-		double baselineMean = baselineCount > 0 ? baselineSum / baselineCount : 0.0;
-		double delta = currentMean - baselineMean;
+		Double currentMean = currentCount > 0 ? Double.valueOf(currentSum / currentCount)
+				: currentFormat ? null : Double.valueOf(0);
+		Double baselineMean = baselineCount > 0 ? Double.valueOf(baselineSum / baselineCount)
+				: currentFormat ? null : Double.valueOf(0);
+		Double delta = currentMean == null || baselineMean == null ? null : currentMean - baselineMean;
 
 		return new ScoreComparison(scorerName, currentMean, baselineMean, delta, improvements, regressions, unchanged,
 				newItems, removedItems);
 	}
 
+	private static void validateJudgeComparison(ExperimentResult current, ExperimentResult baseline) {
+		boolean a = "JUDGE".equals(current.experimentKind()), b = "JUDGE".equals(baseline.experimentKind());
+		if (!a && !b)
+			return;
+		List<String> reasons = new ArrayList<>();
+		if (!a || !b)
+			reasons.add("INCOMPATIBLE: current Judge measures cannot join legacy/subject series");
+		else {
+			var left = current.judgeRun();
+			var right = baseline.judgeRun();
+			if (!"COMPLETE".equals(current.runState()) || !"COMPLETE".equals(baseline.runState()))
+				reasons.add("INCOMPATIBLE: incomplete runs have only partial diagnostics");
+			if (!left.measureId().equals(right.measureId()) || !left.scorerRevision().equals(right.scorerRevision())
+					|| !left.truthKind().equals(right.truthKind()) || left.replicateCount() != right.replicateCount())
+				reasons.add("INCOMPATIBLE: measure/scorer/truth/replicate declaration differs");
+			Map<String, ItemResult> counterparts = indexById(baseline);
+			for (var entry : indexById(current).entrySet()) {
+				ItemResult other = counterparts.get(entry.getKey());
+				if (other == null)
+					continue;
+				var x = (JudgeExecutionDetail) entry.getValue().executionDetail();
+				var y = (JudgeExecutionDetail) other.executionDetail();
+				String compatibility = CaseInputIdentity.compatibility(x.caseInputIdentity(), y.caseInputIdentity());
+				if (!"MATCH".equals(compatibility))
+					reasons.add(compatibility + ": effective input for rows " + current.experimentId() + "/"
+							+ entry.getValue().itemId() + " and " + baseline.experimentId() + "/" + other.itemId());
+				if (x.truth() == null || y.truth() == null || !x.truth().equals(y.truth()))
+					reasons.add("INCOMPATIBLE: supplied truth differs or is unknown for " + entry.getKey());
+			}
+		}
+		if (!reasons.isEmpty())
+			throw new IncomparableConditionsException(current.experimentId(), baseline.experimentId(), reasons);
+	}
+
 	private static Map<String, ItemResult> indexById(ExperimentResult experiment) {
 		Map<String, ItemResult> index = new LinkedHashMap<>();
 		for (ItemResult item : experiment.items()) {
-			index.put(item.itemId(), item);
+			String key = item.itemId();
+			if ("JUDGE".equals(experiment.experimentKind())) {
+				var row = ((JudgeExecutionDetail) item.executionDetail()).row();
+				key = row.caseId().length() + ":" + row.caseId() + ":" + row.replicateIndex();
+			}
+			if (index.put(key, item) != null)
+				throw new IllegalArgumentException("Duplicate comparison counterpart key");
 		}
 		return index;
 	}

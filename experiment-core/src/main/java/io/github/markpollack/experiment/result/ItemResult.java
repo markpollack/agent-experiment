@@ -6,6 +6,8 @@ import java.util.Map;
 import io.github.markpollack.judge.jury.interpretation.Interpretation;
 import io.github.markpollack.judge.jury.interpretation.Verdicts;
 import org.jspecify.annotations.Nullable;
+import io.github.markpollack.experiment.recording.InterpretationSnapshot;
+import io.github.markpollack.experiment.recording.RuntimeIdentity;
 
 /**
  * Result of evaluating a single dataset item within an experiment.
@@ -35,10 +37,11 @@ import org.jspecify.annotations.Nullable;
  * @param metadata item-level metadata
  * @param workspacePath path to preserved workspace (null when not preserved)
  */
-public record ItemResult(String itemId, String itemSlug, boolean success, @Nullable Boolean passed, double costUsd,
-		int totalTokens, long durationMs, Map<String, Double> scores, Map<String, Object> metrics,
-		@Nullable ExecutionDetail executionDetail, @Nullable RecordedVerdict verdict,
-		@Nullable Interpretation interpretation, Map<String, Object> metadata, @Nullable Path workspacePath) {
+public record ItemResult(String itemId, String itemSlug, boolean success, @Nullable Boolean passed,
+		@Nullable Double costUsd, @Nullable Long totalTokens, @Nullable Long durationMs, Map<String, Double> scores,
+		Map<String, Object> metrics, @Nullable ExecutionDetail executionDetail, @Nullable RecordedVerdict verdict,
+		@Nullable Interpretation interpretation, Map<String, Object> metadata, @Nullable Path workspacePath,
+		@Nullable String verdictRole, @Nullable InterpretationSnapshot interpretationSnapshot, boolean historical) {
 
 	public ItemResult {
 		java.util.Objects.requireNonNull(itemId, "itemId must not be null");
@@ -70,7 +73,10 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 			.verdict(verdict)
 			.interpretation(interpretation)
 			.metadata(metadata)
-			.workspacePath(workspacePath);
+			.workspacePath(workspacePath)
+			.verdictRole(verdictRole)
+			.interpretationSnapshot(interpretationSnapshot)
+			.historical(historical);
 	}
 
 	public static final class Builder {
@@ -83,11 +89,13 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 
 		private @Nullable Boolean passed;
 
-		private double costUsd;
+		private boolean passedSupplied;
 
-		private int totalTokens;
+		private @Nullable Double costUsd;
 
-		private long durationMs;
+		private @Nullable Long totalTokens;
+
+		private @Nullable Long durationMs;
 
 		private Map<String, Double> scores = Map.of();
 
@@ -102,6 +110,12 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 		private Map<String, Object> metadata = Map.of();
 
 		private @Nullable Path workspacePath;
+
+		private @Nullable String verdictRole;
+
+		private @Nullable InterpretationSnapshot interpretationSnapshot;
+
+		private boolean historical;
 
 		private Builder() {
 		}
@@ -127,20 +141,21 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 		 */
 		public Builder passed(@Nullable Boolean passed) {
 			this.passed = passed;
+			this.passedSupplied = true;
 			return this;
 		}
 
-		public Builder costUsd(double costUsd) {
+		public Builder costUsd(@Nullable Double costUsd) {
 			this.costUsd = costUsd;
 			return this;
 		}
 
-		public Builder totalTokens(int totalTokens) {
+		public Builder totalTokens(@Nullable Long totalTokens) {
 			this.totalTokens = totalTokens;
 			return this;
 		}
 
-		public Builder durationMs(long durationMs) {
+		public Builder durationMs(@Nullable Long durationMs) {
 			this.durationMs = durationMs;
 			return this;
 		}
@@ -162,6 +177,7 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 
 		public Builder verdict(@Nullable RecordedVerdict verdict) {
 			this.verdict = verdict;
+			this.interpretationSnapshot = null;
 			return this;
 		}
 
@@ -178,7 +194,7 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 		 */
 		public Builder verdict(io.github.markpollack.judge.jury.Verdict verdict, @Nullable String instrumentHash) {
 			this.verdict = RecordedVerdict.from(verdict, instrumentHash);
-			this.interpretation = Verdicts.interpret(verdict);
+			this.interpretation = Verdicts.interpret(this.verdict.document().producerMap());
 			return this;
 		}
 
@@ -201,9 +217,46 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 			return this;
 		}
 
+		public Builder costUsd(double value) {
+			return costUsd(Double.valueOf(value));
+		}
+
+		public Builder totalTokens(long value) {
+			return totalTokens(Long.valueOf(value));
+		}
+
+		public Builder durationMs(long value) {
+			return durationMs(Long.valueOf(value));
+		}
+
+		public Builder verdictRole(@Nullable String value) {
+			this.verdictRole = value;
+			return this;
+		}
+
+		public Builder interpretationSnapshot(@Nullable InterpretationSnapshot value) {
+			this.interpretationSnapshot = value;
+			return this;
+		}
+
+		public Builder historical(boolean value) {
+			this.historical = value;
+			return this;
+		}
+
 		public ItemResult build() {
+			if (verdict != null && !historical && interpretationSnapshot == null) {
+				interpretationSnapshot = InterpretationSnapshot.capture(verdict.document(), RuntimeIdentity.judge());
+				if (interpretation == null)
+					interpretation = interpretationSnapshot.reading();
+			}
+			if (verdict != null && verdictRole == null && !historical)
+				verdictRole = "SUBJECT";
+			if (!historical && verdict != null && !passedSupplied)
+				passed = io.github.markpollack.experiment.attestation.ItemAccounting.passedFlagCurrent(interpretation);
 			return new ItemResult(itemId, itemSlug, success, passed, costUsd, totalTokens, durationMs, scores, metrics,
-					executionDetail, verdict, interpretation, metadata, workspacePath);
+					executionDetail, verdict, interpretation, metadata, workspacePath, verdictRole,
+					interpretationSnapshot, historical);
 		}
 
 	}

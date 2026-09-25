@@ -78,8 +78,17 @@ public final class ItemAccounting {
 		};
 	}
 
+	/** Current-format counts require a supported producer reading. */
+	public static @Nullable Boolean passedFlagCurrent(@Nullable Interpretation interpretation) {
+		return interpretation == null || interpretation.readingSupport() != ReadingSupport.SUPPORTED ? null
+				: passedFlag(interpretation);
+	}
+
 	/** What this item says about the subject. */
 	public static SubjectOutcome outcomeOf(ItemResult item) {
+		if (!item.historical() && item.verdict() != null && item.interpretation() != null
+				&& item.interpretation().readingSupport() != ReadingSupport.SUPPORTED)
+			return SubjectOutcome.UNATTESTABLE;
 		return outcomeOf(item.interpretation(), item.verdict() == null);
 	}
 
@@ -123,6 +132,10 @@ public final class ItemAccounting {
 	 * the defect this whole record exists to remove.
 	 */
 	public static InstrumentHealth instrumentHealth(ItemResult item) {
+		if (!item.historical()
+				&& item.executionDetail() instanceof io.github.markpollack.experiment.judge.JudgeExecutionDetail detail
+				&& (detail.invocationState().equals("THREW") || detail.invocationState().equals("NULL_RETURN")))
+			return InstrumentHealth.FAILED;
 		if (item.verdict() == null) {
 			return InstrumentHealth.UNKNOWN; // no jury ran; nothing says it was fine
 		}
@@ -133,6 +146,11 @@ public final class ItemAccounting {
 		if (interpretation == null) {
 			return InstrumentHealth.UNKNOWN;
 		}
+		if (!item.historical() && java.util.stream.Stream
+			.concat(java.util.stream.Stream.of(interpretation.root()), interpretation.stages().stream())
+			.flatMap(stage -> stage.judges().stream())
+			.anyMatch(seat -> "CONTAINED_FAILURE".equals(String.valueOf(seat.execution()))))
+			return InstrumentHealth.FAILED;
 		if (anyStageFailedToRun(interpretation)) {
 			return InstrumentHealth.FAILED;
 		}

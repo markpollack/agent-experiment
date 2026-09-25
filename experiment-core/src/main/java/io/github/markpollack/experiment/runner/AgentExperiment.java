@@ -242,8 +242,8 @@ public class AgentExperiment {
 		// Aggregate scores — mean per judge across items
 		Map<String, Double> aggregateScores = aggregateScores(results);
 		ItemCounts counts = ItemAccounting.count(results);
-		double totalCost = results.stream().mapToDouble(ItemResult::costUsd).sum();
-		int totalTokens = results.stream().mapToInt(ItemResult::totalTokens).sum();
+		Double totalCost = io.github.markpollack.experiment.recording.MeasurementTotals.cost(results);
+		Long totalTokens = io.github.markpollack.experiment.recording.MeasurementTotals.tokens(results);
 
 		ExperimentResult experimentResult = ExperimentResult.builder()
 			.experimentId(experimentId)

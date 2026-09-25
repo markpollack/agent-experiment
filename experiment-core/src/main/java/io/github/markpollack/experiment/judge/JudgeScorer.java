@@ -12,6 +12,18 @@ package io.github.markpollack.experiment.judge;
 @FunctionalInterface
 public interface JudgeScorer {
 
+	default String measureId() {
+		return null;
+	}
+
+	default String scorerRevision() {
+		return null;
+	}
+
+	default String truthKind() {
+		return "STATUS_LABEL";
+	}
+
 	/**
 	 * Score the candidate judge's judgment against the expected label.
 	 * @param input the scoring input containing dataset item, actual judgment, and

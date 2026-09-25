@@ -20,18 +20,18 @@ public final class JudgeScorers {
 
 	/** Judge PASS/FAIL must exactly match expected "PASS"/"FAIL" label. */
 	public static JudgeScorer exactVerdictMatch() {
-		return input -> {
+		return identified("status-agreement:v1", "1", "STATUS_LABEL", input -> {
 			// A status is always present, and a dataset may legitimately expect ERROR or
 			// NOT_APPLICABLE, so this comparison is always meaningful.
 			boolean match = input.actual().status().name().equalsIgnoreCase(input.expectedLabel());
 			return new JudgeScorerResult(match, match ? 1.0 : 0.0,
 					"Expected " + input.expectedLabel() + ", got " + input.actual().status());
-		};
+		});
 	}
 
 	/** Judgment label must match expected label (case-insensitive). */
 	public static JudgeScorer exactCategoryMatch() {
-		return input -> {
+		return identified("legacy-category-agreement:v1", "1", "CATEGORY", input -> {
 			if (input.actual().label() == null && !classified(input.actual())) {
 				// No label, and a status that classifies nothing. Comparing the status
 				// name here would invent a disagreement the candidate never expressed.
@@ -43,12 +43,12 @@ public final class JudgeScorers {
 			boolean match = actualCategory.equalsIgnoreCase(input.expectedLabel());
 			return new JudgeScorerResult(match, match ? 1.0 : 0.0,
 					"Expected category '" + input.expectedLabel() + "', got '" + actualCategory + "'");
-		};
+		});
 	}
 
 	/** Normalized measured score must be within tolerance of the expected value. */
 	public static JudgeScorer numericalTolerance(double tolerance) {
-		return input -> {
+		return identified("legacy-normalized-tolerance:v1:" + Double.toHexString(tolerance), "1", "NUMERIC", input -> {
 			double expectedVal;
 			try {
 				expectedVal = Double.parseDouble(input.expectedLabel());
@@ -70,7 +70,34 @@ public final class JudgeScorers {
 			boolean match = delta <= tolerance;
 			return new JudgeScorerResult(match, Math.max(0.0, 1.0 - delta),
 					"Expected " + expectedVal + " ± " + tolerance + ", got " + actualVal);
-		};
+		});
+	}
+
+	/** Native Boolean proposition agreement, distinct from operational acceptance. */
+	public static JudgeScorer propositionMatch() {
+		return identified("proposition-match:v1", "1", "PROPOSITION", input -> {
+			Judgment actual = input.actual();
+			if (!classified(actual) || actual.assessment() == null || actual.assessment().proposition() == null
+					|| actual.assessment().proposition().value() == null)
+				return JudgeScorerResult.unscored("Candidate has no eligible Boolean proposition");
+			if (!"true".equals(input.expectedLabel()) && !"false".equals(input.expectedLabel()))
+				return JudgeScorerResult.unscored("Missing Boolean truth");
+			boolean match = actual.assessment().proposition().value() == Boolean.parseBoolean(input.expectedLabel());
+			return new JudgeScorerResult(match, match ? 1.0 : 0.0, "Native proposition equality");
+		});
+	}
+
+	/** Identify a custom scorer so its results cannot silently join a different rule. */
+	public static JudgeScorer identified(String measure, String revision, String truthKind, JudgeScorer delegate) {
+		return new Identified(measure, revision, truthKind, delegate);
+	}
+
+	private record Identified(String measureId, String scorerRevision, String truthKind,
+			JudgeScorer delegate) implements JudgeScorer {
+		@Override
+		public JudgeScorerResult score(JudgeScoringInput input) {
+			return delegate.score(input);
+		}
 	}
 
 	/** Whether this judgment classified the subject at all. */

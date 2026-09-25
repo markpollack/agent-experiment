@@ -32,6 +32,7 @@ public record RunAttestation(String experimentId, String experimentName, List<It
 	 * instrument the run recorded. Reads only; changes nothing.
 	 */
 	public static RunAttestation of(ExperimentResult result) {
+		io.github.markpollack.experiment.recording.RecordingValidation.validate(result);
 		return new RunAttestation(result.experimentId(), result.experimentName(),
 				result.items().stream().map(item -> ItemAttestation.of(item, result.instrument())).toList());
 	}

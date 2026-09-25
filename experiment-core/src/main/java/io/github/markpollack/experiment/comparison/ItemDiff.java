@@ -12,7 +12,12 @@ import java.util.Map;
  * @param status overall item status
  */
 public record ItemDiff(String itemId, Map<String, Double> currentScores, Map<String, Double> baselineScores,
-		Map<String, Double> scoreDeltas, DiffStatus status) {
+		Map<String, Double> scoreDeltas, DiffStatus status, String currentRowId, String baselineRowId) {
+
+	public ItemDiff(String itemId, Map<String, Double> currentScores, Map<String, Double> baselineScores,
+			Map<String, Double> scoreDeltas, DiffStatus status) {
+		this(itemId, currentScores, baselineScores, scoreDeltas, status, null, null);
+	}
 
 	public ItemDiff {
 		java.util.Objects.requireNonNull(itemId, "itemId must not be null");

@@ -51,9 +51,13 @@ public record ItemAttestation(String itemId, String itemSlug, boolean invocation
 			return new ItemAttestation(item.itemId(), item.itemSlug(), item.success(), null, Attestability.NOT_JUDGED,
 					List.of());
 		}
+
 		List<VoteCount> votes = new ArrayList<>();
 		collect(verdict, "jury", null, rosterFor(verdict, instrument), votes);
-		return new ItemAttestation(item.itemId(), item.itemSlug(), item.success(), verdict.aggregated().status(),
+		return new ItemAttestation(item.itemId(), item.itemSlug(), item.success(),
+				!item.historical() && item.interpretation() != null && item.interpretation()
+					.readingSupport() != io.github.markpollack.judge.jury.interpretation.ReadingSupport.SUPPORTED ? null
+							: verdict.aggregated().status(),
 				classify(votes), votes);
 	}
 
@@ -84,7 +88,7 @@ public record ItemAttestation(String itemId, String itemSlug, boolean invocation
 			.stream()
 			.anyMatch(attempt -> CompositeRelation.CASCADE_TIER.wireName().equals(attempt.relation()));
 		if (!cascade) {
-			into.add(VoteCount.of(scope, relation, verdict.aggregated(), rosterSize(jury)));
+			into.add(VoteCount.of(scope, relation, verdict, rosterSize(jury)));
 		}
 		for (RecordedCompositeAttempt attempt : verdict.compositeAttempts()) {
 			Map<?, ?> child = child(jury, attempt.name());

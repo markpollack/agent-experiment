@@ -107,15 +107,18 @@ class FileSystemSessionStoreTest {
 	}
 
 	@Test
-	void idempotentSaveVariantReplacesEntry() {
+	void saveVariantRefusesArchiveReplacement() {
 		store.createSession("suite-1", "exp", Map.of());
 
 		store.saveVariantToSession("suite-1", "exp", "control", minimalResult("id-1", "exp"));
-		store.saveVariantToSession("suite-1", "exp", "control", minimalResult("id-2", "exp"));
+		org.assertj.core.api.Assertions
+			.assertThatThrownBy(
+					() -> store.saveVariantToSession("suite-1", "exp", "control", minimalResult("id-2", "exp")))
+			.isInstanceOf(ResultStoreException.class);
 
 		RunSession session = store.loadSession("exp", "suite-1").orElseThrow();
 		assertThat(session.variants()).hasSize(1);
-		assertThat(session.variants().get(0).experimentId()).isEqualTo("id-2");
+		assertThat(session.variants().get(0).experimentId()).isEqualTo("id-1");
 	}
 
 	@Test

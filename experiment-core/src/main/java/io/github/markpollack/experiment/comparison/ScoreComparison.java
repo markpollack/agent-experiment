@@ -13,7 +13,8 @@ package io.github.markpollack.experiment.comparison;
  * @param newItems items in current but not baseline
  * @param removedItems items in baseline but not current
  */
-public record ScoreComparison(String scorerName, double currentMean, double baselineMean, double delta,
+public record ScoreComparison(String scorerName, @org.jspecify.annotations.Nullable Double currentMean,
+		@org.jspecify.annotations.Nullable Double baselineMean, @org.jspecify.annotations.Nullable Double delta,
 		int improvements, int regressions, int unchanged, int newItems, int removedItems) {
 
 	public ScoreComparison {

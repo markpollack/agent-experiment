@@ -50,6 +50,13 @@ public class FileSystemResultStore implements ResultStore {
 
 	@Override
 	public void save(ExperimentResult result) {
+		io.github.markpollack.experiment.recording.RecordingValidation.validate(result);
+		if (result.recordingSchemaVersion() == null)
+			throw new ResultStoreException("Historical recordings are read-only; create an explicit derivative",
+					new IllegalArgumentException("H0 write refused"));
+		if (load(result.experimentId()).isPresent())
+			throw new ResultStoreException("Experiment ID already exists: " + result.experimentId(),
+					new java.nio.file.FileAlreadyExistsException(result.experimentId()));
 		Path experimentDir = baseDir.resolve(result.experimentName());
 		Path resultFile = experimentDir.resolve(result.experimentId() + ".json");
 		Path indexFile = experimentDir.resolve(INDEX_FILE);
@@ -61,7 +68,8 @@ public class FileSystemResultStore implements ResultStore {
 			Path tempFile = Files.createTempFile(experimentDir, ".result-", ".tmp");
 			try {
 				objectMapper.writeValue(tempFile.toFile(), result);
-				Files.move(tempFile, resultFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+				Files.createLink(resultFile, tempFile);
+				Files.delete(tempFile);
 			}
 			catch (IOException ex) {
 				Files.deleteIfExists(tempFile);
@@ -69,7 +77,18 @@ public class FileSystemResultStore implements ResultStore {
 			}
 
 			// Update index
-			updateIndex(indexFile, result);
+			try {
+				updateIndex(indexFile, result);
+			}
+			catch (IOException indexFailure) {
+				try {
+					Files.deleteIfExists(resultFile);
+				}
+				catch (IOException cleanup) {
+					indexFailure.addSuppressed(cleanup);
+				}
+				throw indexFailure;
+			}
 
 			logger.debug("Saved result {} to {}", result.experimentId(), resultFile);
 		}
@@ -117,7 +136,7 @@ public class FileSystemResultStore implements ResultStore {
 					results.add(objectMapper.readValue(resultFile.toFile(), ExperimentResult.class));
 				}
 				else {
-					logger.warn("Index references missing file: {}", resultFile);
+					throw new IOException("Index references missing file: " + resultFile);
 				}
 			}
 			results.sort(Comparator.comparing(ExperimentResult::timestamp));
@@ -149,8 +168,7 @@ public class FileSystemResultStore implements ResultStore {
 				.orElseThrow();
 			Path resultFile = experimentDir.resolve(latest.fileName());
 			if (!Files.isRegularFile(resultFile)) {
-				logger.warn("Index references missing file: {}", resultFile);
-				return Optional.empty();
+				throw new IOException("Index references missing file: " + resultFile);
 			}
 			return Optional.of(objectMapper.readValue(resultFile.toFile(), ExperimentResult.class));
 		}

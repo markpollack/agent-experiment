@@ -1,17 +1,27 @@
 package io.github.markpollack.experiment.result;
 
 import io.github.markpollack.judge.result.Check;
+import org.jspecify.annotations.Nullable;
 
-/** Agent Experiment-owned persisted form of a judge check. */
-public record RecordedCheck(String name, boolean passed, String message) {
-
+/** A complete child judgment with an explicitly historical Boolean compatibility view. */
+public record RecordedCheck(String name, @Nullable Boolean passed, String message,
+		@Nullable RecordedJudgment judgment) {
 	public RecordedCheck {
-		java.util.Objects.requireNonNull(name, "name must not be null");
-		java.util.Objects.requireNonNull(message, "message must not be null");
+		java.util.Objects.requireNonNull(name);
+		java.util.Objects.requireNonNull(message);
+	}
+
+	public RecordedCheck(String name, boolean passed, String message) {
+		this(name, passed, message, null);
 	}
 
 	public static RecordedCheck from(Check check) {
-		return new RecordedCheck(check.name(), check.passed(), check.message());
+		Boolean value = switch (check.judgment().status()) {
+			case PASS -> true;
+			case FAIL -> false;
+			default -> null;
+		};
+		return new RecordedCheck(check.id(), value, check.message(), RecordedJudgment.from(check.judgment()));
 	}
 
 	public static RecordedCheck pass(String name, String message) {
@@ -21,5 +31,4 @@ public record RecordedCheck(String name, boolean passed, String message) {
 	public static RecordedCheck fail(String name, String message) {
 		return new RecordedCheck(name, false, message);
 	}
-
 }

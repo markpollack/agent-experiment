@@ -22,7 +22,8 @@ public class InMemorySessionStore implements SessionStore {
 	public RunSession createSession(String sessionName, String experimentName, Map<String, String> metadata) {
 		RunSession session = new RunSession(sessionName, experimentName, Instant.now(), null, RunSessionStatus.RUNNING,
 				List.of(), metadata);
-		sessions.put(key(experimentName, sessionName), session);
+		if (sessions.putIfAbsent(key(experimentName, sessionName), session) != null)
+			throw new ResultStoreException("Session already exists", null);
 		return session;
 	}
 
@@ -35,23 +36,14 @@ public class InMemorySessionStore implements SessionStore {
 			throw new ResultStoreException("Session not found: " + sessionName, null);
 		}
 
-		VariantEntry entry = VariantEntry.of(variantName, result.experimentId(), variantName + ".json", result.counts(),
-				result.items().size(), result.totalCostUsd(), result.totalDurationMs());
-
-		List<VariantEntry> updatedVariants = new ArrayList<>();
-		boolean replaced = false;
-		for (VariantEntry existing : current.variants()) {
-			if (existing.variantName().equals(variantName)) {
-				updatedVariants.add(entry);
-				replaced = true;
-			}
-			else {
-				updatedVariants.add(existing);
-			}
-		}
-		if (!replaced) {
-			updatedVariants.add(entry);
-		}
+		io.github.markpollack.experiment.recording.RecordingValidation.validate(result);
+		if (current.variants()
+			.stream()
+			.anyMatch(v -> v.variantName().equals(variantName) || v.experimentId().equals(result.experimentId())))
+			throw new ResultStoreException("Variant or experiment ID already exists", null);
+		VariantEntry entry = VariantEntry.of(variantName, variantName + ".json", result);
+		List<VariantEntry> updatedVariants = new ArrayList<>(current.variants());
+		updatedVariants.add(entry);
 
 		sessions.put(key, new RunSession(current.sessionName(), current.experimentName(), current.createdAt(),
 				current.completedAt(), current.status(), updatedVariants, current.metadata()));

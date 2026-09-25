@@ -110,7 +110,7 @@ class FileSystemResultStoreTest {
 	}
 
 	@Test
-	void saveOverwritesExistingResult() {
+	void saveRefusesExistingResult() {
 		ExperimentResult original = resultWith("exp-001", "my-experiment", "2026-01-15T10:00:00Z");
 		store.save(original);
 
@@ -124,11 +124,12 @@ class FileSystemResultStoreTest {
 			.metadata(Map.of())
 			.aggregateScores(Map.of())
 			.build();
-		store.save(updated);
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> store.save(updated))
+			.isInstanceOf(ResultStoreException.class);
 
 		Optional<ExperimentResult> loaded = store.load("exp-001");
 		assertThat(loaded).isPresent();
-		assertThat(loaded.get().datasetSemanticVersion()).isEqualTo("2.0.0");
+		assertThat(loaded.get().datasetSemanticVersion()).isEqualTo(original.datasetSemanticVersion());
 
 		// Index should not have duplicate entries after re-save
 		assertThat(store.listByName("my-experiment")).hasSize(1);
