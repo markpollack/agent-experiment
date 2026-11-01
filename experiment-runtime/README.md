@@ -1,8 +1,8 @@
 # Typed agent experiment runtime
 
-`io.github.markpollack:experiment-runtime:0.10.0-fresh-v3-qualification-SNAPSHOT` provides Client acquisition,
+`io.github.markpollack:experiment-runtime` (version declared in its POM) provides Client acquisition,
 Journal final assembly, released Workflow execution and immutable per-item results. It uses
-Workflow 0.14.0 and Judge 0.18.0; Client, SDK and Journal are explicitly unreleased task dependencies.
+Workflow 0.14.0 and Judge 0.18.0; Client, SDK and Journal use explicitly versioned development artifacts.
 Use this module alone for the canonical agent path. The older Experiment modules retain their
 historical APIs and dependencies and are not part of this runtime's closure.
 
