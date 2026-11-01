@@ -18,8 +18,8 @@ import java.util.OptionalDouble;
  * broken instrument, and one number cannot say both.
  *
  * @param passes items the jury passed
- * @param nonPasses items the jury decided against the subject: a failure, an abstention,
- * or a tier that stopped on one judge's rejection
+ * @param nonPasses items the jury decided against the subject: current FAIL conclusions;
+ * original historical readings retain their recorded counting policy
  * @param excluded items that left the denominator: the criteria did not apply, or the
  * instrument could not score them
  * @param instrumentFailures items whose instrument failed, whatever the subject outcome

@@ -101,8 +101,7 @@ public final class RecordingValidation {
 									.document()
 									.value(io.github.markpollack.judge.judgment.Judgment.class)))
 					.node();
-				require(candidate.equals(verdict.path("judgment")) && expectedSingle.equals(verdict),
-						"Candidate and producer single-verdict source differ");
+				require(expectedSingle.equals(verdict), "Candidate and producer single-verdict source differ");
 			}
 			else
 				require(item.verdict() == null, "Verdict without captured candidate");
@@ -131,8 +130,7 @@ public final class RecordingValidation {
 						"Unattempted row has invocation observation");
 				require(detail.observation().invocationId().equals(row.runId() + ":" + row.rowId()),
 						"Observation/row identity mismatch");
-				if (detail.candidateJudgment() != null)
-					JevObservations.validate(detail.candidateJudgment(), detail.observation());
+				JevObservations.validate(detail.candidateJudgment(), detail.observation());
 				observations.add(detail.observation());
 			}
 			else

@@ -74,7 +74,7 @@ public final class JudgeExperiment {
 				declaration.add(RowIdentity.of(runId, item.id(), config.candidateId, replicate));
 		JudgeRunDeclaration declared = new JudgeRunDeclaration(config.candidateId, config.measureId,
 				config.scorerRevision, config.truthKind, config.replicateCount, "scored-comparisons:v1",
-				"candidate-outcome:v1", declaration);
+				"experiment-v6-conclusion:v1", declaration);
 		List<ItemResult> results = new ArrayList<>();
 		for (int index = 0; index < declaration.size(); index++)
 			results.add(unattempted(config.items.get(index / config.replicateCount), declaration.get(index)));
@@ -130,7 +130,7 @@ public final class JudgeExperiment {
 			Map<String, String> metadata = new LinkedHashMap<>(
 					Map.of("experimentType", "judge", "candidateId", config.candidateId, "candidateJudge",
 							config.candidate.getClass().getName(), "scorer", config.scorer.getClass().getName(),
-							"comparisonRule", "scored-comparisons:v1", "countRule", "candidate-outcome:v1"));
+							"comparisonRule", "scored-comparisons:v1", "countRule", "experiment-v6-conclusion:v1"));
 			if (orchestrationFailure != null)
 				metadata.put("orchestratorFailure", ProducerDocument.json(orchestrationFailure));
 			ExperimentResult result = ExperimentResult.builder()
@@ -251,13 +251,16 @@ public final class JudgeExperiment {
 				}
 				phase = "OBSERVATION";
 				InvocationObservation basic = observation;
+				InvocationObservation sourceObservation = observation;
 				try {
 					if (captured != null)
 						observation = JevObservations.extract(captured, observation);
+					sourceObservation = observation;
 					if (config.observationExtractor != null)
 						observation = Objects.requireNonNull(
 								config.observationExtractor.extract(row, captured, List.copyOf(failures), observation),
 								"Observation extractor returned null");
+					JevObservations.validate(captured, observation);
 					if (!observation.invocationId().equals(row.runId() + ":" + row.rowId()))
 						throw new IllegalArgumentException("Observation belongs to another invocation");
 				}
@@ -265,9 +268,7 @@ public final class JudgeExperiment {
 					failures.add(FailureFact.of("OBSERVATION", error));
 					if (error instanceof java.util.concurrent.CancellationException)
 						Thread.currentThread().interrupt();
-					observation = new InvocationObservation(row.runId() + ":" + row.rowId(), config.captureMode,
-							basic.startedAt(), basic.endedAt(), basic.elapsedNanos(), null, null, null, List.of(),
-							List.of());
+					observation = sourceObservation;
 				}
 				if (Thread.currentThread().isInterrupted())
 					throw new java.util.concurrent.CancellationException("Interrupted after invocation");

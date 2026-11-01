@@ -4,7 +4,9 @@ import java.util.List;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.github.markpollack.experiment.result.RecordedJudgment;
 
-/** Extracts the current Jev adapter's validated root usage once, never recursively. */
+/**
+ * Reads each complete native owner once; unsupported protocols retain unknown coverage.
+ */
 public final class JevObservations {
 
 	private JevObservations() {
@@ -33,8 +35,11 @@ public final class JevObservations {
 		var artifacts = new java.util.LinkedHashSet<>(observation.artifacts());
 		for (var owner : owners) {
 			artifacts.addAll(owner.artifacts());
-			if (!"jev-systemone:0.2.0".equals(owner.protocol()))
+			if (!"jev-systemone:0.2.0".equals(owner.protocol())) {
+				usage.add(new UsageObservation(owner.id(), "native:" + owner.protocol(), "unsupported-native-usage:v1",
+						"adapter-request", null, null, "input-plus-output:v1", null, null, null, ownerHash(owner)));
 				continue;
+			}
 			JsonNode nativeUsage = ProducerDocument.parse(ProducerDocument.json(owner.nativeFacts())).path("usage");
 			Long input = integer(nativeUsage.get("inputTokens"));
 			Long output = integer(nativeUsage.get("outputTokens"));
@@ -48,19 +53,9 @@ public final class JevObservations {
 				cost = charge.doubleValue();
 				source = declaredSource;
 			}
-			var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
-				.enable(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
-			var portable = ProducerDocument.parse(ProducerDocument.json(owner));
-			String ownerHash;
-			try {
-				Object map = mapper.convertValue(portable, Object.class);
-				ownerHash = ProducerDocument.hash(mapper.writeValueAsBytes(map));
-			}
-			catch (java.io.IOException failure) {
-				throw new IllegalArgumentException("Cannot retain owner identity", failure);
-			}
+
 			usage.add(new UsageObservation(owner.id(), "typesafe.jev", source, "adapter-request", input, output,
-					"input-plus-output:v1", cost, cost == null ? null : "USD", null, ownerHash));
+					"input-plus-output:v1", cost, cost == null ? null : "USD", null, ownerHash(owner)));
 		}
 		return new InvocationObservation(observation.invocationId(), observation.captureMode(), observation.startedAt(),
 				observation.endedAt(), observation.elapsedNanos(), observation.transportAttempts(),
@@ -70,13 +65,11 @@ public final class JevObservations {
 	/**
 	 * Recompute C2 usage from frozen producer owners before trusting a stored summary.
 	 */
-	public static void validate(RecordedJudgment candidate, InvocationObservation observation) {
-		var expected = extract(candidate, observation).usage();
-		var stored = observation.usage()
-			.stream()
-			.filter(value -> "typesafe.jev".equals(value.providerScope()))
-			.toList();
-		if (!expected.equals(stored))
+	public static void validate(@org.jspecify.annotations.Nullable RecordedJudgment candidate,
+			InvocationObservation observation) {
+		var expected = candidate == null ? List.<UsageObservation>of() : extract(candidate, observation).usage();
+
+		if (!expected.equals(observation.usage()))
 			throw new IllegalArgumentException("Stored Jev usage differs from retained native owner");
 	}
 
@@ -99,6 +92,18 @@ public final class JevObservations {
 				observation.endedAt(), observation.elapsedNanos(), attempts.intValue(),
 				request == null || request.isNull() ? null : request.asText(), elapsed, observation.usage(),
 				observation.artifacts());
+	}
+
+	private static String ownerHash(io.github.markpollack.judge.provenance.Invocation owner) {
+		var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+			.enable(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+		try {
+			return ProducerDocument.hash(mapper.writeValueAsBytes(
+					mapper.convertValue(ProducerDocument.parse(ProducerDocument.json(owner)), Object.class)));
+		}
+		catch (java.io.IOException failure) {
+			throw new IllegalArgumentException("Cannot retain owner identity", failure);
+		}
 	}
 
 	private static Long integer(JsonNode node) {

@@ -133,7 +133,9 @@ class CurrentC2RecordingTest {
 	void unknownProtocolDoesNotAcquireJevMeasurements() {
 		var unsupported = new Invocation("native", "unrecognized:v1", true, "fixture", 1, Map.of("usage", usage(1.0)),
 				List.of());
-		assertThat(JevObservations.extract(RecordedJudgment.from(answer(unsupported)), basic()).usage()).isEmpty();
+		var unknown = JevObservations.extract(RecordedJudgment.from(answer(unsupported)), basic());
+		assertThat(unknown.usage()).hasSize(1);
+		assertThat(MeasurementSummary.of(List.of(unknown)).costUsd().total()).isNull();
 	}
 
 	@Test
@@ -169,7 +171,12 @@ class CurrentC2RecordingTest {
 		var wrong = Requirement.text("other", "v1", "other requirement");
 		var original = answer(nativeOwner).forRequirement(wrong);
 		var refused = Judgment.refuse(original, req, nativeOwner);
-		var retained = JevObservations.extract(RecordedJudgment.from(refused), basic());
+		var refusedResult = run("refused", refused, new AtomicInteger()).experimentResult();
+		var reopened = new FileSystemResultStore(root).load(refusedResult.experimentId()).orElseThrow();
+		var refusedDocument = ((JudgeExecutionDetail) reopened.items().getFirst().executionDetail())
+			.candidateJudgment();
+		assertThat(refusedDocument.document().node().has("refusedReturn")).isTrue();
+		var retained = JevObservations.extract(refusedDocument, basic());
 		assertThat(retained.usage()).hasSize(1);
 		assertThat(MeasurementSummary.of(List.of(retained)).costUsd().total()).isEqualTo(1.75);
 	}
@@ -219,6 +226,127 @@ class CurrentC2RecordingTest {
 		Files.write(file, bytes);
 		assertThat(new FileSystemResultStore(root).load("tamper")).contains(result);
 		assertThat(calls).hasValue(1);
+	}
+
+	@Test
+	void mixedSupportedAndUnknownOwnersPreserveKnownSubtotalAndUnknownWholeTotal() {
+		var known = owner("known", usage(1.25));
+		var unknown = new Invocation("other", "unsupported:v1", true, "other", 1, Map.of("usage", usage(50.0)),
+				List.of());
+		var value = answer(known).withInvocations(List.of(known, unknown));
+		var run = run("mixed-protocol", value, new AtomicInteger()).experimentResult();
+		var reopened = new FileSystemResultStore(root).load(run.experimentId()).orElseThrow();
+		assertThat(reopened.totalCostUsd()).isNull();
+		assertThat(reopened.totalTokens()).isNull();
+		assertThat(reopened.measurements().costUsd().knownSubtotal()).isEqualTo(1.25);
+		assertThat(reopened.measurements().costUsd().unknown()).isEqualTo(1);
+		assertThat(reopened.measurements().tokens().knownSubtotal()).isEqualTo(12L);
+		assertThat(((JudgeExecutionDetail) reopened.items().getFirst().executionDetail()).observation().usage())
+			.hasSize(2);
+	}
+
+	@Test
+	void extraProviderChargeRowsRefuseForKnownAndEmptyNativeOwners() throws Exception {
+		for (boolean known : List.of(false, true)) {
+			String id = "extra-" + known;
+			var result = run(id, known ? answer(owner("real", usage(1.0))) : Judgment.pass("no native owner"),
+					new AtomicInteger())
+				.experimentResult();
+			var detail = (JudgeExecutionDetail) result.items().getFirst().executionDetail();
+			var rows = new ArrayList<>(detail.observation().usage());
+			rows.add(new UsageObservation("plant", "other-provider", "unbound", "adapter-request", 5L, 7L,
+					"input-plus-output:v1", 77.0, "USD", null));
+			var summary = MeasurementSummary.of(List.of(detail.observation().withUsage(rows)));
+			var mapper = RecordingVectorsTest.mapper();
+			ObjectNode wire = (ObjectNode) mapper.valueToTree(result);
+			((ObjectNode) wire.at("/items/0/executionDetail/observation")).set("usage", mapper.valueToTree(rows));
+			((ObjectNode) wire.at("/items/0")).put("costUsd", summary.costUsd().total())
+				.put("totalTokens", summary.tokens().total());
+			wire.put("totalCostUsd", summary.costUsd().total()).put("totalTokens", summary.tokens().total());
+			wire.set("measurements", mapper.valueToTree(summary));
+			Files.writeString(root.resolve("current-c2/" + id + ".json"), wire.toString());
+			var store = new FileSystemResultStore(root);
+			assertThatThrownBy(() -> store.load(id)).hasStackTraceContaining("retained native owner");
+			assertThatThrownBy(() -> store.listByName("current-c2")).hasStackTraceContaining("retained native owner");
+			assertThatThrownBy(() -> store.mostRecent("current-c2")).hasStackTraceContaining("retained native owner");
+			Files.writeString(root.resolve("current-c2/" + id + ".json"), mapper.writeValueAsString(result));
+		}
+	}
+
+	@Test
+	void inconclusiveProducerCasesRemainUnknownAfterStore() {
+		var requirement = Requirement.text("unknown-requirement", "v1", "fixture");
+		var child = Verdict.single("error", Judgment.error("error").forRequirement(requirement))
+			.forRequirement(requirement);
+		var rootVerdict = new Verdict.Builder().judgment(Judgment.abstain("incomplete"))
+			.provenance(new VerdictProvenance(VerdictProvenanceKind.ROSTER, null, null))
+			.roster(List.of(requirement))
+			.declaredCardinality(1)
+			.compositeAttempts(List.of(new CompositeAttempt(requirement.id(), CompositeRelation.ROSTER_ITEM, null,
+					AttemptDisposition.USED, null, child, null)))
+			.build();
+		int i = 0;
+		for (var verdict : List.of(Verdict.single("abstain", Judgment.abstain("unknown")),
+				Verdict.single("error", Judgment.error("error")), rootVerdict)) {
+			var row = ItemResult.builder().itemId("item").itemSlug("item").verdict(verdict).build();
+			var result = ExperimentResult.builder()
+				.experimentId("unknown-" + (i++))
+				.experimentName("unknown")
+				.timestamp(Instant.now())
+				.items(List.of(row))
+				.counts(ItemAccounting.count(List.of(row)))
+				.build();
+			var store = new FileSystemResultStore(root);
+			store.save(result);
+			var reopened = store.load(result.experimentId()).orElseThrow();
+			assertThat(reopened.counts().unattestable()).isEqualTo(1);
+			assertThat(reopened.counts().nonPasses()).isZero();
+			assertThat(reopened.counts().excluded()).isZero();
+			assertThat(ItemAccounting.instrumentHealth(reopened.items().getFirst()))
+				.isEqualTo(InstrumentHealth.UNKNOWN);
+		}
+	}
+
+	@Test
+	void sharedAndConflictingOwnersAcrossActualStoredRowsKeepPopulationAndCoverage() {
+		for (boolean conflict : List.of(false, true)) {
+			String id = "cross-row-" + conflict;
+			var cases = new ArrayList<DatasetItem>();
+			for (int i = 0; i < 2; i++)
+				cases.add(new DatasetItem("case-" + i, "case-" + i, "fixture", "test", "A", false, List.of(), List.of(),
+						"active", root, null, null));
+			var run = JudgeExperiment.builder()
+				.name("cross-row")
+				.runId(id)
+				.candidateId("fixture")
+				.captureMode("FAKE")
+				.items(cases)
+				.candidate(item -> () -> {
+					var facts = usage(1.0);
+					if (conflict && item.id().endsWith("1"))
+						facts.put("otherNativeFact", "changed");
+					return answer(owner("shared", facts));
+				})
+				.caseInputIdentity((item, row) -> new CaseInputIdentity("fixture", item.id(), "v1", null,
+						"effective-case-input:v1"))
+				.truth(item -> JudgeTruth.status("FAIL"))
+				.scorer(JudgeScorers.exactVerdictMatch())
+				.resultStore(new FileSystemResultStore(root))
+				.build()
+				.run();
+			var stored = new FileSystemResultStore(root).load(id).orElseThrow();
+			assertThat(stored.items()).hasSize(2);
+			if (conflict) {
+				assertThat(stored.totalCostUsd()).isNull();
+				assertThat(stored.measurements().costUsd().conflicted()).isEqualTo(1);
+			}
+			else {
+				assertThat(stored.totalCostUsd()).isEqualTo(1.0);
+				assertThat(stored.totalTokens()).isEqualTo(12L);
+				assertThat(stored.measurements().costUsd().measured()).isEqualTo(1);
+			}
+			assertThat(stored.judgeRun().countRule()).isEqualTo("experiment-v6-conclusion:v1");
+		}
 	}
 
 }

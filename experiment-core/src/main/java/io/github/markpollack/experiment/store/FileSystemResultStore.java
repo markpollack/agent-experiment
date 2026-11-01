@@ -24,9 +24,11 @@ import org.slf4j.LoggerFactory;
  * </p>
  *
  * <p>
- * Writes are atomic (temp file + {@link Files#move}) to prevent partial files on crashes.
- * The {@code load(String id)} method scans all subdirectories to find a result by ID
- * without requiring the experiment name.
+ * Result publication uses an exclusive hardlink from a completed temporary file; index
+ * replacement uses {@link Files#move}. One writer owns a store root. Post-publication
+ * index failure retains the immutable result and reports failure; no crash-durable
+ * transaction is promised. The {@code load(String id)} method scans all subdirectories to
+ * find a result by ID without requiring the experiment name.
  * </p>
  */
 public class FileSystemResultStore implements ResultStore {

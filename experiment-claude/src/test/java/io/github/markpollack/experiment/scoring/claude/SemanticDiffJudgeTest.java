@@ -32,6 +32,8 @@ class SemanticDiffJudgeTest {
 
 	private RuntimeException providerFailure;
 
+	private boolean failedResponse;
+
 	private SemanticDiffFixture judge;
 
 	/**
@@ -43,14 +45,15 @@ class SemanticDiffJudgeTest {
 			throw providerFailure;
 		}
 		String output = cannedOutputs.isEmpty() ? "" : cannedOutputs.poll();
-		return new AgentResponse(
-				List.of(new AgentGeneration(output, new AgentGenerationMetadata("SUCCESS", Map.of()))));
+		return new AgentResponse(List.of(new AgentGeneration(output,
+				new AgentGenerationMetadata(failedResponse ? "ERROR" : "SUCCESS", Map.of()))));
 	};
 
 	@BeforeEach
 	void setUp() {
 		cannedOutputs.clear();
 		providerFailure = null;
+		failedResponse = false;
 		judge = new SemanticDiffFixture(SemanticDiffJudgeConfig.defaults(), stubProvider);
 	}
 
@@ -313,6 +316,24 @@ class SemanticDiffJudgeTest {
 
 	private String planWithRoadmap(String roadmap) {
 		return roadmap;
+	}
+
+	@Test
+	void providerFailureCannotBecomePassingCriteriaAndDiagnosticsSurvive() {
+		failedResponse = true;
+		mockStructuredResponses("PASS", "misleading failed response");
+		var result = judge.judge(contextWithMetadata(Map.of("plan", "- [ ] VERIFY: compile")));
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(result.checks()).hasSize(1);
+		assertThat(result.checks().getFirst().judgment().status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(result.checks().getFirst().judgment().metadata()).containsEntry("parserConfidence", 0.0);
+	}
+
+	@Test
+	void proseFallbackConfidenceIsRetainedInActualReturnedCheck() {
+		cannedOutputs.add("After inspection this criterion should PASS.");
+		var result = judge.judge(contextWithMetadata(Map.of("plan", "- [ ] VERIFY: compile")));
+		assertThat(result.checks().getFirst().judgment().metadata()).containsEntry("parserConfidence", 0.5);
 	}
 
 }

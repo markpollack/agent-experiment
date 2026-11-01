@@ -23,8 +23,10 @@ public record ReportingMeasures(String verdictRole, String countRule, @Nullable 
 			return new ReportingMeasures("LEGACY", "legacy-recorded", "legacy-agreement", null, "LEGACY", null, null,
 					null, null, Map.of());
 		if (!"JUDGE".equals(result.experimentKind()))
-			return new ReportingMeasures("SUBJECT", "subject-outcome:v1", null, null, result.runState(), null, null,
-					null, null, Map.of());
+			return new ReportingMeasures("SUBJECT",
+					result.items().stream().anyMatch(io.github.markpollack.experiment.result.ItemResult::historical)
+							? "preserved-historical-outcomes:v1" : "experiment-v6-conclusion:v1",
+					null, null, result.runState(), null, null, null, null, Map.of());
 		var typed = JudgeExperimentResult.from(result);
 		Map<String, Long> reasons = new LinkedHashMap<>();
 		result.items().forEach(item -> {

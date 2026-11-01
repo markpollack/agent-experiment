@@ -11,7 +11,7 @@ public record JudgeRunDeclaration(String candidateId, String measureId, String s
 			if (value == null || value.isBlank())
 				throw new IllegalArgumentException("Run declaration identity required");
 		if (replicateCount < 1 || !"scored-comparisons:v1".equals(comparisonRule)
-				|| !"candidate-outcome:v1".equals(countRule))
+				|| !"experiment-v6-conclusion:v1".equals(countRule))
 			throw new IllegalArgumentException("Unsupported Judge run rules");
 		rows = List.copyOf(rows);
 		if (rows.stream().map(RowIdentity::rowId).distinct().count() != rows.size())

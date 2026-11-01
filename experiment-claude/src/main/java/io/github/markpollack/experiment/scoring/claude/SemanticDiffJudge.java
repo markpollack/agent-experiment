@@ -45,7 +45,8 @@ import io.github.markpollack.judge.judgment.Judgment;
  * produced a score is therefore written into the judgment metadata as {@code judgeModel},
  * because a score is not interpretable without it.
  */
-public class SemanticDiffJudge implements io.github.markpollack.judge.JudgeWithMetadata {
+public class SemanticDiffJudge implements io.github.markpollack.judge.JudgeWithMetadata,
+		io.github.markpollack.judge.description.ConfiguredJudge {
 
 	private static final Logger logger = LoggerFactory.getLogger(SemanticDiffJudge.class);
 
@@ -92,6 +93,12 @@ public class SemanticDiffJudge implements io.github.markpollack.judge.JudgeWithM
 	}
 
 	@Override
+	public Map<String, Object> configuration() {
+		return Map.of("judgeModel", config.model(), "maxCriteria", config.maxCriteriaToEvaluate(), "timeoutMillis",
+				config.timeout().toMillis());
+	}
+
+	@Override
 	public Judgment judge() {
 		if (plan == null)
 			return Judgment.abstain("No plan roadmap supplied");
@@ -123,23 +130,23 @@ public class SemanticDiffJudge implements io.github.markpollack.judge.JudgeWithM
 			}
 		}
 
-		// If ALL criteria failed due to LLM errors, return ERROR judgment
-		if (errorCount == results.size()) {
-			return Judgment.error("All " + results.size() + " criterion evaluations failed due to LLM errors");
-		}
-
 		// Build checks and compute score
 		List<Check> checks = new ArrayList<>();
 		int passed = 0;
 		for (CriterionResult result : results) {
-			if (result.passed()) {
-				checks.add(Check.pass(result.criterion(), result.reasoning()));
+			if (result.passed())
 				passed++;
-			}
-			else {
-				checks.add(Check.fail(result.criterion(), result.reasoning()));
-			}
+			Judgment detail = result.confidence() == 0.0 ? Judgment.error(result.reasoning())
+					: result.passed() ? Judgment.pass(result.reasoning()) : Judgment.fail(result.reasoning());
+			checks.add(new Check(result.criterion(),
+					detail.toBuilder().metadata("parserConfidence", result.confidence()).build()));
 		}
+		if (errorCount == results.size())
+			return Judgment.error("All " + results.size() + " criterion evaluations failed due to LLM errors")
+				.toBuilder()
+				.checks(checks)
+				.metadata("judgeModel", config.model())
+				.build();
 
 		double scoreValue = (double) passed / results.size();
 		String reasoning = String.format("%d/%d criteria passed (%.0f%%)", passed, results.size(), scoreValue * 100);
@@ -180,15 +187,21 @@ public class SemanticDiffJudge implements io.github.markpollack.judge.JudgeWithM
 		AgentOptions options = buildOptions(workspace);
 
 		if (this.agentApi != null) {
-			return AgentClient.create(this.agentApi).run(prompt, options).getResult();
+			return primaryOutput(AgentClient.create(this.agentApi).run(prompt, options));
 		}
 
 		try (ClaudeAgentModel model = ClaudeAgentModel.builder()
 			.workingDirectory(workspace)
 			.timeout(config.timeout())
 			.build()) {
-			return AgentClient.create(model).run(prompt, options).getResult();
+			return primaryOutput(AgentClient.create(model).run(prompt, options));
 		}
+	}
+
+	private static String primaryOutput(io.github.markpollack.agents.client.AgentClientResponse response) {
+		if (!response.isSuccessful())
+			throw new IllegalStateException("Evaluator provider reported failure");
+		return java.util.Objects.toString(response.getResult(), "");
 	}
 
 	/**

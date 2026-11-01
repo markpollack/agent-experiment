@@ -60,7 +60,7 @@ public record ProducerDocument(String sourceKind, String producerJson, String sh
 			throw new IllegalArgumentException("Duplicate consumer association pointer");
 	}
 
-	/** Freeze the producer's ordinary Jackson projection exactly once. */
+	/** Freeze the producer's strict current codec projection exactly once. */
 	public static ProducerDocument from(String kind, Object value) {
 		return text(kind, json(value));
 	}
@@ -101,7 +101,7 @@ public record ProducerDocument(String sourceKind, String producerJson, String sh
 		}
 	}
 
-	/** Serialize with the ordinary producer Jackson configuration. */
+	/** Serialize with the registered producer codec configuration. */
 	public static String json(Object value) {
 		try {
 			return JSON.writeValueAsString(value);

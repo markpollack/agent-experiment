@@ -14,7 +14,7 @@ public record InterpretationSnapshot(String state, String sourceSha256, @Nullabl
 		java.util.Objects.requireNonNull(sourceSha256, "sourceSha256");
 		document = document.deepCopy();
 		if (!document.isObject() && !(state.equals("LEGACY_UNVERIFIED") && document.isNull()))
-			throw new IllegalArgumentException("VerdictAnalysis must be an object");
+			throw new IllegalArgumentException("Conclusion snapshot must be an object");
 		if (state.equals("VERIFIED") && (producerRevision == null || interpreterArtifactSha256 == null))
 			throw new IllegalArgumentException("Verified interpretation needs runtime identity");
 	}
@@ -34,13 +34,13 @@ public record InterpretationSnapshot(String state, String sourceSha256, @Nullabl
 	/** Check the exact source and interpreter before using a current reading. */
 	public void validate(ProducerDocument source, RuntimeIdentity runtime) {
 		if (!sourceSha256.equals(source.sha256()))
-			throw new IllegalArgumentException("VerdictAnalysis source mismatch");
+			throw new IllegalArgumentException("Conclusion snapshot source mismatch");
 		if (state.equals("LEGACY_UNVERIFIED"))
 			return;
 		if (!producerRevision.equals(runtime.revision())
 				|| !interpreterArtifactSha256.equals(runtime.artifacts().get("agent-judge-core"))
 				|| !document.equals(capture(source, runtime).document))
-			throw new IllegalArgumentException("VerdictAnalysis binding or reading mismatch");
+			throw new IllegalArgumentException("Conclusion snapshot binding or reading mismatch");
 	}
 
 	/** Original historical reading or separately versioned current conclusion. */

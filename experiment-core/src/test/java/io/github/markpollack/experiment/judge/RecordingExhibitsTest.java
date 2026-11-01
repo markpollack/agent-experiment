@@ -108,7 +108,23 @@ class RecordingExhibitsTest {
 	}
 
 	JudgeExperiment.Builder measured(JudgeExperiment.Builder b, UsageObservation... usage) {
-		return b.observationExtractor((row, candidate, failures, basic) -> basic.withUsage(List.of(usage)));
+		return b.candidate(item -> () -> {
+			var owners = new ArrayList<io.github.markpollack.judge.provenance.Invocation>();
+			for (var value : usage) {
+				var facts = new LinkedHashMap<String, Object>();
+				if (value.inputTokens() != null)
+					facts.put("inputTokens", value.inputTokens());
+				if (value.outputTokens() != null)
+					facts.put("outputTokens", value.outputTokens());
+				if (value.cost() != null) {
+					facts.put("cost", value.cost());
+					facts.put("currency", value.currency());
+					facts.put("costSource", CurrentC2RecordingTest.COST_SOURCE);
+				}
+				owners.add(CurrentC2RecordingTest.owner(value.observationId(), facts));
+			}
+			return nativeFinding(true, "synthetic native-owner fixture").withInvocations(owners);
+		});
 	}
 
 	ExperimentResult storeSubject(String id, RecordedVerdict verdict) {
@@ -416,28 +432,29 @@ class RecordingExhibitsTest {
 	@Test
 	void E13_scopedUsageDeduplicatesAndConflictsInvalidateTotals() throws Exception {
 		var u = usage("same", 7L, 3L, null, null);
-		var dedup = run(measured(builder("same", ctx -> nativeFinding(true, "ok"), 1), u, u));
-		assertThat(dedup.experimentResult().totalTokens()).isEqualTo(10L);
-		var conflict = run(measured(builder("conflict", ctx -> nativeFinding(true, "ok"), 1), u,
-				usage("same", 9L, 3L, null, null)));
-		assertThat(conflict.experimentResult().totalTokens()).isNull();
-		assertThat(conflict.experimentResult().measurements().tokens().conflicted()).isEqualTo(1);
+		var one = new InvocationObservation("fixture", "FAKE", null, null, null, null, null, null, List.of(u),
+				List.of());
+		assertThat(MeasurementSummary.of(List.of(one, one)).tokens().total()).isEqualTo(10L);
+		var conflicting = one.withUsage(List.of(usage("same", 9L, 3L, null, null)));
+		assertThat(MeasurementSummary.of(List.of(one, conflicting)).tokens().total()).isNull();
+		assertThat(MeasurementSummary.of(List.of(one, conflicting)).tokens().conflicted()).isEqualTo(1);
 	}
 
 	@Test
-	void E14_partialOverflowMixedCurrencyAndUnknownCostHaveNoCompleteTotal() throws Exception {
-		var partial = run(measured(builder("partial", ctx -> nativeFinding(true, "ok"), 1),
-				usage("partial", 7L, null, null, null)));
-		assertThat(partial.experimentResult().totalTokens()).isNull();
-		assertThat(partial.experimentResult().measurements().tokens().knownSubtotal()).isEqualTo(7L);
-		var overflow = run(measured(builder("overflow", ctx -> nativeFinding(true, "ok"), 1),
-				usage("overflow", Long.MAX_VALUE, 1L, null, null)));
-		assertThat(overflow.experimentResult().totalTokens()).isNull();
-		assertThat(overflow.experimentResult().measurements().tokens().knownSubtotal()).isNull();
-		var currency = run(measured(builder("currency", ctx -> nativeFinding(true, "ok"), 1),
-				usage("usd", 1L, 1L, 2.0, "USD"), usage("eur", 1L, 1L, 3.0, "EUR")));
-		assertThat(currency.experimentResult().totalCostUsd()).isNull();
-		assertThat(currency.experimentResult().measurements().costUsd().knownSubtotal()).isEqualTo(2.0);
+	void E14_partialOverflowMixedCurrencyAndUnknownCostHaveNoCompleteTotal() {
+		var base = new InvocationObservation("fixture", "FAKE", null, null, null, null, null, null, List.of(),
+				List.of());
+		var partial = MeasurementSummary.of(List.of(base.withUsage(List.of(usage("partial", 7L, null, null, null)))));
+		assertThat(partial.tokens().total()).isNull();
+		assertThat(partial.tokens().knownSubtotal()).isEqualTo(7L);
+		var overflow = MeasurementSummary
+			.of(List.of(base.withUsage(List.of(usage("overflow", Long.MAX_VALUE, 1L, null, null)))));
+		assertThat(overflow.tokens().total()).isNull();
+		assertThat(overflow.tokens().knownSubtotal()).isNull();
+		var currency = MeasurementSummary
+			.of(List.of(base.withUsage(List.of(usage("usd", 1L, 1L, 2.0, "USD"), usage("eur", 1L, 1L, 3.0, "EUR")))));
+		assertThat(currency.costUsd().total()).isNull();
+		assertThat(currency.costUsd().knownSubtotal()).isEqualTo(2.0);
 	}
 
 	@Test

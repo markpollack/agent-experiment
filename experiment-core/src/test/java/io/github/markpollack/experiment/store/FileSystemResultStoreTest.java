@@ -18,6 +18,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FileSystemResultStoreTest {
 
@@ -210,6 +211,26 @@ class FileSystemResultStoreTest {
 		assertThat(restoredManifest.files().get(0).relativePath()).isEqualTo("spring/boot-migration.md");
 		assertThat(restoredManifest.files().get(0).sizeBytes()).isEqualTo(4096);
 		assertThat(restoredManifest.exclusions()).containsExactly("*.bak");
+	}
+
+	@Test
+	void anotherWriterFailsBeforePublication() throws Exception {
+		Files.createDirectories(tempDir);
+		try (var channel = java.nio.channels.FileChannel.open(tempDir.resolve(".writer.lock"),
+				java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE);
+				var lock = channel.lock()) {
+			assertThatThrownBy(() -> store.save(resultWith("locked", "experiment", "2026-01-01T00:00:00Z")))
+				.hasMessageContaining("one writer");
+		}
+		assertThat(store.load("locked")).isEmpty();
+	}
+
+	@Test
+	void duplicateIdsAcrossExperimentNamesCannotPublishAnotherResult() {
+		store.save(resultWith("shared-id", "first", "2026-01-01T00:00:00Z"));
+		assertThatThrownBy(() -> new FileSystemResultStore(tempDir)
+			.save(resultWith("shared-id", "second", "2026-01-01T00:00:00Z"))).hasMessageContaining("already exists");
+		assertThat(tempDir.resolve("second/shared-id.json")).doesNotExist();
 	}
 
 	private static ExperimentResult resultWith(String id, String name, String timestamp) {

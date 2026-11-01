@@ -129,8 +129,8 @@ public final class InterpretationReExport {
 
 	/**
 	 * A re-export that asks the library what each stored verdict says.
-	 * @return one wired to {@code VerdictAnalysis.interpret} at the library's current
-	 * schema version
+	 * @return one wired to {@code the current producer codec/conclusion} at the library's
+	 * current schema version
 	 */
 	public static InterpretationReExport asking() {
 		ObjectMapper mapper = new ObjectMapper();
