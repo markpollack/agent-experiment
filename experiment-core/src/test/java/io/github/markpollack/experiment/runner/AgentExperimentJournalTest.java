@@ -77,4 +77,29 @@ class AgentExperimentJournalTest {
 			.hasMessageContaining("Legacy phase writer retired");
 	}
 
+	@Test
+	void judgingFactoryFailureKeepsAlreadyReturnedResponseAndUnknownMeasures() {
+		var store = new FileSystemResultStore(root.resolve("results"));
+		var runner = new AgentExperiment(new FileSystemDatasetManager(), input -> {
+			throw new IllegalStateException("fixture judging failure");
+		}, store, config().build());
+		assertThatThrownBy(() -> runner.run(input -> new InvocationResult(true, TerminalStatus.COMPLETED, List.of(), 0,
+				0, 0, 0, 0, 0.0, 1, "provider-session",
+				Map.of("measurementState", "UNKNOWN", "measurementReason", "No qualified usage", "agentResponse",
+						"retained original"),
+				null)))
+			.isInstanceOf(io.github.markpollack.experiment.attestation.InstrumentFailureException.class);
+		var recorded = store.mostRecent("unknown-replies").orElseThrow();
+		assertThat(recorded.items()).isNotEmpty();
+		assertThat(recorded.totalCostUsd()).isNull();
+		assertThat(recorded.totalTokens()).isNull();
+		for (var item : recorded.items()) {
+			assertThat(item.success()).isTrue();
+			assertThat(((InvocationResult) item.executionDetail()).metadata()).containsEntry("agentResponse",
+					"retained original");
+			assertThat(item.metadata())
+				.containsKey(io.github.markpollack.experiment.result.InstrumentRecord.ITEM_INSTRUMENT_FAILURE);
+		}
+	}
+
 }

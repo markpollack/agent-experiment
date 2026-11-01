@@ -59,12 +59,7 @@ public final class ReEvaluator {
 	 */
 	public ExperimentResult reEvaluate(ExperimentResult original,
 			java.util.function.Function<AgentJudgingInput, Jury> jury) {
-		InstrumentRecord instrument = null;
-		List<ItemResult> items = original.items()
-			.stream()
-			.map(item -> InstrumentFailures
-				.mark(reEvaluateItem(item, jury, instrument == null ? null : instrument.specHash()), instrument))
-			.toList();
+		List<ItemResult> items = original.items().stream().map(item -> reEvaluateItem(item, jury)).toList();
 
 		Map<String, Double> aggregateScores = aggregateScores(items);
 
@@ -107,8 +102,7 @@ public final class ReEvaluator {
 		return reEvaluate(original, jury);
 	}
 
-	private ItemResult reEvaluateItem(ItemResult original, java.util.function.Function<AgentJudgingInput, Jury> jury,
-			@Nullable String instrumentHash) {
+	private ItemResult reEvaluateItem(ItemResult original, java.util.function.Function<AgentJudgingInput, Jury> jury) {
 		Optional<AgentJudgingInput> context = contextFactory.create(original);
 
 		if (context.isEmpty()) {
@@ -122,7 +116,7 @@ public final class ReEvaluator {
 		RecordedVerdict recorded = RecordedVerdict.from(verdict, rowInstrument.specHash());
 		JsonNode interpretation = io.github.markpollack.experiment.recording.InterpretationSnapshot
 			.currentReading(recorded.document());
-		return original.toBuilder()
+		ItemResult rescored = original.toBuilder()
 			.passed(ItemAccounting.passedFlag(interpretation))
 			.scores(VerdictExtractor.extractScores(verdict))
 			.verdict(recorded)
@@ -137,6 +131,7 @@ public final class ReEvaluator {
 							"originalCostUsd", String.valueOf(original.costUsd()), "reEvaluationJury",
 							jury.getClass().getSimpleName())))
 			.build();
+		return InstrumentFailures.mark(rescored, rowInstrument);
 	}
 
 	private ItemResult preserveAsSkipped(ItemResult original) {

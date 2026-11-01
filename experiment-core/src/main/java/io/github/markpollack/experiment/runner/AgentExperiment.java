@@ -75,9 +75,6 @@ public class AgentExperiment {
 
 	private final java.util.function.Function<AgentJudgingInput, Jury> juryFactory;
 
-	/** The jury described once, before any vote; stamped on every verdict it produces. */
-	private final InstrumentRecord instrument;
-
 	private final ResultStore resultStore;
 
 	private final @Nullable SessionStore sessionStore;
@@ -107,7 +104,6 @@ public class AgentExperiment {
 			WorkspaceProvisioner workspaceProvisioner) {
 		this.datasetManager = java.util.Objects.requireNonNull(datasetManager, "datasetManager must not be null");
 		this.juryFactory = java.util.Objects.requireNonNull(jury, "jury must not be null");
-		this.instrument = null;
 		this.resultStore = java.util.Objects.requireNonNull(resultStore, "resultStore must not be null");
 		this.sessionStore = sessionStore;
 		this.config = java.util.Objects.requireNonNull(config, "config must not be null");
@@ -262,7 +258,7 @@ public class AgentExperiment {
 			.codeVersion(codeVersion)
 			.codeDirty(codeDirty)
 			.conditions(runConditions(agentInvoker, config))
-			.instrument(commonInstrument(results))
+			.instrument(InstrumentRecorder.common(results))
 			.build();
 
 		resultStore.save(experimentResult);
@@ -290,6 +286,7 @@ public class AgentExperiment {
 			@Nullable ActiveSession activeSession) {
 		long startTime = System.currentTimeMillis();
 		Path workspace = null;
+		InvocationResult observedInvocation = null;
 		try {
 			ResolvedItem resolved = datasetManager.resolve(item);
 			workspace = workspaceProvisioner.provision(resolved);
@@ -306,6 +303,7 @@ public class AgentExperiment {
 				.build();
 
 			InvocationResult invocationResult = invokeWithTimeout(agentInvoker, context);
+			observedInvocation = invocationResult;
 			long durationMs = System.currentTimeMillis() - startTime;
 
 			if (!invocationResult.success()) {
@@ -373,13 +371,21 @@ public class AgentExperiment {
 			return ItemResult.builder()
 				.itemId(item.id())
 				.itemSlug(item.slug())
-				.success(false)
+				.success(observedInvocation != null && observedInvocation.success())
 				.passed(null)
 				.durationMs(durationMs)
 				.scores(Map.of())
-				.metrics(Map.of())
+				.metrics(observedInvocation == null ? Map.of() : buildMetrics(observedInvocation))
+				.executionDetail(observedInvocation)
+				.costUsd(observedInvocation == null
+						|| "UNKNOWN".equals(observedInvocation.metadata().get("measurementState")) ? null
+								: Double.valueOf(observedInvocation.totalCostUsd()))
+				.totalTokens(observedInvocation == null
+						|| "UNKNOWN".equals(observedInvocation.metadata().get("measurementState")) ? null
+								: Long.valueOf(observedInvocation.totalTokens()))
 				.workspacePath(preservedPath)
-				.metadata(Map.of("error", ex.getMessage() != null ? ex.getMessage() : ex.getClass().getName()))
+				.metadata(observedInvocation == null ? Map.of("error", ex.toString())
+						: Map.of("error", ex.toString(), InstrumentRecord.ITEM_INSTRUMENT_FAILURE, "judgingFailure"))
 				.build();
 		}
 		finally {
@@ -487,20 +493,10 @@ public class AgentExperiment {
 		});
 	}
 
-	private static @Nullable InstrumentRecord commonInstrument(List<ItemResult> items) {
-		var records = items.stream()
-			.map(item -> item.metadata().get("configuredInstrument"))
-			.filter(InstrumentRecord.class::isInstance)
-			.map(InstrumentRecord.class::cast)
-			.toList();
-		return records.isEmpty() || records.stream().map(InstrumentRecord::specHash).distinct().count() != 1 ? null
-				: records.getFirst();
-	}
-
 	private static Map<String, Object> buildMetrics(InvocationResult result) {
 		if ("UNKNOWN".equals(result.metadata().get("measurementState")))
 			return Map.of("measurementState", "UNKNOWN", "measurementReason",
-					result.metadata().get("measurementReason"));
+					result.metadata().getOrDefault("measurementReason", "Usage not reported"));
 		return Map.of("input_tokens", result.inputTokens(), "output_tokens", result.outputTokens(), "thinking_tokens",
 				result.thinkingTokens());
 	}
