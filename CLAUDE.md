@@ -16,7 +16,7 @@
 - Agent-specific consumers use `instanceof` pattern matching to cast from `ExecutionDetail`
 - `ItemResult.toBuilder()` enables re-evaluation (modifying stored results without re-running agents)
 
-## Journaling (run-journal lifecycle)
+## Legacy journaling (experiment-core run-journal lifecycle)
 - `AgentExperiment` owns the canonical agent-journal trace: per item it opens one journal `Run` on `JsonFileStorage`, records each returned `PhaseCapture` (auto-emits derived per-step `StepCostEvent`s → `analysis.jsonl`, keyed by tool_use id), and finishes. **Invokers stay dumb** — they only return `PhaseCapture`; never push journaling into invokers.
 - On by default when `outputDir` is set; opt out with `ExperimentConfig.Builder.withoutJournal()`. No `outputDir` → WARN + no-op.
 - Layout (beside the result store output): `<runDir>/journal/experiments/<exp>/runs/<runId>/{run,events,analysis}.jsonl`. The measurement ETL (agent-control-theory) joins on `run.json` `config`: **`variant`** (the arm/per-arm grouping key; `"default"` for non-session runs), `itemId`, `itemSlug`, `model`, `session?` — recoverable from the journal alone (no result-store re-join).
@@ -49,7 +49,7 @@
 
 ## Canonical typed runtime
 - `experiment-runtime` provides the canonical agent path; its focused build is `./mvnw -pl experiment-runtime -am verify`.
-- It consumes released Workflow 0.14.0/Judge 0.18.0 and explicitly versioned Client/SDK/Journal task artifacts.
+- It consumes released Workflow 0.14.0/Judge 0.18.0 and explicitly versioned Client/SDK/Journal development artifacts.
 - Its records and historical raw reader have no retired PhaseCapture dependency. Legacy modules above retain their existing contracts.
 - Client seals acquisition; Experiment calls Journal FinalAssembly once and records distinct acquisition/canonical hashes. Complete usage/cost evidence remains in the canonical sources; unavailable totals are UNKNOWN.
 - Per-item Jury factory runs after typed preparation/measurement; see `experiment-runtime/README.md` and the compiling three-stage consumer test.
