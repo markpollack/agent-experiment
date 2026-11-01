@@ -1,8 +1,8 @@
 package io.github.markpollack.experiment.judge;
 
 /**
- * Scores a candidate judge's {@link io.github.markpollack.judge.result.Judgment} against
- * the expected label from the dataset.
+ * Scores a candidate judge's {@link io.github.markpollack.judge.judgment.Judgment}
+ * against the expected label from the dataset.
  *
  * <p>
  * Built-in implementations use only {@code actual} + {@code expectedLabel}. The

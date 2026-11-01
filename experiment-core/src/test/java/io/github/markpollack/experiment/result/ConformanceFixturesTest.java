@@ -9,11 +9,10 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.jury.interpretation.Interpretation;
-import io.github.markpollack.judge.jury.interpretation.Verdicts;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.verdict.Verdict;
+
 import io.github.markpollack.experiment.attestation.ItemAccounting;
 import io.github.markpollack.experiment.store.FileSystemResultStore;
 import org.junit.jupiter.api.Test;
@@ -148,7 +147,8 @@ class ConformanceFixturesTest {
 			case ERROR -> Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "recorded");
 		};
 		Verdict verdict = Verdict.single("recorded", judgment);
-		Interpretation interpretation = Verdicts.interpret(verdict);
+		VerdictAnalysis interpretation = io.github.markpollack.experiment.recording.InterpretationSnapshot
+			.currentReading(RecordedVerdict.from(verdict).document());
 		// Derived the same way the runner derives it, so the fixture shows what a real
 		// run writes: absent when the jury decided nothing, false only when it decided
 		// against.

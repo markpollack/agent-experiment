@@ -1,7 +1,7 @@
 package io.github.markpollack.experiment.result;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import io.github.markpollack.judge.jury.Seat;
+import io.github.markpollack.judge.verdict.Seat;
 import org.jspecify.annotations.Nullable;
 
 /**

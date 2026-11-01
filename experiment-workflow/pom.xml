@@ -18,6 +18,8 @@
     <description>Workflow-backed AgentInvoker base classes: WorkflowInvoker and WorkflowAgentInvoker</description>
 
     <dependencies>
+        <dependency><groupId>io.github.markpollack</groupId><artifactId>experiment-runtime</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>io.github.markpollack</groupId><artifactId>experiment-agent-client</artifactId><version>${project.version}</version></dependency>
         <!-- Internal -->
         <dependency>
             <groupId>io.github.markpollack</groupId>
@@ -29,16 +31,9 @@
             <groupId>io.github.markpollack</groupId>
             <artifactId>workflow-flows</artifactId>
         </dependency>
-        <dependency>
-            <groupId>io.github.markpollack</groupId>
-            <artifactId>workflow-journal</artifactId>
-        </dependency>
+
 
         <!-- Journal core: Journal, Run, JsonFileStorage -->
-        <dependency>
-            <groupId>io.github.markpollack</groupId>
-            <artifactId>journal-core</artifactId>
-        </dependency>
 
         <!-- Agent client -->
         <dependency>
@@ -54,10 +49,6 @@
         </dependency>
 
         <!-- Phase capture for AbstractTemplateAgentInvoker.AgentResult -->
-        <dependency>
-            <groupId>io.github.markpollack</groupId>
-            <artifactId>claude-code-capture</artifactId>
-        </dependency>
 
         <!-- Null safety -->
         <dependency>

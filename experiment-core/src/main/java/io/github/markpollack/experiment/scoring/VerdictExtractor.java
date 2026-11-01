@@ -3,8 +3,8 @@ package io.github.markpollack.experiment.scoring;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * Extracts per-judge normalized scores from a {@link Verdict}.
@@ -53,7 +53,7 @@ public final class VerdictExtractor {
 	 * @return {@code true} if the aggregated judgment passed
 	 */
 	public static boolean passed(Verdict verdict) {
-		return verdict.aggregated().pass();
+		return verdict.conclusion() == Verdict.Conclusion.PASS;
 	}
 
 }

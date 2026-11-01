@@ -25,7 +25,7 @@ class InterpretationReExportTest {
 	Path dir;
 
 	@Test
-	void addsAnInterpretationAndLeavesTheVerdictExactlyAsItWas() throws Exception {
+	void addsAnVerdictAnalysisAndLeavesTheVerdictExactlyAsItWas() throws Exception {
 		Path file = write("run.json", """
 				{
 				  "runId" : "r1",
@@ -68,7 +68,7 @@ class InterpretationReExportTest {
 	}
 
 	@Test
-	void anInterpretationFromAnOlderSchemaIsReplacedRatherThanLeftToRot() throws Exception {
+	void anVerdictAnalysisFromAnOlderSchemaIsReplacedRatherThanLeftToRot() throws Exception {
 		Path file = write("run.json", oneItemWithVerdict());
 		new InterpretationReExport(reading("REJECTED", 1), 1).run(List.of(file), false);
 

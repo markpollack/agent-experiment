@@ -36,8 +36,6 @@ import io.github.markpollack.experiment.dataset.DatasetItem;
 import io.github.markpollack.experiment.dataset.DatasetManager;
 import io.github.markpollack.experiment.dataset.DatasetVersion;
 import io.github.markpollack.experiment.dataset.ResolvedItem;
-import io.github.markpollack.experiment.journal.ExperimentJournal;
-import io.github.markpollack.experiment.journal.RunJournal;
 import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.result.InstrumentRecord;
 import io.github.markpollack.experiment.result.ItemResult;
@@ -46,21 +44,19 @@ import io.github.markpollack.experiment.result.KnowledgeManifest;
 import io.github.markpollack.experiment.runner.workspace.DefaultWorkspaceProvisioner;
 import io.github.markpollack.experiment.runner.workspace.WorkspaceProvisioner;
 import io.github.markpollack.experiment.scoring.InstrumentRecorder;
-import io.github.markpollack.experiment.scoring.JudgmentContextFactory;
+import io.github.markpollack.experiment.scoring.AgentJudgingInputFactory;
 import io.github.markpollack.experiment.util.GitOperations;
 import io.github.markpollack.experiment.scoring.VerdictExtractor;
 import io.github.markpollack.experiment.store.ActiveSession;
 import io.github.markpollack.experiment.store.ResultStore;
 import io.github.markpollack.experiment.store.SessionStore;
-import io.github.markpollack.journal.claude.PhaseCapture;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.jury.interpretation.Interpretation;
-import io.github.markpollack.judge.jury.interpretation.Verdicts;
+import io.github.markpollack.judge.verdict.Verdict;
+import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * Orchestrates a full agent experiment: load dataset, iterate items, invoke agent, judge
@@ -77,7 +73,7 @@ public class AgentExperiment {
 
 	private final DatasetManager datasetManager;
 
-	private final Jury jury;
+	private final java.util.function.Function<AgentJudgingInput, Jury> juryFactory;
 
 	/** The jury described once, before any vote; stamped on every verdict it produces. */
 	private final InstrumentRecord instrument;
@@ -90,12 +86,13 @@ public class AgentExperiment {
 
 	private final WorkspaceProvisioner workspaceProvisioner;
 
-	public AgentExperiment(DatasetManager datasetManager, Jury jury, ResultStore resultStore, ExperimentConfig config) {
+	public AgentExperiment(DatasetManager datasetManager, java.util.function.Function<AgentJudgingInput, Jury> jury,
+			ResultStore resultStore, ExperimentConfig config) {
 		this(datasetManager, jury, resultStore, null, config);
 	}
 
-	public AgentExperiment(DatasetManager datasetManager, Jury jury, ResultStore resultStore,
-			@Nullable SessionStore sessionStore, ExperimentConfig config) {
+	public AgentExperiment(DatasetManager datasetManager, java.util.function.Function<AgentJudgingInput, Jury> jury,
+			ResultStore resultStore, @Nullable SessionStore sessionStore, ExperimentConfig config) {
 		this(datasetManager, jury, resultStore, sessionStore, config, new DefaultWorkspaceProvisioner());
 	}
 
@@ -105,14 +102,18 @@ public class AgentExperiment {
 	 * to check out a dataset item's {@code beforeRef} from git. The provisioner is closed
 	 * at the end of {@link #run(AgentInvoker, ActiveSession)}.
 	 */
-	public AgentExperiment(DatasetManager datasetManager, Jury jury, ResultStore resultStore,
-			@Nullable SessionStore sessionStore, ExperimentConfig config, WorkspaceProvisioner workspaceProvisioner) {
+	public AgentExperiment(DatasetManager datasetManager, java.util.function.Function<AgentJudgingInput, Jury> jury,
+			ResultStore resultStore, @Nullable SessionStore sessionStore, ExperimentConfig config,
+			WorkspaceProvisioner workspaceProvisioner) {
 		this.datasetManager = java.util.Objects.requireNonNull(datasetManager, "datasetManager must not be null");
-		this.jury = java.util.Objects.requireNonNull(jury, "jury must not be null");
-		this.instrument = InstrumentRecorder.describe(jury);
+		this.juryFactory = java.util.Objects.requireNonNull(jury, "jury must not be null");
+		this.instrument = null;
 		this.resultStore = java.util.Objects.requireNonNull(resultStore, "resultStore must not be null");
 		this.sessionStore = sessionStore;
 		this.config = java.util.Objects.requireNonNull(config, "config must not be null");
+		if (config.shouldJournal())
+			throw new IllegalArgumentException(
+					"Legacy phase writer retired; use experiment-runtime canonical acquisition");
 		this.workspaceProvisioner = java.util.Objects.requireNonNull(workspaceProvisioner,
 				"workspaceProvisioner must not be null");
 	}
@@ -227,11 +228,9 @@ public class AgentExperiment {
 
 		logger.info("Loaded dataset '{}' v{} ({} items)", dataset.name(), version.semanticVersion(), items.size());
 
-		ExperimentJournal experimentJournal = openExperimentJournal(runDir);
-
 		List<ItemResult> results = new ArrayList<>();
 		for (DatasetItem item : items) {
-			ItemResult result = runItem(agentInvoker, item, experimentId, runDir, activeSession, experimentJournal);
+			ItemResult result = runItem(agentInvoker, item, experimentId, runDir, activeSession);
 			results.add(result);
 			logger.info("Item {}: {} (passed={}, cost=${}, tokens={})", item.id(), item.slug(), result.passed(),
 					String.format("%.4f", result.costUsd()), result.totalTokens());
@@ -263,7 +262,7 @@ public class AgentExperiment {
 			.codeVersion(codeVersion)
 			.codeDirty(codeDirty)
 			.conditions(runConditions(agentInvoker, config))
-			.instrument(instrument)
+			.instrument(commonInstrument(results))
 			.build();
 
 		resultStore.save(experimentResult);
@@ -287,58 +286,8 @@ public class AgentExperiment {
 		return experimentResult;
 	}
 
-	/**
-	 * Opens the experiment's run journal. On by default; a durable journal needs a run
-	 * directory (it is written beside the experiment artifacts). When journaling is
-	 * requested but there is no output directory, announce the degradation once
-	 * (fail-loud spirit) and fall back to a no-op.
-	 */
-	private ExperimentJournal openExperimentJournal(@Nullable Path runDir) {
-		if (!config.shouldJournal()) {
-			return ExperimentJournal.disabled(config.experimentName());
-		}
-		if (runDir == null) {
-			logger.warn("Journaling is enabled but no outputDir is configured — the canonical per-step "
-					+ "cost journal (analysis.jsonl) will not be written. Set outputDir, or call "
-					+ "withoutJournal() to silence this.");
-			return ExperimentJournal.disabled(config.experimentName());
-		}
-		return ExperimentJournal.open(ExperimentJournal.journalRoot(runDir), config.experimentName());
-	}
-
-	/**
-	 * Records every {@link PhaseCapture} the invoker returned into a per-item journal
-	 * run. The variant/arm and session labels are carried into the journal's
-	 * {@code run.json} (so per-arm measurement is recoverable from the journal alone); a
-	 * non-session run uses the {@code "default"} variant sentinel. Journal failures are
-	 * logged but never demote an otherwise-good item result — except the slice-1
-	 * fail-loud {@code IllegalStateException} (derived events on non-durable storage),
-	 * which is a configuration bug the caller must see, so it propagates.
-	 */
-	private void journalItem(ExperimentJournal experimentJournal, DatasetItem item, InvocationResult invocationResult,
-			@Nullable ActiveSession activeSession) {
-		if (!experimentJournal.enabled()) {
-			return;
-		}
-		String variant = activeSession != null ? activeSession.variantName() : "default";
-		String session = activeSession != null ? activeSession.sessionName() : null;
-		try (RunJournal journal = experimentJournal.openItem(item.id(), item.slug(), config.model(), variant, session,
-				invocationResult.sessionId())) {
-			for (PhaseCapture phase : invocationResult.phases()) {
-				journal.recordPhase(phase);
-			}
-			journal.finish();
-		}
-		catch (IllegalStateException ex) {
-			throw ex;
-		}
-		catch (RuntimeException ex) {
-			logger.error("Failed to journal run for item {}: {}", item.id(), ex.getMessage(), ex);
-		}
-	}
-
 	ItemResult runItem(AgentInvoker agentInvoker, DatasetItem item, String experimentId, @Nullable Path runDir,
-			@Nullable ActiveSession activeSession, ExperimentJournal experimentJournal) {
+			@Nullable ActiveSession activeSession) {
 		long startTime = System.currentTimeMillis();
 		Path workspace = null;
 		try {
@@ -359,13 +308,6 @@ public class AgentExperiment {
 			InvocationResult invocationResult = invokeWithTimeout(agentInvoker, context);
 			long durationMs = System.currentTimeMillis() - startTime;
 
-			// Own the run-journal lifecycle here — the framework, not the invoker (DESIGN
-			// §4). The
-			// invoker stays dumb (it only returned PhaseCaptures); we open a Run, record
-			// each phase
-			// (auto-emitting per-step StepCostEvents to analysis.jsonl), and finish.
-			journalItem(experimentJournal, item, invocationResult, activeSession);
-
 			if (!invocationResult.success()) {
 				@Nullable Path preservedPath = preserveWorkspace(workspace, experimentId, item.slug(), activeSession);
 				return ItemResult.builder()
@@ -375,8 +317,10 @@ public class AgentExperiment {
 					// The agent did not complete, so no jury ever reached this item. That
 					// is not the subject failing.
 					.passed(null)
-					.costUsd(invocationResult.totalCostUsd())
-					.totalTokens(invocationResult.totalTokens())
+					.costUsd("UNKNOWN".equals(invocationResult.metadata().get("measurementState")) ? null
+							: Double.valueOf(invocationResult.totalCostUsd()))
+					.totalTokens("UNKNOWN".equals(invocationResult.metadata().get("measurementState")) ? null
+							: Long.valueOf(invocationResult.totalTokens()))
 					.durationMs(durationMs)
 					.scores(Map.of())
 					.metrics(buildMetrics(invocationResult))
@@ -388,13 +332,16 @@ public class AgentExperiment {
 
 			// Judge the result
 			@Nullable Path referenceDir = resolved.referenceDir();
-			JudgmentContext judgmentContext = JudgmentContextFactory.create(item, workspace, invocationResult,
+			AgentJudgingInput judgmentContext = AgentJudgingInputFactory.create(item, workspace, invocationResult,
 					referenceDir, resolved.beforeDir(), null, config);
-			Verdict verdict = jury.vote(judgmentContext);
+			Jury configuredJury = java.util.Objects.requireNonNull(juryFactory.apply(judgmentContext));
+			InstrumentRecord rowInstrument = InstrumentRecorder.describe(configuredJury);
+			Verdict verdict = configuredJury.vote();
 
 			Map<String, Double> scores = new LinkedHashMap<>(VerdictExtractor.extractScores(verdict));
-			RecordedVerdict recorded = RecordedVerdict.from(verdict, instrument.specHash());
-			Interpretation interpretation = Verdicts.interpret(verdict);
+			RecordedVerdict recorded = RecordedVerdict.from(verdict, rowInstrument.specHash());
+			JsonNode interpretation = io.github.markpollack.experiment.recording.InterpretationSnapshot
+				.currentReading(RecordedVerdict.from(verdict).document());
 			// Null when the jury decided nothing about the subject, never false.
 			Boolean passed = ItemAccounting.passedFlag(interpretation);
 
@@ -404,8 +351,10 @@ public class AgentExperiment {
 				.itemSlug(item.slug())
 				.success(true)
 				.passed(passed)
-				.costUsd(invocationResult.totalCostUsd())
-				.totalTokens(invocationResult.totalTokens())
+				.costUsd("UNKNOWN".equals(invocationResult.metadata().get("measurementState")) ? null
+						: Double.valueOf(invocationResult.totalCostUsd()))
+				.totalTokens("UNKNOWN".equals(invocationResult.metadata().get("measurementState")) ? null
+						: Long.valueOf(invocationResult.totalTokens()))
 				.durationMs(durationMs)
 				.scores(scores)
 				.metrics(buildMetrics(invocationResult))
@@ -413,8 +362,8 @@ public class AgentExperiment {
 				.verdict(recorded)
 				.interpretation(interpretation)
 				.workspacePath(preservedPath)
-				.metadata(Map.of())
-				.build(), instrument);
+				.metadata(Map.of("configuredInstrument", rowInstrument))
+				.build(), rowInstrument);
 
 		}
 		catch (Exception ex) {
@@ -538,7 +487,20 @@ public class AgentExperiment {
 		});
 	}
 
+	private static @Nullable InstrumentRecord commonInstrument(List<ItemResult> items) {
+		var records = items.stream()
+			.map(item -> item.metadata().get("configuredInstrument"))
+			.filter(InstrumentRecord.class::isInstance)
+			.map(InstrumentRecord.class::cast)
+			.toList();
+		return records.isEmpty() || records.stream().map(InstrumentRecord::specHash).distinct().count() != 1 ? null
+				: records.getFirst();
+	}
+
 	private static Map<String, Object> buildMetrics(InvocationResult result) {
+		if ("UNKNOWN".equals(result.metadata().get("measurementState")))
+			return Map.of("measurementState", "UNKNOWN", "measurementReason",
+					result.metadata().get("measurementReason"));
 		return Map.of("input_tokens", result.inputTokens(), "output_tokens", result.outputTokens(), "thinking_tokens",
 				result.thinkingTokens());
 	}

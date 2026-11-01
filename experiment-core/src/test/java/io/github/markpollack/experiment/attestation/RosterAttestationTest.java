@@ -16,15 +16,15 @@ import io.github.markpollack.experiment.scoring.InstrumentRecorder;
 import io.github.markpollack.experiment.store.FileSystemResultStore;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
 import io.github.markpollack.judge.description.JuryDescription;
 import io.github.markpollack.judge.jury.CascadedJury;
-import io.github.markpollack.judge.jury.ConsensusStrategy;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.TierPolicy;
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.jury.VotingStrategy;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.VotingStrategy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RosterAttestationTest {
 
-	private static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("roster").build();
+	private static final AgentJudgingInput CONTEXT = AgentJudgingInput.builder().goal("roster").build();
 
 	@Test
 	void everyListedJudgeVotedSoTheDenominatorIsAttested() {
@@ -52,7 +52,7 @@ class RosterAttestationTest {
 	void juryThatVotesWithFewerJudgesThanItListsIsCaught() {
 		SimpleJury listed = jury(Judges.alwaysPass("a"), Judges.alwaysPass("b"), Judges.alwaysPass("c"));
 		SimpleJury voting = jury(Judges.alwaysPass("a"), Judges.alwaysPass("b"));
-		Jury silentlyShort = new Jury() {
+		Jury silentlyShort = new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
 			public List<Judge> getJudges() {
 				return listed.getJudges();
@@ -64,8 +64,8 @@ class RosterAttestationTest {
 			}
 
 			@Override
-			public Verdict vote(JudgmentContext context) {
-				return voting.vote(context);
+			public Verdict vote() {
+				return voting.vote();
 			}
 
 			@Override
@@ -175,7 +175,7 @@ class RosterAttestationTest {
 	}
 
 	private static ItemResult scored(String id, Jury jury, InstrumentRecord instrument) {
-		return item(id).success(true).verdict(RecordedVerdict.from(jury.vote(CONTEXT), instrument.specHash())).build();
+		return item(id).success(true).verdict(RecordedVerdict.from(jury.vote(), instrument.specHash())).build();
 	}
 
 	private static ItemResult.Builder item(String id) {

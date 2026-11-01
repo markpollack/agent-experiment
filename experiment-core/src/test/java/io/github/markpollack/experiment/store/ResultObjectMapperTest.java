@@ -17,18 +17,17 @@ import io.github.markpollack.experiment.result.RecordedJudgmentStatus;
 import io.github.markpollack.experiment.result.RecordedVerdict;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.markpollack.judge.jury.interpretation.Verdicts;
-import io.github.markpollack.judge.jury.interpretation.Interpretation;
+
 import org.junit.jupiter.api.Test;
-import io.github.markpollack.judge.jury.CompositeAttempt;
-import io.github.markpollack.judge.jury.CompositeFailure;
-import io.github.markpollack.judge.jury.CompositeFailureCode;
-import io.github.markpollack.judge.jury.CompositeRelation;
+import io.github.markpollack.judge.verdict.CompositeAttempt;
+import io.github.markpollack.judge.verdict.CompositeFailure;
+import io.github.markpollack.judge.verdict.CompositeFailureCode;
+import io.github.markpollack.judge.verdict.CompositeRelation;
 import io.github.markpollack.judge.jury.TierPolicy;
-import io.github.markpollack.judge.jury.Decision;
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.verdict.VerdictProvenance;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -301,7 +300,7 @@ class ResultObjectMapperTest {
 
 	@Test
 	void roundTripsItemResultWithJudgeExecutionDetail() throws Exception {
-		io.github.markpollack.judge.result.Judgment candidateJudgment = Judgment.pass("Passed");
+		io.github.markpollack.judge.judgment.Judgment candidateJudgment = Judgment.pass("Passed");
 		io.github.markpollack.experiment.judge.JudgeScorerResult scorerResult = new io.github.markpollack.experiment.judge.JudgeScorerResult(
 				true, 1.0, "Expected PASS, got PASS");
 		io.github.markpollack.experiment.judge.JudgeExecutionDetail judgeDetail = new io.github.markpollack.experiment.judge.JudgeExecutionDetail(
@@ -432,13 +431,14 @@ class ResultObjectMapperTest {
 	}
 
 	@Test
-	void anItemsInterpretationSurvivesTheRoundTrip() throws Exception {
+	void anItemsVerdictAnalysisSurvivesTheRoundTrip() throws Exception {
 		// The reading is what every consumer now counts from. If it were silently dropped
 		// on the way back in, every item would read as unattestable and the run would
 		// look
 		// unmeasured rather than broken.
 		Verdict verdict = Verdict.single("gate", Judgment.fail("no bounded contexts"));
-		Interpretation interpretation = Verdicts.interpret(verdict);
+		VerdictAnalysis interpretation = io.github.markpollack.experiment.recording.InterpretationSnapshot
+			.currentReading(RecordedVerdict.from(verdict).document());
 		ItemResult item = ItemResult.builder()
 			.itemId("a")
 			.itemSlug("a")

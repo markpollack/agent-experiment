@@ -10,10 +10,9 @@ import io.github.markpollack.experiment.recording.*;
 import io.github.markpollack.experiment.store.ResultStore;
 import io.github.markpollack.experiment.attestation.ItemAccounting;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.jury.interpretation.ReadingSupport;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.verdict.Verdict;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -27,7 +26,7 @@ public final class JudgeExperiment {
 		Objects.requireNonNull(builder.name, "name");
 		Objects.requireNonNull(builder.candidate, "candidate");
 		Objects.requireNonNull(builder.items, "items");
-		Objects.requireNonNull(builder.input, "input");
+
 		Objects.requireNonNull(builder.scorer, "scorer");
 		Objects.requireNonNull(builder.resultStore, "resultStore");
 		if (builder.truth == null && builder.expected == null)
@@ -207,17 +206,20 @@ public final class JudgeExperiment {
 
 		private ItemResult run() {
 			try {
-				JudgmentContext context = Objects.requireNonNull(config.input.apply(item),
-						"Input supplier returned null");
+
+				Judge configuredCandidate = Objects.requireNonNull(config.candidate.apply(item),
+						"Configured candidate factory returned null");
 				if (config.identity != null)
-					identity = config.identity.apply(context, row);
+					identity = config.identity.apply(item, row);
 				if (Thread.currentThread().isInterrupted())
 					throw new java.util.concurrent.CancellationException("Interrupted before invocation");
 				phase = "INVOCATION";
 				Instant started = Instant.now();
 				long before = System.nanoTime();
 				try {
-					actual = config.candidate.judge(context);
+					actual = Objects
+						.requireNonNull(config.candidate.apply(item), "Configured candidate factory returned null")
+						.judge();
 					invocation = actual == null ? "NULL_RETURN" : "RETURNED";
 				}
 				catch (RuntimeException error) {
@@ -279,14 +281,17 @@ public final class JudgeExperiment {
 						comparison = unscored(captured, truth, invalid, "Supplied truth is absent or incompatible");
 					else {
 						phase = "SCORING";
-						var reading = io.github.markpollack.judge.jury.interpretation.Verdicts
-							.interpret(verdict.document().producerMap());
-						if (reading.readingSupport() != ReadingSupport.SUPPORTED)
+						if (!verdict.document()
+							.value(Verdict.class)
+							.requireUsable()
+							.conclusion()
+							.equals(Verdict.Conclusion.PASS) && !config.truthKind.equals("STATUS_LABEL")
+								&& actual.status() == io.github.markpollack.judge.judgment.JudgmentStatus.ERROR)
 							comparison = unscored(captured, truth, "UNSUPPORTED_CANDIDATE",
-									"Candidate has no supported reading");
+									"Candidate has no supported subject conclusion");
 						else if (!config.truthKind.equals("STATUS_LABEL")
-								&& actual.status() != io.github.markpollack.judge.result.JudgmentStatus.PASS
-								&& actual.status() != io.github.markpollack.judge.result.JudgmentStatus.FAIL)
+								&& actual.status() != io.github.markpollack.judge.judgment.JudgmentStatus.PASS
+								&& actual.status() != io.github.markpollack.judge.judgment.JudgmentStatus.FAIL)
 							comparison = unscored(captured, truth, unscoredCandidateReason(actual),
 									"Candidate is not eligible for semantic comparison");
 						else {
@@ -382,10 +387,6 @@ public final class JudgeExperiment {
 	}
 
 	private String unscoredCandidateReason(Judgment actual) {
-		if (actual.policyApplication() instanceof io.github.markpollack.judge.result.PolicyFailure)
-			return "POLICY_FAILED";
-		if (actual.policyApplication() != null && actual.status() != actual.producerStatus())
-			return "WITHHELD_ASSESSMENT";
 		return switch (actual.status()) {
 			case ABSTAIN -> "ABSTAINED";
 			case NOT_APPLICABLE -> "NOT_APPLICABLE";
@@ -424,13 +425,11 @@ public final class JudgeExperiment {
 
 		private String captureMode;
 
-		private Judge candidate;
+		private Function<DatasetItem, Judge> candidate;
 
 		private List<DatasetItem> items;
 
 		private int replicateCount = 1;
-
-		private Function<DatasetItem, JudgmentContext> input;
 
 		private Function<DatasetItem, String> expected;
 
@@ -440,7 +439,7 @@ public final class JudgeExperiment {
 
 		private ResultStore resultStore;
 
-		private BiFunction<JudgmentContext, RowIdentity, CaseInputIdentity> identity;
+		private BiFunction<DatasetItem, RowIdentity, CaseInputIdentity> identity;
 
 		private ObservationExtractor observationExtractor;
 
@@ -465,7 +464,7 @@ public final class JudgeExperiment {
 			b.candidate = candidate;
 			b.items = items;
 			b.replicateCount = replicateCount;
-			b.input = input;
+
 			b.expected = expected;
 			b.truth = truth;
 			b.scorer = scorer;
@@ -482,7 +481,7 @@ public final class JudgeExperiment {
 			return this;
 		}
 
-		public Builder candidate(Judge v) {
+		public Builder candidate(Function<DatasetItem, Judge> v) {
 			candidate = v;
 			return this;
 		}
@@ -499,11 +498,6 @@ public final class JudgeExperiment {
 
 		public Builder datasetVersion(String v) {
 			datasetVersion = v;
-			return this;
-		}
-
-		public Builder input(Function<DatasetItem, JudgmentContext> v) {
-			input = v;
 			return this;
 		}
 
@@ -557,7 +551,7 @@ public final class JudgeExperiment {
 			return this;
 		}
 
-		public Builder caseInputIdentity(BiFunction<JudgmentContext, RowIdentity, CaseInputIdentity> v) {
+		public Builder caseInputIdentity(BiFunction<DatasetItem, RowIdentity, CaseInputIdentity> v) {
 			identity = v;
 			return this;
 		}

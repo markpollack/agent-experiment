@@ -101,15 +101,14 @@ final class RawSessionArchive {
 		manifest.put("schema", 1);
 		manifest.put("captured_at", Instant.now().toString());
 		manifest.put("provider", "claude-code");
-		manifest.put("provider_session_id",
-				providerSessionId != null ? providerSessionId : ExperimentJournal.NO_PROVIDER_SESSION);
+		manifest.put("provider_session_id", providerSessionId != null ? providerSessionId : "none");
 
 		List<Map<String, Object>> files = new ArrayList<>();
 		try {
 			Path rawDir = runArtifactDir.resolve(RAW_DIR);
 			Files.createDirectories(rawDir);
 
-			if (providerSessionId == null || ExperimentJournal.NO_PROVIDER_SESSION.equals(providerSessionId)) {
+			if (providerSessionId == null || "none".equals(providerSessionId)) {
 				manifest.put("archived", false);
 				manifest.put("reason", "the provider returned no session id, so there is nothing to resolve");
 			}

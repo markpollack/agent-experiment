@@ -8,15 +8,14 @@ import io.github.markpollack.experiment.agent.TerminalStatus;
 import io.github.markpollack.experiment.dataset.DatasetItem;
 import io.github.markpollack.experiment.runner.ExperimentConfig;
 import org.jspecify.annotations.Nullable;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
 
 /**
- * Factory for creating {@link JudgmentContext} instances from experiment-driver types.
+ * Factory for creating {@link AgentJudgingInput} instances from experiment-driver types.
  *
  * <p>
  * Maps experiment-driver domain objects ({@link DatasetItem}, {@link InvocationResult})
- * to agent-judge-core's {@link JudgmentContext} for jury evaluation. The
+ * to agent-judge-core's {@link AgentJudgingInput} for jury evaluation. The
  * {@code expectedDir} metadata key is set to the reference directory path, which
  * {@code FileComparisonJudge} uses for semantic file comparison.
  *
@@ -26,27 +25,27 @@ import io.github.markpollack.judge.context.JudgmentContext;
  * configuration metadata. All enrichment parameters are nullable — missing data is simply
  * omitted from the context metadata.
  */
-public final class JudgmentContextFactory {
+public final class AgentJudgingInputFactory {
 
-	private JudgmentContextFactory() {
+	private AgentJudgingInputFactory() {
 	}
 
 	/**
-	 * Create a {@link JudgmentContext} from experiment-driver types.
+	 * Create a {@link AgentJudgingInput} from experiment-driver types.
 	 * @param item the dataset item being evaluated
 	 * @param workspace the workspace directory where the agent operated
 	 * @param invocationResult the result of the agent invocation
 	 * @param referenceDir the reference directory for expected output comparison, or
 	 * {@code null} if no physical reference directory is available
-	 * @return a fully populated JudgmentContext
+	 * @return a fully populated AgentJudgingInput
 	 */
-	public static JudgmentContext create(DatasetItem item, Path workspace, InvocationResult invocationResult,
+	public static AgentJudgingInput create(DatasetItem item, Path workspace, InvocationResult invocationResult,
 			@Nullable Path referenceDir) {
 		return create(item, workspace, invocationResult, referenceDir, null, null, null);
 	}
 
 	/**
-	 * Create an enriched {@link JudgmentContext} with additional judging metadata.
+	 * Create an enriched {@link AgentJudgingInput} with additional judging metadata.
 	 *
 	 * <p>
 	 * Populates metadata keys used by tiered jury judges:
@@ -66,12 +65,12 @@ public final class JudgmentContextFactory {
 	 * (nullable)
 	 * @param planRoadmap roadmap markdown describing the intended work (nullable)
 	 * @param config the experiment configuration (nullable)
-	 * @return a fully populated JudgmentContext with enrichment metadata
+	 * @return a fully populated AgentJudgingInput with enrichment metadata
 	 */
-	public static JudgmentContext create(DatasetItem item, Path workspace, InvocationResult invocationResult,
+	public static AgentJudgingInput create(DatasetItem item, Path workspace, InvocationResult invocationResult,
 			@Nullable Path referenceDir, @Nullable Path beforeDir, @Nullable String planRoadmap,
 			@Nullable ExperimentConfig config) {
-		JudgmentContext.Builder builder = JudgmentContext.builder()
+		AgentJudgingInput.Builder builder = AgentJudgingInput.builder()
 			.goal(item.developerTask())
 			.workspace(workspace)
 			.executionTime(Duration.ofMillis(invocationResult.durationMs()))
@@ -90,7 +89,7 @@ public final class JudgmentContextFactory {
 			enrichFromConfig(builder, config);
 		}
 
-		// Forward invoker metadata (e.g. coverage metrics) into JudgmentContext
+		// Forward invoker metadata (e.g. coverage metrics) into AgentJudgingInput
 		if (invocationResult.metadata() != null) {
 			for (var entry : invocationResult.metadata().entrySet()) {
 				builder.metadata(entry.getKey(), entry.getValue());
@@ -102,35 +101,24 @@ public final class JudgmentContextFactory {
 
 	/**
 	 * Map experiment-driver {@link TerminalStatus} to agent-judge-core
-	 * {@link ExecutionStatus}.
+	 * {@link TerminalStatus}.
 	 * @param status the terminal status from the agent invocation
 	 * @return the corresponding execution status
 	 */
-	static ExecutionStatus mapStatus(TerminalStatus status) {
+	static TerminalStatus mapStatus(TerminalStatus status) {
 		return switch (status) {
-			case COMPLETED -> ExecutionStatus.SUCCESS;
-			case TIMEOUT -> ExecutionStatus.TIMEOUT;
+			case COMPLETED -> TerminalStatus.COMPLETED;
+			case TIMEOUT -> TerminalStatus.TIMEOUT;
 			// A ceiling cut the agent off. Closer to a timeout than a failure: the agent
 			// did not
 			// fail at the task, it was not permitted to finish it.
-			case MAX_TURNS -> ExecutionStatus.TIMEOUT;
-			case ERROR -> ExecutionStatus.FAILED;
+			case MAX_TURNS -> TerminalStatus.TIMEOUT;
+			case ERROR -> TerminalStatus.ERROR;
 		};
 	}
 
-	private static void enrichFromConfig(JudgmentContext.Builder builder, ExperimentConfig config) {
-		String targetBootVersion = config.metadata().get("targetBootVersion");
-		if (targetBootVersion != null) {
-			builder.metadata("targetBootVersion", targetBootVersion);
-		}
-		String targetJavaVersion = config.metadata().get("targetJavaVersion");
-		if (targetJavaVersion != null) {
-			builder.metadata("targetJavaVersion", targetJavaVersion);
-		}
-		String targetClassVersion = config.metadata().get("targetClassVersion");
-		if (targetClassVersion != null) {
-			builder.metadata("targetClassVersion", Integer.parseInt(targetClassVersion));
-		}
+	private static void enrichFromConfig(AgentJudgingInput.Builder builder, ExperimentConfig config) {
+		config.metadata().forEach(builder::metadata);
 	}
 
 }

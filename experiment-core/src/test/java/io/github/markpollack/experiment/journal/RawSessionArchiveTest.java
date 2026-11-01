@@ -10,8 +10,6 @@ import java.util.stream.Stream;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.markpollack.journal.claude.PhaseCapture;
-import io.github.markpollack.journal.claude.ToolUseRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -114,23 +112,6 @@ class RawSessionArchiveTest {
 	 * End to end through the journal: a real run leaves a real archive beside its
 	 * run.json.
 	 */
-	@Test
-	void aJournalledRunArchivesItsTranscriptBesideRunJson(@TempDir Path root) throws Exception {
-		Path fixtures = transcriptFixture(root, SESSION);
-		Path journalRoot = ExperimentJournal.journalRoot(root.resolve("artifacts"));
-		ExperimentJournal journal = ExperimentJournal.open(journalRoot, "raw-exp").withRawSearchRoot(fixtures);
-
-		try (RunJournal run = journal.openItem("ITEM-1", "item-1", "sonnet", "arm-a", "sweep-1", SESSION)) {
-			run.recordPhase(phase());
-			run.finish();
-		}
-
-		Path runJson = onlyFile(journalRoot, "run.json");
-		Path manifest = runJson.getParent().resolve("raw/MANIFEST.json");
-		assertThat(manifest).as("raw/ must land beside run.json, per (run_id, item_id)").exists();
-		assertThat(new ObjectMapper().readTree(manifest.toFile()).get("archived").asBoolean()).isTrue();
-	}
-
 	private static Path transcriptFixture(Path root, String sessionId) throws Exception {
 		Path dir = Files.createDirectories(root.resolve("claude-projects").resolve("proj-a"));
 		Files.writeString(dir.resolve(sessionId + ".jsonl"), """
@@ -161,11 +142,6 @@ class RawSessionArchiveTest {
 			assertThat(f).hasSize(1);
 			return f.get(0);
 		}
-	}
-
-	private static PhaseCapture phase() {
-		return new PhaseCapture("explore", "task", 1000, 200, 0, 0, 0, 1500L, 1200L, 0.02, SESSION, 1, false, "done",
-				List.of(), List.of(new ToolUseRecord("t1", "Read", Map.of())), "raw", List.of(), List.of(), List.of());
 	}
 
 }

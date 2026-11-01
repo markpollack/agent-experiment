@@ -6,8 +6,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.github.markpollack.judge.jury.interpretation.Interpretation;
-import io.github.markpollack.judge.jury.interpretation.Verdicts;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -32,9 +30,15 @@ final class StoredVerdictInterpreter implements InterpretationReExport.VerdictIn
 
 	@Override
 	public @Nullable ObjectNode interpret(JsonNode storedVerdict) {
-		Map<String, Object> stored = this.mapper.convertValue(storedVerdict, MAP);
-		Interpretation interpretation = Verdicts.interpret(stored);
-		return this.mapper.valueToTree(interpretation);
+		try {
+			var source = io.github.markpollack.experiment.recording.ProducerDocument.text("VERDICT",
+					storedVerdict.toString());
+			return (ObjectNode) io.github.markpollack.experiment.recording.InterpretationSnapshot
+				.currentReading(source);
+		}
+		catch (IllegalArgumentException unsupported) {
+			return null;
+		}
 	}
 
 }

@@ -2,7 +2,7 @@ package io.github.markpollack.experiment.result;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import org.jspecify.annotations.Nullable;
-import io.github.markpollack.judge.jury.CompositeAttempt;
+import io.github.markpollack.judge.verdict.CompositeAttempt;
 
 /**
  * Agent Experiment-owned persisted form of a composite jury attempt.
@@ -42,7 +42,7 @@ public record RecordedCompositeAttempt(String name, String relation, @Nullable S
 
 	public static RecordedCompositeAttempt from(CompositeAttempt attempt) {
 		return new RecordedCompositeAttempt(attempt.name(), attempt.relation().wireName(),
-				attempt.policy() != null ? attempt.policy().wireName() : null,
+				attempt.routingRule() != null ? attempt.routingRule().wireName() : null,
 				attempt.disposition() != null ? attempt.disposition().wireName() : null,
 				attempt.dispositionReason() != null ? attempt.dispositionReason().wireName() : null,
 				attempt.verdict() != null ? RecordedVerdict.from(attempt.verdict()) : null,

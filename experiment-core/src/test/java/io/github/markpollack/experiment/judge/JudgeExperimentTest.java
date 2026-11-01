@@ -9,8 +9,8 @@ import io.github.markpollack.experiment.dataset.DatasetItem;
 import io.github.markpollack.experiment.result.ExperimentResult;
 import io.github.markpollack.experiment.store.InMemoryResultStore;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
+import io.github.markpollack.judge.judgment.Judgment;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -41,9 +41,8 @@ class JudgeExperimentTest {
 			.caseInputIdentity((context, row) -> new io.github.markpollack.experiment.recording.CaseInputIdentity(
 					"fixture", row.caseId(), "1", null, "effective-case-input:v1"))
 			.name("test-judge-experiment")
-			.candidate(alwaysPassJudge())
+			.candidate(item -> alwaysPassJudge())
 			.items(testItems)
-			.input(item -> JudgmentContext.builder().goal(item.developerTask()).build())
 			.expected(item -> "PASS")
 			.scorer(JudgeScorers.exactVerdictMatch())
 			.resultStore(resultStore)
@@ -63,9 +62,8 @@ class JudgeExperimentTest {
 			.caseInputIdentity((context, row) -> new io.github.markpollack.experiment.recording.CaseInputIdentity(
 					"fixture", row.caseId(), "1", null, "effective-case-input:v1"))
 			.name("mismatch-experiment")
-			.candidate(alwaysPassJudge())
+			.candidate(item -> alwaysPassJudge())
 			.items(testItems)
-			.input(item -> JudgmentContext.builder().goal(item.developerTask()).build())
 			.expected(item -> item.id().equals("pos-1") ? "PASS" : "FAIL")
 			.scorer(JudgeScorers.exactVerdictMatch())
 			.resultStore(resultStore)
@@ -116,9 +114,8 @@ class JudgeExperimentTest {
 			.caseInputIdentity((context, row) -> new io.github.markpollack.experiment.recording.CaseInputIdentity(
 					"fixture", row.caseId(), "1", null, "effective-case-input:v1"))
 			.name("compare-experiment")
-			.candidate(alwaysPassJudge())
+			.candidate(item -> alwaysPassJudge())
 			.items(testItems)
-			.input(item -> JudgmentContext.builder().goal(item.developerTask()).build())
 			.expected(item -> "PASS")
 			.scorer(JudgeScorers.exactVerdictMatch())
 			.resultStore(resultStore)
@@ -131,9 +128,8 @@ class JudgeExperimentTest {
 			.caseInputIdentity((context, row) -> new io.github.markpollack.experiment.recording.CaseInputIdentity(
 					"fixture", row.caseId(), "1", null, "effective-case-input:v1"))
 			.name("compare-experiment")
-			.candidate(alwaysFailJudge())
+			.candidate(item -> alwaysFailJudge())
 			.items(testItems)
-			.input(item -> JudgmentContext.builder().goal(item.developerTask()).build())
 			.expected(item -> "PASS")
 			.scorer(JudgeScorers.exactVerdictMatch())
 			.resultStore(resultStore)
@@ -157,9 +153,8 @@ class JudgeExperimentTest {
 			.caseInputIdentity((context, row) -> new io.github.markpollack.experiment.recording.CaseInputIdentity(
 					"fixture", row.caseId(), "1", null, "effective-case-input:v1"))
 			.name("default-experiment")
-			.candidate(alwaysPassJudge())
+			.candidate(item -> alwaysPassJudge())
 			.items(testItems)
-			.input(item -> JudgmentContext.builder().goal(item.developerTask()).build())
 			.expected(item -> "PASS")
 			.scorer(JudgeScorers.exactVerdictMatch())
 			.resultStore(resultStore)
@@ -168,11 +163,11 @@ class JudgeExperimentTest {
 	}
 
 	private static Judge alwaysPassJudge() {
-		return ctx -> Judgment.pass("Passed");
+		return () -> Judgment.pass("Passed");
 	}
 
 	private static Judge alwaysFailJudge() {
-		return ctx -> Judgment.fail("Failed");
+		return () -> Judgment.fail("Failed");
 	}
 
 }

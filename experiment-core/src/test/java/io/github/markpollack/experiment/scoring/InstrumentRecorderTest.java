@@ -7,13 +7,13 @@ import java.util.Map;
 import io.github.markpollack.experiment.result.InstrumentRecord;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
 import io.github.markpollack.judge.description.JuryDescription;
-import io.github.markpollack.judge.jury.ConsensusStrategy;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.jury.VotingStrategy;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.VotingStrategy;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,7 +61,7 @@ class InstrumentRecorderTest {
 
 	@Test
 	void juryThatCannotBeDescribedIsRecordedAsSuchNotAsAnEmptyJury() {
-		Jury undescribable = new Jury() {
+		Jury undescribable = new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
 			public List<Judge> getJudges() {
 				return List.of();
@@ -73,7 +73,7 @@ class InstrumentRecorderTest {
 			}
 
 			@Override
-			public Verdict vote(JudgmentContext context) {
+			public Verdict vote() {
 				throw new UnsupportedOperationException();
 			}
 

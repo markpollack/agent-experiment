@@ -14,7 +14,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import io.github.markpollack.judge.jury.interpretation.Interpretation;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -130,15 +129,15 @@ public final class InterpretationReExport {
 
 	/**
 	 * A re-export that asks the library what each stored verdict says.
-	 * @return one wired to {@code Verdicts.interpret} at the library's current schema
-	 * version
+	 * @return one wired to {@code VerdictAnalysis.interpret} at the library's current
+	 * schema version
 	 */
 	public static InterpretationReExport asking() {
 		ObjectMapper mapper = new ObjectMapper();
 		mapper.registerModule(new JavaTimeModule());
 		mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 		mapper.enable(SerializationFeature.INDENT_OUTPUT);
-		return new InterpretationReExport(new StoredVerdictInterpreter(mapper), Interpretation.SCHEMA_VERSION);
+		return new InterpretationReExport(new StoredVerdictInterpreter(mapper), 3);
 	}
 
 	public InterpretationReExport(VerdictInterpreter interpreter, int schemaVersion) {

@@ -14,7 +14,7 @@ public final class RecordingValidation {
 	public static void validate(ExperimentResult result) {
 		if (result.recordingSchemaVersion() == null)
 			return; // Named historical reader only.
-		require(result.recordingSchemaVersion() == 2, "Unsupported Experiment recording version");
+		require(result.recordingSchemaVersion() == 3, "Unsupported Experiment recording version");
 		require(List.of("JUDGE", "AGENT").contains(result.experimentKind()), "Unknown experiment kind");
 		require(result.writer() != null && result.judgeRuntime() != null, "Recording runtime identity missing");
 		RuntimeIdentity current = RuntimeIdentity.judge();
@@ -36,7 +36,7 @@ public final class RecordingValidation {
 			require(item.costUsd() == null || Double.isFinite(item.costUsd()) && item.costUsd() >= 0, "Invalid cost");
 			if (item.verdict() != null) {
 				require(List.of("SUBJECT", "CANDIDATE").contains(item.verdictRole()), "Verdict role missing");
-				require(item.interpretationSnapshot() != null, "Interpretation snapshot missing");
+				require(item.interpretationSnapshot() != null, "VerdictAnalysis snapshot missing");
 				item.interpretationSnapshot().validate(item.verdict().document(), current);
 				require(item.historical() == "LEGACY_UNVERIFIED".equals(item.interpretationSnapshot().state()),
 						"Historical/snapshot state differs");
@@ -95,11 +95,13 @@ public final class RecordingValidation {
 				require(!item.historical(), "Judge candidate must have a verified current snapshot");
 				var verdict = item.verdict().document().node();
 				var candidate = detail.candidateJudgment().document().node();
-				var expectedSingle = ProducerDocument.from("VERDICT", io.github.markpollack.judge.jury.Verdict.single(
-						"candidate",
-						detail.candidateJudgment().document().value(io.github.markpollack.judge.result.Judgment.class)))
+				var expectedSingle = ProducerDocument.from("VERDICT",
+						io.github.markpollack.judge.verdict.Verdict.single("candidate",
+								detail.candidateJudgment()
+									.document()
+									.value(io.github.markpollack.judge.judgment.Judgment.class)))
 					.node();
-				require(candidate.equals(verdict.path("aggregated")) && expectedSingle.equals(verdict),
+				require(candidate.equals(verdict.path("judgment")) && expectedSingle.equals(verdict),
 						"Candidate and producer single-verdict source differ");
 			}
 			else
@@ -115,8 +117,8 @@ public final class RecordingValidation {
 			require(item.scores().equals(comparison.scored() ? Map.of(run.measureId(), comparison.score()) : Map.of()),
 					"Public scores differ from comparison");
 			if (comparison.scored()) {
-				require(detail.candidateJudgment() != null && item.interpretation() != null && item.interpretation()
-					.readingSupport() == io.github.markpollack.judge.jury.interpretation.ReadingSupport.SUPPORTED,
+				require(detail.candidateJudgment() != null && item.interpretation() != null
+						&& item.interpretation().has("accountingVersion"),
 						"Scored comparison requires a supported candidate");
 				require(comparison.kind().equals("STATUS_LABEL")
 						|| List.of(RecordedJudgmentStatus.PASS, RecordedJudgmentStatus.FAIL)

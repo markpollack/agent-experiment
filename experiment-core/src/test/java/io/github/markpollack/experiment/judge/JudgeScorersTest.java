@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import io.github.markpollack.experiment.dataset.DatasetItem;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

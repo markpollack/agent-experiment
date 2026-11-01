@@ -97,6 +97,45 @@ public class FileSystemResultStore implements ResultStore {
 		}
 	}
 
+	/**
+	 * Exact historical/future bytes, with no claim of a supported typed accounting view.
+	 */
+	public record RawRecording(String text, String sha256) {
+		public RawRecording {
+			if (!io.github.markpollack.experiment.recording.ProducerDocument
+				.hash(text.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+				.equals(sha256))
+				throw new IllegalArgumentException("Raw recording hash mismatch");
+		}
+
+		public com.fasterxml.jackson.databind.JsonNode document() {
+			return io.github.markpollack.experiment.recording.ProducerDocument.parse(text);
+		}
+	}
+
+	/** Opens raw source only; no producer, policy, supplier or model is executed. */
+	public Optional<RawRecording> loadRaw(String id) {
+		if (id == null || id.contains("/") || id.contains("\\"))
+			throw new IllegalArgumentException("Recording ID required");
+		if (!Files.isDirectory(baseDir))
+			return Optional.empty();
+		try (var dirs = Files.newDirectoryStream(baseDir, Files::isDirectory)) {
+			for (Path dir : dirs) {
+				Path file = dir.resolve(id + ".json");
+				if (Files.isRegularFile(file)) {
+					String text = Files.readString(file);
+					return Optional
+						.of(new RawRecording(text, io.github.markpollack.experiment.recording.ProducerDocument
+							.hash(Files.readAllBytes(file))));
+				}
+			}
+			return Optional.empty();
+		}
+		catch (IOException failure) {
+			throw new ResultStoreException("Cannot read raw source", failure);
+		}
+	}
+
 	@Override
 	public Optional<ExperimentResult> load(String id) {
 		// First try to find via index files for efficiency

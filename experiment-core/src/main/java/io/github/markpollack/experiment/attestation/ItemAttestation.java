@@ -9,7 +9,7 @@ import io.github.markpollack.experiment.result.ItemResult;
 import io.github.markpollack.experiment.result.RecordedCompositeAttempt;
 import io.github.markpollack.experiment.result.RecordedJudgmentStatus;
 import io.github.markpollack.experiment.result.RecordedVerdict;
-import io.github.markpollack.judge.jury.CompositeRelation;
+import io.github.markpollack.judge.verdict.CompositeRelation;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -54,10 +54,7 @@ public record ItemAttestation(String itemId, String itemSlug, boolean invocation
 
 		List<VoteCount> votes = new ArrayList<>();
 		collect(verdict, "jury", null, rosterFor(verdict, instrument), votes);
-		return new ItemAttestation(item.itemId(), item.itemSlug(), item.success(),
-				!item.historical() && item.interpretation() != null && item.interpretation()
-					.readingSupport() != io.github.markpollack.judge.jury.interpretation.ReadingSupport.SUPPORTED ? null
-							: verdict.aggregated().status(),
+		return new ItemAttestation(item.itemId(), item.itemSlug(), item.success(), verdict.aggregated().status(),
 				classify(votes), votes);
 	}
 

@@ -2,7 +2,7 @@ package io.github.markpollack.experiment.result;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 /** Stable Agent Experiment wire status for a recorded judgment. */
 public enum RecordedJudgmentStatus {

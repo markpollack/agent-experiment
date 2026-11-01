@@ -1,162 +1,101 @@
 package io.github.markpollack.experiment.workflow;
 
 import java.nio.file.Path;
-import java.util.List;
-
-import io.github.markpollack.agents.claude.ClaudeAgentModel;
+import java.time.Duration;
+import java.util.*;
 import io.github.markpollack.agents.model.AgentApi;
-import io.github.markpollack.experiment.agent.InvocationContext;
-import io.github.markpollack.journal.Journal;
-import io.github.markpollack.journal.Run;
-import io.github.markpollack.journal.storage.JsonFileStorage;
-import io.github.markpollack.workflow.core.AgentContext;
-import io.github.markpollack.workflow.flows.steps.AgentClient;
-import io.github.markpollack.workflow.flows.steps.AgentClientStep;
-import io.github.markpollack.workflow.flows.workflow.LocalStepRunner;
-import io.github.markpollack.workflow.flows.workflow.Workflow;
-import io.github.markpollack.workflow.flows.workflow.WorkflowExecutor;
-import io.github.markpollack.workflow.journal.WorkflowJournal;
+import io.github.markpollack.experiment.agent.*;
+import io.github.markpollack.experiment.agent.client.AgentClientInvoker;
+import io.github.markpollack.workflow.flows.*;
+import io.github.markpollack.workflow.batch.durable.*;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * AgentInvoker that uses agent-workflow's {@link Workflow} to orchestrate a single
- * {@link AgentClientStep} backed by an {@link AgentApi}-compatible model.
- *
- * <p>
- * By default, uses {@link ClaudeAgentModel} configured with the invocation context's
- * workspace directory and a standard trace output path. Pass an {@link AgentApi}
- * implementation to the constructor overload to use a different model — the caller then
- * owns model lifecycle and configuration.
- *
- * <p>
- * Produces JSONL trace files per step and wires trace paths through the workflow journal.
- * This is the recommended invoker for experiments that need tool-call traces (Markov
- * analysis, cost attribution, debugging).
- *
- * <h2>Default (Claude) usage</h2> <pre>{@code
- * // Journal storage must be configured once at startup
- * Journal.configure(new JsonFileStorage(Path.of("experiments", "traces", ".agent-journal")));
- * WorkflowJournal.registerEventType();
- *
- * AgentInvoker invoker = new WorkflowAgentInvoker();
- * }</pre>
- *
- * <h2>Custom model usage</h2> <pre>{@code
- * AgentApi myModel = request -> myClient.execute(request);
- * AgentInvoker invoker = new WorkflowAgentInvoker(myModel);
- * }</pre>
- *
- * @see WorkflowInvoker
- * @see AbstractTemplateAgentInvoker
+ * One current typed Client step; knowledge hooks remain owned by the template adapter.
  */
 public class WorkflowAgentInvoker extends AbstractTemplateAgentInvoker {
 
-	private static final Logger logger = LoggerFactory.getLogger(WorkflowAgentInvoker.class);
+	private final AgentClientInvoker invoker;
 
-	private static final Path TRACE_DIR = Path.of("experiments", "traces");
-
-	private static final Path JOURNAL_DIR = Path.of("experiments", "traces", ".agent-journal");
-
-	static {
-		Journal.configure(new JsonFileStorage(JOURNAL_DIR));
-		WorkflowJournal.registerEventType();
-	}
-
-	@Nullable private final AgentApi agentApi;
-
-	/** Default constructor — uses {@link ClaudeAgentModel} configured per-invocation. */
 	public WorkflowAgentInvoker() {
-		super();
-		this.agentApi = null;
+		this(null, null, null);
 	}
 
-	/**
-	 * Constructor with knowledge-file staging and default {@link ClaudeAgentModel}.
-	 * @param knowledgeSourceDir directory containing knowledge files to stage
-	 * @param knowledgeFiles list of relative paths to copy, or {@code ["index.md"]} to
-	 * copy the full tree
-	 */
 	public WorkflowAgentInvoker(@Nullable Path knowledgeSourceDir, @Nullable List<String> knowledgeFiles) {
-		super(knowledgeSourceDir, knowledgeFiles);
-		this.agentApi = null;
+		this(null, knowledgeSourceDir, knowledgeFiles);
 	}
 
-	/**
-	 * Constructor with an injectable {@link AgentApi} model, for use with non-Claude
-	 * models or when the caller owns model lifecycle.
-	 * @param agentApi the model to use; the caller is responsible for its lifecycle
-	 */
-	public WorkflowAgentInvoker(AgentApi agentApi) {
-		super();
-		this.agentApi = agentApi;
+	public WorkflowAgentInvoker(AgentApi api) {
+		this(api, null, null);
 	}
 
-	/**
-	 * Constructor with an injectable model and knowledge-file staging.
-	 * @param agentApi the model to use; the caller is responsible for its lifecycle
-	 * @param knowledgeSourceDir directory containing knowledge files to stage
-	 * @param knowledgeFiles list of relative paths to copy, or {@code ["index.md"]} to
-	 * copy the full tree
-	 */
-	public WorkflowAgentInvoker(AgentApi agentApi, @Nullable Path knowledgeSourceDir,
+	public WorkflowAgentInvoker(@Nullable AgentApi api, @Nullable Path knowledgeSourceDir,
 			@Nullable List<String> knowledgeFiles) {
 		super(knowledgeSourceDir, knowledgeFiles);
-		this.agentApi = agentApi;
+		invoker = api == null ? new AgentClientInvoker() : new AgentClientInvoker(api);
+	}
+
+	public record Request(String workspace, String prompt, String model, long timeoutMs, Map<String, String> metadata) {
+	}
+
+	public record Reply(boolean successful, String response, Map<String, String> metadata) {
+	}
+
+	public static final class Invoke implements Step<Request, Reply> {
+
+		private final AgentClientInvoker invoker;
+
+		public Invoke(AgentClientInvoker invoker) {
+			this.invoker = invoker;
+		}
+
+		public Reply execute(StepContext step, Request request) {
+			try {
+				var value = invoker.invoke(InvocationContext.builder()
+					.workspacePath(Path.of(request.workspace()))
+					.prompt(request.prompt())
+					.model(request.model())
+					.timeout(Duration.ofMillis(request.timeoutMs()))
+					.metadata(request.metadata())
+					.build());
+				return new Reply(value.success(), value.metadata().getOrDefault("agentResponse", ""), value.metadata());
+			}
+			catch (AgentInvocationException failure) {
+				throw new IllegalStateException(failure);
+			}
+		}
+
 	}
 
 	@Override
 	protected AgentResult invokeAgent(InvocationContext context) throws Exception {
-		String experimentId = context.metadata().getOrDefault("experimentId", "experiment-run");
-		logger.info("WorkflowAgentInvoker: executing single-step workflow for workspace: {}", context.workspacePath());
-
-		try (Run run = Journal.run(experimentId).start()) {
-			WorkflowExecutor executor = new WorkflowExecutor(new LocalStepRunner(), WorkflowJournal.forRun(run));
-
-			if (agentApi != null) {
-				runSingleStepWorkflow(context, executor,
-						io.github.markpollack.agents.client.AgentClient.create(agentApi));
-			}
-			else {
-				try (ClaudeAgentModel model = ClaudeAgentModel.builder()
-					.workingDirectory(context.workspacePath())
-					.traceDir(TRACE_DIR)
-					.build()) {
-					runSingleStepWorkflow(context, executor,
-							io.github.markpollack.agents.client.AgentClient.create(model));
-				}
-			}
-		}
-
-		return new AgentResult(List.of(), null);
-	}
-
-	private void runSingleStepWorkflow(InvocationContext context, WorkflowExecutor executor,
-			io.github.markpollack.agents.client.AgentClient coreClient) {
-
-		AgentClient workflowClient = new AgentClient() {
-			@Override
-			public String execute(String prompt, AgentContext ctx) {
-				return executeForResult(prompt, ctx).text();
+		Invoke step = new Invoke(invoker);
+		var definition = Workflows.define("experiment-client")
+			.maxDuration(context.timeout())
+			.then(step)
+			.terminate(io.github.markpollack.workflow.flows.compiler.WorkflowModel.Terminal.SUCCEEDED)
+			.build();
+		var plan = new WorkflowInvoker.Plan(definition, StepRegistry.builder().register("client-v1", step).build(),
+				new ExecutionCompatibility("experiment-client", "0.10.0-SNAPSHOT", Map.of()));
+		var driver = new WorkflowInvoker<Request>() {
+			protected String workflowName() {
+				return "experiment-client";
 			}
 
-			@Override
-			public ExecutionResult executeForResult(String prompt, AgentContext ctx) {
-				var response = coreClient.run(prompt);
-				String tracePath = (String) response.getMetadata().get("tracePath");
-				return new ExecutionResult(response.getResult(), tracePath);
+			protected Plan buildWorkflow(InvocationContext ignored) {
+				return plan;
+			}
+
+			protected Request buildInitialState(InvocationContext value) {
+				return new Request(value.workspacePath().toString(), value.prompt(), value.model(),
+						value.timeout().toMillis(), value.metadata());
+			}
+
+			protected boolean outputSucceeded(Object value) {
+				return value instanceof Reply reply && reply.successful();
 			}
 		};
-
-		AgentClientStep agentStep = AgentClientStep.of(workflowClient, "{input}");
-
-		String result = Workflow.<String, String>define("experiment-run")
-			.withExecutor(executor)
-			.step(agentStep)
-			.run(context.prompt());
-
-		logger.info("Workflow completed, response length: {} chars", result.length());
+		return new AgentResult(driver.invoke(context));
 	}
 
 }

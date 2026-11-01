@@ -16,7 +16,7 @@ import io.github.markpollack.experiment.agent.AgentInvocationException;
 import io.github.markpollack.experiment.agent.AgentInvoker;
 import io.github.markpollack.experiment.agent.InvocationContext;
 import io.github.markpollack.experiment.agent.InvocationResult;
-import io.github.markpollack.journal.claude.PhaseCapture;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,6 +101,14 @@ public abstract class AbstractTemplateAgentInvoker implements AgentInvoker {
 		postInvoke(workspace, context, enrichedMetadata);
 
 		long durationMs = System.currentTimeMillis() - startTime;
+		if (agentResult.invocation() != null) {
+			var value = agentResult.invocation();
+			enrichedMetadata.putAll(value.metadata());
+			return new InvocationResult(value.success(), value.status(), value.phases(), value.inputTokens(),
+					value.outputTokens(), value.thinkingTokens(), value.cacheCreationInputTokens(),
+					value.cacheReadInputTokens(), value.totalCostUsd(), durationMs, value.sessionId(), enrichedMetadata,
+					value.errorMessage());
+		}
 
 		return InvocationResult.fromPhases(agentResult.phases(), durationMs, agentResult.sessionId(), enrichedMetadata);
 	}
@@ -191,7 +199,15 @@ public abstract class AbstractTemplateAgentInvoker implements AgentInvoker {
 	/**
 	 * Result from the agent invocation phase, carrying phase captures and session ID.
 	 */
-	public record AgentResult(List<PhaseCapture> phases, @Nullable String sessionId) {
+	public record AgentResult(List<JsonNode> phases, @Nullable String sessionId,
+			@Nullable InvocationResult invocation) {
+		public AgentResult(List<JsonNode> phases, @Nullable String sessionId) {
+			this(phases, sessionId, null);
+		}
+
+		public AgentResult(InvocationResult value) {
+			this(value.phases(), value.sessionId(), value);
+		}
 	}
 
 }

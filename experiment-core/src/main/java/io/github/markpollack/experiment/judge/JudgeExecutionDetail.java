@@ -22,7 +22,7 @@ public record JudgeExecutionDetail(String kind, int schemaVersion, @Nullable Row
 				expectedLabel, scorerResult);
 	}
 
-	public JudgeExecutionDetail(io.github.markpollack.judge.result.Judgment candidate, String expected,
+	public JudgeExecutionDetail(io.github.markpollack.judge.judgment.Judgment candidate, String expected,
 			JudgeScorerResult result) {
 		this(RecordedJudgment.from(candidate), expected, result);
 	}

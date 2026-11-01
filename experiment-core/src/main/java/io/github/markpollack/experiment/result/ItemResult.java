@@ -3,8 +3,7 @@ package io.github.markpollack.experiment.result;
 import java.nio.file.Path;
 import java.util.Map;
 
-import io.github.markpollack.judge.jury.interpretation.Interpretation;
-import io.github.markpollack.judge.jury.interpretation.Verdicts;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.jspecify.annotations.Nullable;
 import io.github.markpollack.experiment.recording.InterpretationSnapshot;
 import io.github.markpollack.experiment.recording.RuntimeIdentity;
@@ -40,7 +39,7 @@ import io.github.markpollack.experiment.recording.RuntimeIdentity;
 public record ItemResult(String itemId, String itemSlug, boolean success, @Nullable Boolean passed,
 		@Nullable Double costUsd, @Nullable Long totalTokens, @Nullable Long durationMs, Map<String, Double> scores,
 		Map<String, Object> metrics, @Nullable ExecutionDetail executionDetail, @Nullable RecordedVerdict verdict,
-		@Nullable Interpretation interpretation, Map<String, Object> metadata, @Nullable Path workspacePath,
+		@Nullable JsonNode interpretation, Map<String, Object> metadata, @Nullable Path workspacePath,
 		@Nullable String verdictRole, @Nullable InterpretationSnapshot interpretationSnapshot, boolean historical) {
 
 	public ItemResult {
@@ -49,6 +48,12 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 		scores = Map.copyOf(scores);
 		metrics = Map.copyOf(metrics);
 		metadata = Map.copyOf(metadata);
+		interpretation = interpretation == null ? null : interpretation.deepCopy();
+	}
+
+	@Override
+	public @Nullable JsonNode interpretation() {
+		return interpretation == null ? null : interpretation.deepCopy();
 	}
 
 	public static Builder builder() {
@@ -105,7 +110,7 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 
 		private @Nullable RecordedVerdict verdict;
 
-		private @Nullable Interpretation interpretation;
+		private @Nullable JsonNode interpretation;
 
 		private Map<String, Object> metadata = Map.of();
 
@@ -182,7 +187,7 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 		}
 
 		/** Record a live jury verdict using the stable Agent Experiment projection. */
-		public Builder verdict(io.github.markpollack.judge.jury.Verdict verdict) {
+		public Builder verdict(io.github.markpollack.judge.verdict.Verdict verdict) {
 			return verdict(verdict, null);
 		}
 
@@ -192,9 +197,9 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 		 * Taken here, where the live verdict still exists, rather than parsed back out of
 		 * the stored projection afterwards.
 		 */
-		public Builder verdict(io.github.markpollack.judge.jury.Verdict verdict, @Nullable String instrumentHash) {
+		public Builder verdict(io.github.markpollack.judge.verdict.Verdict verdict, @Nullable String instrumentHash) {
 			this.verdict = RecordedVerdict.from(verdict, instrumentHash);
-			this.interpretation = Verdicts.interpret(this.verdict.document().producerMap());
+			this.interpretation = InterpretationSnapshot.currentReading(this.verdict.document());
 			return this;
 		}
 
@@ -202,7 +207,7 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 		 * The library's reading of this item's verdict. Set automatically when a live
 		 * verdict is recorded.
 		 */
-		public Builder interpretation(@Nullable Interpretation interpretation) {
+		public Builder interpretation(@Nullable JsonNode interpretation) {
 			this.interpretation = interpretation;
 			return this;
 		}

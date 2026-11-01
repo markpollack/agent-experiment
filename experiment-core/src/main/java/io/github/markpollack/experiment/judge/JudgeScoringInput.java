@@ -1,7 +1,7 @@
 package io.github.markpollack.experiment.judge;
 
 import io.github.markpollack.experiment.dataset.DatasetItem;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * Input to a {@link JudgeScorer}: the dataset item, the candidate judge's actual

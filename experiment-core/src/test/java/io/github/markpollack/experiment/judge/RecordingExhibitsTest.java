@@ -14,9 +14,9 @@ import io.github.markpollack.experiment.recording.*;
 import io.github.markpollack.experiment.store.*;
 import io.github.markpollack.experiment.comparison.*;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.*;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
+import io.github.markpollack.judge.judgment.*;
+import io.github.markpollack.judge.verdict.Verdict;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
@@ -65,9 +65,8 @@ class RecordingExhibitsTest {
 			.runId("run-" + (++runSequence))
 			.candidateId(candidate)
 			.captureMode("FAKE")
-			.candidate(judge)
+			.candidate(item -> judge)
 			.items(cases(size))
-			.input(item -> JudgmentContext.builder().goal(item.id()).build())
 			.caseInputIdentity((input, row) -> new CaseInputIdentity("fixture", input.goal(), "v1", null,
 					"effective-case-input:v1"))
 			.truth(item -> JudgeTruth.proposition(true))
@@ -343,7 +342,7 @@ class RecordingExhibitsTest {
 		var result = run(builder("input", ctx -> nativeFinding(true, "ok"), 3).input(item -> {
 			if (item.id().endsWith("0"))
 				throw new IllegalArgumentException("bad input");
-			return JudgmentContext.builder().goal(item.id()).build();
+			return AgentJudgingInput.builder().goal(item.id()).build();
 		}));
 		assertThat(result.experimentResult().declaredRows()).isEqualTo(3);
 		assertThat(result.experimentResult().attemptedRows()).isEqualTo(3);
@@ -543,7 +542,7 @@ class RecordingExhibitsTest {
 		var derivative = reevaluator.reEvaluate(historical,
 				io.github.markpollack.judge.jury.SimpleJury.builder()
 					.judge(context -> nativeFinding(true, "unused"), 1.0)
-					.votingStrategy(new io.github.markpollack.judge.jury.MajorityVotingStrategy())
+					.votingStrategy(new io.github.markpollack.judge.voting.MajorityVotingStrategy())
 					.build());
 		var loaded = store.load(derivative.experimentId()).orElseThrow();
 		assertThat(loaded.metadata()).containsEntry("reEvaluatedFrom", historical.experimentId());
@@ -628,7 +627,7 @@ class RecordingExhibitsTest {
 	}
 
 	@Test
-	void E21_duplicateProducerMembersFailBeforeInterpretation() throws Exception {
+	void E21_duplicateProducerMembersFailBeforeVerdictAnalysis() throws Exception {
 		assertThatThrownBy(() -> RecordedVerdict.fromProducerJson("{\"schemaVersion\":2,\"schemaVersion\":99}"))
 			.isInstanceOf(IllegalArgumentException.class);
 		var valid = run(builder("dup", ctx -> nativeFinding(true, "ok"), 1));

@@ -25,7 +25,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public record ProducerDocument(String sourceKind, String producerJson, String sha256,
 		@JsonInclude(JsonInclude.Include.NON_EMPTY) List<Association> associations) {
 
-	private static final ObjectMapper JSON = new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+	private static final ObjectMapper JSON = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module())
+		.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
 		.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
 	/** A consumer association at an existing verdict node. */
@@ -51,7 +53,7 @@ public record ProducerDocument(String sourceKind, String producerJson, String sh
 			throw new IllegalArgumentException("Associations require a verdict source");
 		for (Association association : associations) {
 			JsonNode target = source.at(association.verdictPointer());
-			if (!target.isObject() || !target.has("aggregated"))
+			if (!target.isObject() || !(target.has("aggregated") || target.has("judgment")))
 				throw new IllegalArgumentException("Association does not identify a verdict node");
 		}
 		if (associations.stream().map(Association::verdictPointer).distinct().count() != associations.size())

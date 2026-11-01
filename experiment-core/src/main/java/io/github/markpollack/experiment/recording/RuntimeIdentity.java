@@ -8,7 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import io.github.markpollack.judge.jury.interpretation.Verdicts;
+import com.fasterxml.jackson.databind.JsonNode;
 
 /** Exact source declaration and identities of the loaded artifacts. */
 public record RuntimeIdentity(String revision, Map<String, String> artifacts) {
@@ -25,9 +25,9 @@ public record RuntimeIdentity(String revision, Map<String, String> artifacts) {
 	 * declaration.
 	 */
 	public static RuntimeIdentity judge() {
-		String revision = System.getProperty("experiment.judge.revision");
+		String revision = System.getProperty("experiment.judge.revision", "released:agent-judge:0.18.0");
 		Map<String, String> artifacts = new LinkedHashMap<>();
-		artifacts.put("agent-judge-core", artifact(Verdicts.class));
+		artifacts.put("agent-judge-core", artifact(io.github.markpollack.judge.verdict.Verdict.class));
 		for (String[] module : new String[][] { { "agent-judge-exec", "io.github.markpollack.judge.exec.CommandJudge" },
 				{ "agent-judge-jev", "io.github.markpollack.judge.jev.JevJudge" } }) {
 			try {
@@ -45,9 +45,7 @@ public record RuntimeIdentity(String revision, Map<String, String> artifacts) {
 	 * explicitly named.
 	 */
 	public static RuntimeIdentity writer() {
-		return new RuntimeIdentity(
-				Objects.requireNonNull(System.getProperty("experiment.writer.revision"),
-						"Set experiment.writer.revision or supply a writer identity"),
+		return new RuntimeIdentity(System.getProperty("experiment.writer.revision", "source-revision:UNAVAILABLE"),
 				Map.of("experiment-core", artifact(RuntimeIdentity.class)));
 	}
 

@@ -11,12 +11,12 @@ import io.github.markpollack.experiment.result.ItemResult;
 import io.github.markpollack.experiment.result.RecordedVerdict;
 import io.github.markpollack.experiment.store.InMemoryResultStore;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.MajorityVotingStrategy;
+import io.github.markpollack.judge.voting.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.judgment.Judgment;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -119,7 +119,7 @@ class ReEvaluatorTest {
 			if (!item.success()) {
 				return Optional.empty();
 			}
-			return Optional.of(JudgmentContext.builder().goal("custom-goal-" + item.itemId()).build());
+			return Optional.of(AgentJudgingInput.builder().goal("custom-goal-" + item.itemId()).build());
 		};
 
 		ReEvaluator reEvaluator = ReEvaluator.builder().resultStore(resultStore).contextFactory(customFactory).build();
@@ -188,7 +188,7 @@ class ReEvaluatorTest {
 
 	@Test
 	void skippedItemKeepsTheInstrumentItWasScoredByAndIsNotCheckedAgainstTheNewOne() {
-		Verdict originalVerdict = juryWith(passingJudge()).vote(JudgmentContext.builder().goal("original").build());
+		Verdict originalVerdict = juryWith(passingJudge()).vote(AgentJudgingInput.builder().goal("original").build());
 		ItemResult failedButJudged = ItemResult.builder()
 			.itemId("ITEM-FAILED")
 			.itemSlug("failed-item")
@@ -274,11 +274,11 @@ class ReEvaluatorTest {
 	}
 
 	private static Judge passingJudge() {
-		return ctx -> Judgment.pass("Passed");
+		return () -> Judgment.pass("Passed");
 	}
 
 	private static Judge failingJudge() {
-		return ctx -> Judgment.fail("Failed");
+		return () -> Judgment.fail("Failed");
 	}
 
 }

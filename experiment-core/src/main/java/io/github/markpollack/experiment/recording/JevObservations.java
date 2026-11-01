@@ -15,32 +15,45 @@ public final class JevObservations {
 	 * caller-owned.
 	 */
 	public static InvocationObservation extract(RecordedJudgment judgment, InvocationObservation observation) {
-		JsonNode source = judgment.document().node();
-		JsonNode provenance = source.path("provenance");
-		if (!"typesafe.jev".equals(provenance.path("instrumentId").asText())
-				|| !provenance.path("revision").asText().startsWith("jev-adapter:2;jev-java:0.2.0;"))
-			return observation;
-		var references = new java.util.ArrayList<io.github.markpollack.judge.result.ArtifactRef>();
-		for (JsonNode ref : provenance.path("evidence"))
-			references.add(new io.github.markpollack.judge.result.ArtifactRef(ref.path("id").asText(),
-					ref.path("sha256").asText(), ref.hasNonNull("selector") ? ref.path("selector").asText() : null));
-		if (provenance.hasNonNull("response")) {
-			JsonNode ref = provenance.path("response");
-			references.add(new io.github.markpollack.judge.result.ArtifactRef(ref.path("id").asText(),
-					ref.path("sha256").asText(), ref.hasNonNull("selector") ? ref.path("selector").asText() : null));
+		var value = judgment.document().value(io.github.markpollack.judge.judgment.Judgment.class);
+		var owners = io.github.markpollack.judge.verdict.InvocationRecords
+			.of(io.github.markpollack.judge.verdict.Verdict.single("candidate", value));
+		var usage = new java.util.ArrayList<UsageObservation>();
+		var artifacts = new java.util.LinkedHashSet<>(observation.artifacts());
+		for (var owner : owners) {
+			artifacts.addAll(owner.artifacts());
+			if (!"jev-systemone:0.2.0".equals(owner.protocol()))
+				continue;
+			JsonNode nativeUsage = ProducerDocument.parse(ProducerDocument.json(owner.nativeFacts())).path("usage");
+			Long input = integer(nativeUsage.get("inputTokens"));
+			Long output = integer(nativeUsage.get("outputTokens"));
+			Double cost = null;
+			String source = "jev-native-usage:v1:/usage";
+			JsonNode charge = nativeUsage.path("cost");
+			String declaredSource = nativeUsage.path("costSource").asText();
+			if (charge.isNumber() && Double.isFinite(charge.doubleValue()) && charge.doubleValue() >= 0
+					&& "USD".equals(nativeUsage.path("currency").asText())
+					&& "vercel-gateway-reported:v1:/provider_metadata/gateway/cost".equals(declaredSource)) {
+				cost = charge.doubleValue();
+				source = declaredSource;
+			}
+			var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+				.enable(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+			var portable = ProducerDocument.parse(ProducerDocument.json(owner));
+			String ownerHash;
+			try {
+				Object map = mapper.convertValue(portable, Object.class);
+				ownerHash = ProducerDocument.hash(mapper.writeValueAsBytes(map));
+			}
+			catch (java.io.IOException failure) {
+				throw new IllegalArgumentException("Cannot retain owner identity", failure);
+			}
+			usage.add(new UsageObservation(owner.id(), "typesafe.jev", source, "adapter-request", input, output,
+					"input-plus-output:v1", cost, cost == null ? null : "USD", null, ownerHash));
 		}
-		observation = new InvocationObservation(observation.invocationId(), observation.captureMode(),
-				observation.startedAt(), observation.endedAt(), observation.elapsedNanos(),
-				observation.transportAttempts(), observation.requestId(), observation.transportElapsedNanos(),
-				observation.usage(), references);
-		JsonNode usage = source.path("metadata").path("usage");
-		Long input = integer(usage.get("inputTokens")), output = integer(usage.get("outputTokens"));
-		if (input == null && output == null)
-			return observation;
-		UsageObservation value = new UsageObservation(observation.invocationId(), "typesafe.jev",
-				"jev-root-usage:v1:" + provenance.path("revision").asText() + ":/metadata/usage", "adapter-request",
-				input, output, "input-plus-output:v1", null, null, null);
-		return observation.withUsage(List.of(value));
+		return new InvocationObservation(observation.invocationId(), observation.captureMode(), observation.startedAt(),
+				observation.endedAt(), observation.elapsedNanos(), observation.transportAttempts(),
+				observation.requestId(), observation.transportElapsedNanos(), usage, List.copyOf(artifacts));
 	}
 
 	/**
@@ -48,7 +61,7 @@ public final class JevObservations {
 	 * reference and exact bytes.
 	 */
 	public static InvocationObservation withTransportTrace(InvocationObservation observation,
-			io.github.markpollack.judge.result.ArtifactRef reference, byte[] bytes) {
+			io.github.markpollack.judge.provenance.ArtifactRef reference, byte[] bytes) {
 		if (!observation.artifacts().contains(reference) || !ProducerDocument.hash(bytes).equals(reference.sha256()))
 			throw new IllegalArgumentException("Trace reference/hash mismatch");
 		JsonNode trace = ProducerDocument.parse(new String(bytes, java.nio.charset.StandardCharsets.UTF_8));

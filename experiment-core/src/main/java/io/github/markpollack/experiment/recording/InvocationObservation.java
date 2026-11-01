@@ -2,7 +2,7 @@ package io.github.markpollack.experiment.recording;
 
 import java.time.Instant;
 import java.util.List;
-import io.github.markpollack.judge.result.ArtifactRef;
+import io.github.markpollack.judge.provenance.ArtifactRef;
 import org.jspecify.annotations.Nullable;
 
 /** Logical-call observation, separate from any observed transport attempt. */

@@ -3,10 +3,10 @@ package io.github.markpollack.experiment.reeval;
 import java.util.Optional;
 
 import io.github.markpollack.experiment.result.ItemResult;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
 
 /**
- * Reconstructs a {@link JudgmentContext} from a stored {@link ItemResult} for
+ * Reconstructs a {@link AgentJudgingInput} from a stored {@link ItemResult} for
  * re-evaluation.
  *
  * <p>
@@ -23,11 +23,11 @@ import io.github.markpollack.judge.context.JudgmentContext;
 public interface ReEvaluationContextFactory {
 
 	/**
-	 * Attempt to reconstruct a JudgmentContext from a stored ItemResult. Returns empty if
-	 * re-evaluation is not possible for this item.
+	 * Attempt to reconstruct a AgentJudgingInput from a stored ItemResult. Returns empty
+	 * if re-evaluation is not possible for this item.
 	 * @param item the stored item result
 	 * @return reconstructed context, or empty if re-evaluation is not possible
 	 */
-	Optional<JudgmentContext> create(ItemResult item);
+	Optional<AgentJudgingInput> create(ItemResult item);
 
 }

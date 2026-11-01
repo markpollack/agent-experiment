@@ -4,8 +4,8 @@ import java.util.Map;
 
 import io.github.markpollack.experiment.result.RecordedJudgment;
 import io.github.markpollack.experiment.result.RecordedJudgmentStatus;
-import io.github.markpollack.judge.jury.AggregationEvidence;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.voting.AggregationEvidence;
+import io.github.markpollack.judge.judgment.Judgment;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -81,21 +81,7 @@ public record VoteCount(String scope, @Nullable String relation, @Nullable Recor
 
 	static VoteCount of(String scope, @Nullable String relation,
 			io.github.markpollack.experiment.result.RecordedVerdict verdict, @Nullable Integer rosterCount) {
-		var interpretation = io.github.markpollack.judge.jury.interpretation.Verdicts
-			.interpret(verdict.document().producerMap());
-		var stage = interpretation.root();
-		if (interpretation.readingSupport() == io.github.markpollack.judge.jury.interpretation.ReadingSupport.SUPPORTED
-				&& stage != null && stage.declaredCardinality() != null) {
-			var evidence = stage.evidence();
-			return new VoteCount(scope, relation,
-					stage.status() == null ? null
-							: RecordedJudgmentStatus.valueOf(stage.status().toUpperCase(java.util.Locale.ROOT)),
-					stage.failure(), evidence == null ? null : evidence.strategy(),
-					evidence == null ? null : evidence.errorPolicy(), stage.judges().size(),
-					evidence == null ? null : evidence.eligibleCount(),
-					evidence == null ? null : evidence.explicitAbstainCount(),
-					evidence == null ? null : evidence.errorCount(), rosterCount, stage.declaredCardinality());
-		}
+
 		return of(scope, relation, verdict.aggregated(), rosterCount);
 	}
 

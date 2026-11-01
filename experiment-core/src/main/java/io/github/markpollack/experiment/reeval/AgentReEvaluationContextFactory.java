@@ -6,14 +6,13 @@ import java.util.Optional;
 import io.github.markpollack.experiment.agent.InvocationResult;
 import io.github.markpollack.experiment.agent.TerminalStatus;
 import io.github.markpollack.experiment.result.ItemResult;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
 
 /**
  * Default context reconstruction for agent experiment results.
  *
  * <p>
- * Reconstructs a {@link JudgmentContext} from a stored {@link ItemResult} whose
+ * Reconstructs a {@link AgentJudgingInput} from a stored {@link ItemResult} whose
  * {@code executionDetail} is an {@link InvocationResult}. Returns
  * {@code Optional.empty()} for failed items or items without an {@code InvocationResult}
  * execution detail.
@@ -25,7 +24,7 @@ public class AgentReEvaluationContextFactory implements ReEvaluationContextFacto
 	}
 
 	@Override
-	public Optional<JudgmentContext> create(ItemResult item) {
+	public Optional<AgentJudgingInput> create(ItemResult item) {
 		if (!item.success()) {
 			return Optional.empty();
 		}
@@ -33,7 +32,7 @@ public class AgentReEvaluationContextFactory implements ReEvaluationContextFacto
 			return Optional.empty();
 		}
 
-		JudgmentContext.Builder builder = JudgmentContext.builder()
+		AgentJudgingInput.Builder builder = AgentJudgingInput.builder()
 			.goal(item.itemSlug())
 			.executionTime(Duration.ofMillis(invocationResult.durationMs()))
 			.status(mapStatus(invocationResult.status()));
@@ -52,15 +51,15 @@ public class AgentReEvaluationContextFactory implements ReEvaluationContextFacto
 		return Optional.of(builder.build());
 	}
 
-	private static ExecutionStatus mapStatus(TerminalStatus status) {
+	private static TerminalStatus mapStatus(TerminalStatus status) {
 		return switch (status) {
-			case COMPLETED -> ExecutionStatus.SUCCESS;
-			case TIMEOUT -> ExecutionStatus.TIMEOUT;
+			case COMPLETED -> TerminalStatus.COMPLETED;
+			case TIMEOUT -> TerminalStatus.TIMEOUT;
 			// A ceiling cut the agent off. Closer to a timeout than a failure: the agent
 			// did not
 			// fail at the task, it was not permitted to finish it.
-			case MAX_TURNS -> ExecutionStatus.TIMEOUT;
-			case ERROR -> ExecutionStatus.FAILED;
+			case MAX_TURNS -> TerminalStatus.TIMEOUT;
+			case ERROR -> TerminalStatus.ERROR;
 		};
 	}
 

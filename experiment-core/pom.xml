@@ -18,6 +18,8 @@
     <description>Core abstractions, runner, comparison, and results for experiment driver</description>
 
     <dependencies>
+        <dependency><groupId>io.github.markpollack</groupId><artifactId>experiment-runtime</artifactId><version>${project.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>io.github.markpollack</groupId><artifactId>agent-judge-json-jackson2</artifactId><version>${agent-judge.version}</version></dependency>
         <!-- JSON processing -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -63,15 +65,7 @@
         </dependency>
 
         <!-- Phase capture data types + production RunRecorder (from agent-journal) -->
-        <dependency>
-            <groupId>io.github.markpollack</groupId>
-            <artifactId>claude-code-capture</artifactId>
-        </dependency>
         <!-- Journal lifecycle: Journal, Run, JsonFileStorage, StepCostEvent, AttributionMethod -->
-        <dependency>
-            <groupId>io.github.markpollack</groupId>
-            <artifactId>journal-core</artifactId>
-        </dependency>
 
         <!-- Logging -->
         <dependency>

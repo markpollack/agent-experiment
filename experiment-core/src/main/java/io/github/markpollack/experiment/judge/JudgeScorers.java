@@ -2,7 +2,7 @@ package io.github.markpollack.experiment.judge;
 
 import java.util.OptionalDouble;
 
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * Built-in {@link JudgeScorer} implementations.
@@ -77,12 +77,12 @@ public final class JudgeScorers {
 	public static JudgeScorer propositionMatch() {
 		return identified("proposition-match:v1", "1", "PROPOSITION", input -> {
 			Judgment actual = input.actual();
-			if (!classified(actual) || actual.assessment() == null || actual.assessment().proposition() == null
-					|| actual.assessment().proposition().value() == null)
+			if (!classified(actual) || actual.finding() == null || actual.finding().booleanFinding() == null
+					|| actual.finding().booleanFinding().value() == null)
 				return JudgeScorerResult.unscored("Candidate has no eligible Boolean proposition");
 			if (!"true".equals(input.expectedLabel()) && !"false".equals(input.expectedLabel()))
 				return JudgeScorerResult.unscored("Missing Boolean truth");
-			boolean match = actual.assessment().proposition().value() == Boolean.parseBoolean(input.expectedLabel());
+			boolean match = actual.finding().booleanFinding().value() == Boolean.parseBoolean(input.expectedLabel());
 			return new JudgeScorerResult(match, match ? 1.0 : 0.0, "Native proposition equality");
 		});
 	}

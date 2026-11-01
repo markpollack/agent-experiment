@@ -5,7 +5,14 @@ import org.jspecify.annotations.Nullable;
 /** Usage reported for one scoped observation; missing measurements stay null. */
 public record UsageObservation(String observationId, String providerScope, String source, String scope,
 		@Nullable Long inputTokens, @Nullable Long outputTokens, String totalDefinition, @Nullable Double cost,
-		@Nullable String currency, @Nullable String priceRuleId) {
+		@Nullable String currency, @Nullable String priceRuleId, @Nullable String ownerSha256) {
+	public UsageObservation(String observationId, String providerScope, String source, String scope,
+			@Nullable Long inputTokens, @Nullable Long outputTokens, String totalDefinition, @Nullable Double cost,
+			@Nullable String currency, @Nullable String priceRuleId) {
+		this(observationId, providerScope, source, scope, inputTokens, outputTokens, totalDefinition, cost, currency,
+				priceRuleId, null);
+	}
+
 	public UsageObservation {
 		for (String text : new String[] { observationId, providerScope, source, scope, totalDefinition })
 			if (text == null || text.isBlank())

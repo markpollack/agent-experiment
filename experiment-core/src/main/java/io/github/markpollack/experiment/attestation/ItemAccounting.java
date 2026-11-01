@@ -5,10 +5,7 @@ import java.util.List;
 import io.github.markpollack.experiment.result.InstrumentRecord;
 import io.github.markpollack.experiment.result.ItemCounts;
 import io.github.markpollack.experiment.result.ItemResult;
-import io.github.markpollack.judge.jury.interpretation.Interpretation;
-import io.github.markpollack.judge.jury.interpretation.ReadingSupport;
-import io.github.markpollack.judge.jury.interpretation.Stage;
-import io.github.markpollack.judge.jury.interpretation.VerdictReading;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -70,7 +67,7 @@ public final class ItemAccounting {
 	 * judged and a run that failed everything are different results; recording false for
 	 * both is how they came to render identically.
 	 */
-	public static @Nullable Boolean passedFlag(@Nullable Interpretation interpretation) {
+	public static @Nullable Boolean passedFlag(@Nullable JsonNode interpretation) {
 		return switch (outcomeOf(interpretation, false)) {
 			case PASS -> Boolean.TRUE;
 			case NON_PASS -> Boolean.FALSE;
@@ -78,111 +75,71 @@ public final class ItemAccounting {
 		};
 	}
 
-	/** Current-format counts require a supported producer reading. */
-	public static @Nullable Boolean passedFlagCurrent(@Nullable Interpretation interpretation) {
-		return interpretation == null || interpretation.readingSupport() != ReadingSupport.SUPPORTED ? null
-				: passedFlag(interpretation);
-	}
-
-	/** What this item says about the subject. */
-	public static SubjectOutcome outcomeOf(ItemResult item) {
-		if (!item.historical() && item.verdict() != null && item.interpretation() != null
-				&& item.interpretation().readingSupport() != ReadingSupport.SUPPORTED)
-			return SubjectOutcome.UNATTESTABLE;
-		return outcomeOf(item.interpretation(), item.verdict() == null);
-	}
-
-	private static SubjectOutcome outcomeOf(@Nullable Interpretation interpretation, boolean noVerdict) {
-		if (noVerdict) {
-			return SubjectOutcome.NOT_JUDGED;
-		}
-		if (interpretation == null) {
-			// A verdict with no reading beside it. Stored before the reading existed and
-			// not yet re-exported: its outcome is not recoverable here, and deriving one
-			// from the verdict's shape is the thing this record exists to stop.
-			return SubjectOutcome.UNATTESTABLE;
-		}
-		if (interpretation.readingSupport() == ReadingSupport.CONTRADICTED) {
-			return SubjectOutcome.UNATTESTABLE;
-		}
-		VerdictReading reading = interpretation.reading();
-		if (reading == null) {
-			return SubjectOutcome.UNATTESTABLE;
-		}
-		return switch (reading) {
-			case ACCEPTED -> SubjectOutcome.PASS;
-			// An abstention is about a criterion that applied and could not be decided,
-			// so
-			// it counts against the subject. A not-applicable criterion was never
-			// assessed,
-			// and an unassessed subject is the instrument's failure, not the subject's.
-			case REJECTED, UNDECIDED -> SubjectOutcome.NON_PASS;
-			case NOT_APPLICABLE, NOT_ASSESSED -> SubjectOutcome.EXCLUDED;
+	/** Current conclusion accounting version: INCONCLUSIVE remains unknown. */
+	public static @Nullable Boolean passedFlagCurrent(@Nullable JsonNode interpretation) {
+		SubjectOutcome outcome = outcomeOf(interpretation, false);
+		return switch (outcome) {
+			case PASS -> true;
+			case NON_PASS -> false;
+			default -> null;
 		};
 	}
 
-	/**
-	 * What this item says about the instrument that scored it, independently of the
-	 * subject outcome.
-	 *
-	 * <p>
-	 * Three states, not two. A record that never said whether a stage was usable cannot
-	 * report that the instrument was fine, so it reports {@link InstrumentHealth#UNKNOWN}
-	 * rather than a comfortable false. Two states here would rebuild, one level along,
-	 * the defect this whole record exists to remove.
-	 */
+	public static SubjectOutcome outcomeOf(ItemResult item) {
+		return subjectOutcome(item);
+	}
+
+	public static SubjectOutcome subjectOutcome(ItemResult item) {
+		return outcomeOf(item.interpretation(), item.verdict() == null);
+	}
+
+	private static SubjectOutcome outcomeOf(@Nullable JsonNode reading, boolean noVerdict) {
+		if (noVerdict)
+			return SubjectOutcome.NOT_JUDGED;
+		if (reading == null)
+			return SubjectOutcome.UNATTESTABLE;
+		if (reading.has("accountingVersion")) {
+			if (!"experiment-v6-conclusion:v1".equals(reading.path("accountingVersion").asText()))
+				return SubjectOutcome.UNATTESTABLE;
+			return switch (reading.path("conclusion").asText()) {
+				case "PASS" -> SubjectOutcome.PASS;
+				case "FAIL" -> SubjectOutcome.NON_PASS;
+				case "NOT_APPLICABLE" -> SubjectOutcome.EXCLUDED;
+				default -> SubjectOutcome.UNATTESTABLE;
+			};
+		}
+		// These are original historical observations, never a new reading of old
+		// Verdicts.
+		if ("CONTRADICTED".equals(reading.path("readingSupport").asText()))
+			return SubjectOutcome.UNATTESTABLE;
+		return switch (reading.path("reading").asText()) {
+			case "ACCEPTED" -> SubjectOutcome.PASS;
+			case "REJECTED", "UNDECIDED" -> SubjectOutcome.NON_PASS;
+			case "NOT_APPLICABLE", "NOT_ASSESSED" -> SubjectOutcome.EXCLUDED;
+			default -> SubjectOutcome.UNATTESTABLE;
+		};
+	}
+
 	public static InstrumentHealth instrumentHealth(ItemResult item) {
-		if (!item.historical()
-				&& item.executionDetail() instanceof io.github.markpollack.experiment.judge.JudgeExecutionDetail detail
+		if (item.executionDetail() instanceof io.github.markpollack.experiment.judge.JudgeExecutionDetail detail
 				&& (detail.invocationState().equals("THREW") || detail.invocationState().equals("NULL_RETURN")))
 			return InstrumentHealth.FAILED;
-		if (item.verdict() == null) {
-			return InstrumentHealth.UNKNOWN; // no jury ran; nothing says it was fine
-		}
-		if (item.metadata().containsKey(InstrumentRecord.ITEM_INSTRUMENT_FAILURE)) {
+		if (item.metadata().containsKey(InstrumentRecord.ITEM_INSTRUMENT_FAILURE))
 			return InstrumentHealth.FAILED;
-		}
-		Interpretation interpretation = item.interpretation();
-		if (interpretation == null) {
+		JsonNode reading = item.interpretation();
+		if (reading == null || reading.has("accountingVersion"))
 			return InstrumentHealth.UNKNOWN;
-		}
-		if (!item.historical() && java.util.stream.Stream
-			.concat(java.util.stream.Stream.of(interpretation.root()), interpretation.stages().stream())
-			.flatMap(stage -> stage.judges().stream())
-			.anyMatch(seat -> "CONTAINED_FAILURE".equals(String.valueOf(seat.execution()))))
+		if (reading.path("root").hasNonNull("failure") || "NOT_ASSESSED".equals(reading.path("reading").asText()))
 			return InstrumentHealth.FAILED;
-		if (anyStageFailedToRun(interpretation)) {
-			return InstrumentHealth.FAILED;
-		}
-		if (interpretation.reading() == VerdictReading.NOT_ASSESSED) {
-			return InstrumentHealth.FAILED;
-		}
-		if (interpretation.reading() == null || interpretation.readingSupport() == ReadingSupport.CONTRADICTED) {
-			return InstrumentHealth.UNKNOWN;
-		}
-		return InstrumentHealth.OK;
+		for (JsonNode stage : reading.path("stages"))
+			if (stage.hasNonNull("failure"))
+				return InstrumentHealth.FAILED;
+		return reading.hasNonNull("reading") && !"CONTRADICTED".equals(reading.path("readingSupport").asText())
+				? InstrumentHealth.OK : InstrumentHealth.UNKNOWN;
 	}
 
-	/** True only when the instrument is known to have failed. */
 	public static boolean instrumentFailed(ItemResult item) {
 		return instrumentHealth(item) == InstrumentHealth.FAILED;
-	}
-
-	/**
-	 * A stage that entered and never produced a verdict: the jury could not be run there.
-	 * The library reports it; this only has to decide that it counts against the
-	 * instrument rather than against the subject.
-	 */
-	private static boolean anyStageFailedToRun(Interpretation interpretation) {
-		if (interpretation.root().failure() != null) {
-			return true;
-		}
-		for (Stage stage : interpretation.stages()) {
-			if (stage.failure() != null) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 }

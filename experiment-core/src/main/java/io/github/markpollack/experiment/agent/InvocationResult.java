@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.markpollack.experiment.result.ExecutionDetail;
-import io.github.markpollack.journal.claude.PhaseCapture;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -24,15 +24,23 @@ import org.jspecify.annotations.Nullable;
  * @param metadata pass-through metadata from context
  * @param errorMessage error detail if status is ERROR/TIMEOUT
  */
-public record InvocationResult(boolean success, TerminalStatus status, List<PhaseCapture> phases, int inputTokens,
+public record InvocationResult(boolean success, TerminalStatus status, List<JsonNode> phases, int inputTokens,
 		int outputTokens, int thinkingTokens, int cacheCreationInputTokens, int cacheReadInputTokens,
 		double totalCostUsd, long durationMs, @Nullable String sessionId, Map<String, String> metadata,
 		@Nullable String errorMessage) implements ExecutionDetail {
 
 	public InvocationResult {
 		java.util.Objects.requireNonNull(status, "status must not be null");
-		phases = List.copyOf(phases);
+		phases = phases.stream().map(JsonNode::deepCopy).map(JsonNode.class::cast).toList();
 		metadata = Map.copyOf(metadata);
+	}
+
+	/**
+	 * Isolated original historical phase documents. No producer PhaseCapture dependency.
+	 */
+	@Override
+	public List<JsonNode> phases() {
+		return phases.stream().map(JsonNode::deepCopy).map(JsonNode.class::cast).toList();
 	}
 
 	/** Total input tokens including prompt cache reads and cache creation. */
@@ -46,7 +54,7 @@ public record InvocationResult(boolean success, TerminalStatus status, List<Phas
 	}
 
 	/** Factory for a successful completion. */
-	public static InvocationResult completed(List<PhaseCapture> phases, int inputTokens, int outputTokens,
+	public static InvocationResult completed(List<JsonNode> phases, int inputTokens, int outputTokens,
 			int thinkingTokens, double totalCostUsd, long durationMs, @Nullable String sessionId,
 			Map<String, String> metadata) {
 		return new InvocationResult(true, TerminalStatus.COMPLETED, phases, inputTokens, outputTokens, thinkingTokens,
@@ -67,30 +75,32 @@ public record InvocationResult(boolean success, TerminalStatus status, List<Phas
 	}
 
 	/**
-	 * Factory that aggregates token counts and cost from a list of PhaseCapture records.
+	 * Factory that aggregates token counts and cost from a list of JsonNode records.
 	 * @param phases per-phase captures from the agent
 	 * @param durationMs wall-clock duration in milliseconds
 	 * @param sessionId agent session ID (nullable, extracted from last phase if null)
 	 * @param metadata pass-through metadata
 	 * @return a completed InvocationResult with aggregated metrics
 	 */
-	public static InvocationResult fromPhases(List<PhaseCapture> phases, long durationMs, @Nullable String sessionId,
+	public static InvocationResult fromPhases(List<JsonNode> phases, long durationMs, @Nullable String sessionId,
 			Map<String, String> metadata) {
-		int totalInput = phases.stream().mapToInt(PhaseCapture::inputTokens).sum();
-		int totalOutput = phases.stream().mapToInt(PhaseCapture::outputTokens).sum();
-		int totalThinking = phases.stream().mapToInt(PhaseCapture::thinkingTokens).sum();
-		int totalCacheCreation = phases.stream().mapToInt(PhaseCapture::cacheCreationInputTokens).sum();
-		int totalCacheRead = phases.stream().mapToInt(PhaseCapture::cacheReadInputTokens).sum();
-		double totalCost = phases.stream().mapToDouble(PhaseCapture::totalCostUsd).sum();
+		int totalInput = phases.stream().mapToInt(phase -> phase.path("inputTokens").asInt()).sum();
+		int totalOutput = phases.stream().mapToInt(phase -> phase.path("outputTokens").asInt()).sum();
+		int totalThinking = phases.stream().mapToInt(phase -> phase.path("thinkingTokens").asInt()).sum();
+		int totalCacheCreation = phases.stream()
+			.mapToInt(phase -> phase.path("cacheCreationInputTokens").asInt())
+			.sum();
+		int totalCacheRead = phases.stream().mapToInt(phase -> phase.path("cacheReadInputTokens").asInt()).sum();
+		double totalCost = phases.stream().mapToDouble(phase -> phase.path("totalCostUsd").asDouble()).sum();
 
 		// Use provided sessionId, or fall back to last phase's sessionId
 		String resolvedSessionId = sessionId;
 		if (resolvedSessionId == null && !phases.isEmpty()) {
-			resolvedSessionId = phases.get(phases.size() - 1).sessionId();
+			resolvedSessionId = phases.get(phases.size() - 1).path("sessionId").textValue();
 		}
 
 		// Check if any phase reported an error
-		boolean hasError = phases.stream().anyMatch(PhaseCapture::isError);
+		boolean hasError = phases.stream().anyMatch(phase -> phase.path("isError").asBoolean());
 
 		if (hasError) {
 			return new InvocationResult(false, TerminalStatus.ERROR, phases, totalInput, totalOutput, totalThinking,

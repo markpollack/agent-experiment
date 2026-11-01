@@ -12,8 +12,8 @@ import com.sun.net.httpserver.HttpServer;
 import io.github.markpollack.experiment.dataset.DatasetItem;
 import io.github.markpollack.experiment.recording.*;
 import io.github.markpollack.experiment.store.*;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.*;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
+import io.github.markpollack.judge.judgment.*;
 import io.github.markpollack.judge.jev.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -72,7 +72,6 @@ class JevRecordingFixtureTest {
 				.captureMode("FIXTURE")
 				.items(List.of(new DatasetItem("case", "case", goal, "fixture", "A", false, List.of(), List.of(),
 						"active", directory, null, null)))
-				.input(item -> JudgmentContext.builder().goal(goal).metadata(JevEvidence.CONTEXT_KEY, selected).build())
 				.candidate(ctx -> {
 					Judgment actual = judge.judge(ctx);
 					return actual.toBuilder().check(new Check("repeat", actual)).build();

@@ -7,8 +7,8 @@ import java.util.Optional;
 
 import io.github.markpollack.experiment.agent.InvocationResult;
 import io.github.markpollack.experiment.result.ItemResult;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.experiment.agent.TerminalStatus;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,13 +34,13 @@ class AgentReEvaluationContextFactoryTest {
 			.workspacePath(Path.of("/tmp/workspace"))
 			.build();
 
-		Optional<JudgmentContext> result = factory.create(item);
+		Optional<AgentJudgingInput> result = factory.create(item);
 
 		assertThat(result).isPresent();
-		JudgmentContext context = result.get();
+		AgentJudgingInput context = result.get();
 		assertThat(context.goal()).isEqualTo("rename-field");
 		assertThat(context.workspace()).isEqualTo(Path.of("/tmp/workspace"));
-		assertThat(context.status()).isEqualTo(ExecutionStatus.SUCCESS);
+		assertThat(context.status()).isEqualTo(TerminalStatus.COMPLETED);
 		assertThat(context.metadata()).containsEntry("key", "value");
 	}
 
@@ -56,7 +56,7 @@ class AgentReEvaluationContextFactoryTest {
 			.executionDetail(invocation)
 			.build();
 
-		Optional<JudgmentContext> result = factory.create(item);
+		Optional<AgentJudgingInput> result = factory.create(item);
 
 		assertThat(result).isEmpty();
 	}
@@ -70,7 +70,7 @@ class AgentReEvaluationContextFactoryTest {
 			.passed(true)
 			.build();
 
-		Optional<JudgmentContext> result = factory.create(item);
+		Optional<AgentJudgingInput> result = factory.create(item);
 
 		assertThat(result).isEmpty();
 	}
@@ -87,7 +87,7 @@ class AgentReEvaluationContextFactoryTest {
 			})
 			.build();
 
-		Optional<JudgmentContext> result = factory.create(item);
+		Optional<AgentJudgingInput> result = factory.create(item);
 
 		assertThat(result).isEmpty();
 	}
@@ -104,7 +104,7 @@ class AgentReEvaluationContextFactoryTest {
 			.executionDetail(invocation)
 			.build();
 
-		Optional<JudgmentContext> result = factory.create(item);
+		Optional<AgentJudgingInput> result = factory.create(item);
 
 		assertThat(result).isPresent();
 		assertThat(result.get().workspace()).isNull();

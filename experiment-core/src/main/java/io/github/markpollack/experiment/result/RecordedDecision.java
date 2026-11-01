@@ -1,7 +1,7 @@
 package io.github.markpollack.experiment.result;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import io.github.markpollack.judge.jury.Decision;
+
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -24,14 +24,6 @@ public record RecordedDecision(String kind, @Nullable String tier, @Nullable Str
 
 	public RecordedDecision {
 		java.util.Objects.requireNonNull(kind, "kind must not be null");
-	}
-
-	public static @Nullable RecordedDecision from(@Nullable Decision decision) {
-		if (decision == null) {
-			return null;
-		}
-		return new RecordedDecision(decision.kind().wireName(), decision.tier(),
-				decision.basis() != null ? decision.basis().wireName() : null);
 	}
 
 }

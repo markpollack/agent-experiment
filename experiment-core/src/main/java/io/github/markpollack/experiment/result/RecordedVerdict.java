@@ -4,7 +4,7 @@ import java.util.*;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.github.markpollack.experiment.recording.ProducerDocument;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 import org.jspecify.annotations.Nullable;
 
 /** Complete producer verdict source; consumer instrument associations are external. */
@@ -103,7 +103,9 @@ public final class RecordedVerdict {
 	}
 
 	public RecordedJudgment aggregated() {
-		return RecordedJudgment.fromProducerJson(source.node().path("aggregated").toString());
+		return RecordedJudgment.fromProducerJson(
+				(source.node().has("judgment") ? source.node().path("judgment") : source.node().path("aggregated"))
+					.toString());
 	}
 
 	public List<RecordedJudgment> individual() {

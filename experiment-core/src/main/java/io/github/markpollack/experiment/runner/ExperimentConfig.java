@@ -29,10 +29,10 @@ import org.jspecify.annotations.Nullable;
  * null, defaults to the JVM working directory at run time
  * @param requireCleanGit when true, throw if the experiment project has uncommitted
  * changes; when false (default), log a warning and continue
- * @param journalEnabled whether to write a canonical agent-journal trace (events +
- * per-step cost) per item; null defaults to true. Requires {@code outputDir} (the durable
- * journal is written beside the experiment artifacts); a no-op without one. Disable via
- * {@code withoutJournal()} for lightweight/judge runs.
+ * @param journalEnabled legacy phase-writer request, rejected by current AgentExperiment
+ * (events + per-step cost) per item; null defaults to true. Requires {@code outputDir}
+ * (the durable journal is written beside the experiment artifacts); a no-op without one.
+ * Disable via {@code withoutJournal()} for lightweight/judge runs.
  */
 public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable ItemFilter itemFilter, String model,
 		String promptTemplate, Duration perItemTimeout, @Nullable String systemPrompt, @Nullable Path knowledgeBaseDir,
@@ -58,12 +58,11 @@ public record ExperimentConfig(String experimentName, Path datasetDir, @Nullable
 	}
 
 	/**
-	 * Whether per-item journaling is requested. Defaults to true when
-	 * {@code journalEnabled} is null. A durable journal is only actually written when
-	 * {@code outputDir} is also set.
+	 * Whether the caller explicitly requested the retired phase writer. Current callers
+	 * use the canonical acquisition runtime; an explicit legacy request is rejected.
 	 */
 	public boolean shouldJournal() {
-		return journalEnabled == null || journalEnabled;
+		return Boolean.TRUE.equals(journalEnabled);
 	}
 
 	public static Builder builder() {

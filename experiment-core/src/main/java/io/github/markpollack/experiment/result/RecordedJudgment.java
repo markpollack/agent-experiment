@@ -4,7 +4,7 @@ import java.util.*;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.github.markpollack.experiment.recording.ProducerDocument;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 import org.jspecify.annotations.Nullable;
 
 /** Complete immutable producer source with derived legacy convenience views. */

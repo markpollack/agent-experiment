@@ -366,7 +366,7 @@ final class ResultObjectMapper {
 			if (p.getParsingContext().inRoot() && p.nextToken() != null)
 				throw new IOException("Trailing Experiment recording content");
 			if (tree.has("recordingSchemaVersion")) {
-				if (!tree.get("recordingSchemaVersion").isInt() || tree.get("recordingSchemaVersion").intValue() != 2)
+				if (!tree.get("recordingSchemaVersion").isInt() || tree.get("recordingSchemaVersion").intValue() != 3)
 					throw new IOException("Unsupported Experiment recording schema");
 				for (String field : List.of("totalTokens", "totalDurationMs", "declaredRows", "attemptedRows"))
 					if (tree.hasNonNull(field) && (!tree.get(field).isIntegralNumber()

@@ -113,7 +113,7 @@ public record ExperimentResult(String experimentId, String experimentName, @Null
 
 		private boolean codeDirty;
 
-		private @Nullable Integer recordingSchemaVersion = 2;
+		private @Nullable Integer recordingSchemaVersion = 3;
 
 		private String experimentKind = "AGENT";
 

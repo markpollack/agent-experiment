@@ -9,10 +9,7 @@ import io.github.markpollack.experiment.result.ItemResult;
 import io.github.markpollack.experiment.result.RecordedJudgment;
 import io.github.markpollack.experiment.result.RecordedJudgmentStatus;
 import io.github.markpollack.experiment.result.RecordedVerdict;
-import io.github.markpollack.judge.jury.interpretation.Interpretation;
-import io.github.markpollack.judge.jury.interpretation.ReadingSupport;
-import io.github.markpollack.judge.jury.interpretation.Stage;
-import io.github.markpollack.judge.jury.interpretation.VerdictReading;
+
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -31,10 +28,22 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ItemAccountingTest {
 
+	enum Reading {
+
+		ACCEPTED, REJECTED, UNDECIDED, NOT_APPLICABLE, NOT_ASSESSED
+
+	}
+
+	enum ReadingSupport {
+
+		SUPPORTED, UNDETERMINED, CONTRADICTED
+
+	}
+
 	@Test
 	void acceptedRejectedAndUndecidedAreAllScored() {
-		ItemCounts counts = ItemAccounting.count(List.of(item("a", VerdictReading.ACCEPTED),
-				item("b", VerdictReading.REJECTED), item("c", VerdictReading.UNDECIDED)));
+		ItemCounts counts = ItemAccounting
+			.count(List.of(item("a", Reading.ACCEPTED), item("b", Reading.REJECTED), item("c", Reading.UNDECIDED)));
 
 		// An abstention is about a criterion that applied, so it counts against the
 		// subject.
@@ -45,7 +54,7 @@ class ItemAccountingTest {
 	@Test
 	void notApplicableLeavesTheDenominatorAndAnAllExcludedRunHasNoRate() {
 		ItemCounts counts = ItemAccounting
-			.count(List.of(item("a", VerdictReading.NOT_APPLICABLE), item("b", VerdictReading.NOT_APPLICABLE)));
+			.count(List.of(item("a", Reading.NOT_APPLICABLE), item("b", Reading.NOT_APPLICABLE)));
 
 		assertThat(counts).isEqualTo(new ItemCounts(0, 0, 2, 0, 0, 0));
 		// Nothing was scored, so there is no rate. Reporting 0.0 would say the subject
@@ -55,7 +64,7 @@ class ItemAccountingTest {
 
 	@Test
 	void anUnassessedSubjectIsExcludedAndCountedAsAnInstrumentFailure() {
-		ItemCounts counts = ItemAccounting.count(List.of(item("a", VerdictReading.NOT_ASSESSED)));
+		ItemCounts counts = ItemAccounting.count(List.of(item("a", Reading.NOT_ASSESSED)));
 
 		// The jury could not assess the subject. That is the instrument's failure, and
 		// counting it against the subject is the defect this whole record exists to
@@ -68,7 +77,7 @@ class ItemAccountingTest {
 	void aRejectionWhoseStageAlsoFailedCountsAgainstTheSubjectAndAsAnInstrumentFailure() {
 		// The mixed case: the subject was rejected and a stage of the jury also failed to
 		// run. One number cannot say both, so both are recorded.
-		ItemResult mixed = item("a", VerdictReading.REJECTED, ReadingSupport.SUPPORTED, stageThatFailedToRun());
+		ItemResult mixed = item("a", Reading.REJECTED, ReadingSupport.SUPPORTED, stageThatFailedToRun());
 
 		assertThat(ItemAccounting.outcomeOf(mixed)).isEqualTo(SubjectOutcome.NON_PASS);
 		assertThat(ItemAccounting.count(List.of(mixed))).isEqualTo(new ItemCounts(0, 1, 0, 1, 0, 0));
@@ -76,7 +85,7 @@ class ItemAccountingTest {
 
 	@Test
 	void aStageThatFailedIsCountedEvenWhenTheSubjectPassed() {
-		ItemResult item = item("a", VerdictReading.ACCEPTED, ReadingSupport.SUPPORTED, stageThatFailedToRun());
+		ItemResult item = item("a", Reading.ACCEPTED, ReadingSupport.SUPPORTED, stageThatFailedToRun());
 
 		// The subject passed and the instrument still failed. One number cannot say both.
 		assertThat(ItemAccounting.count(List.of(item))).isEqualTo(new ItemCounts(1, 0, 0, 1, 0, 0));
@@ -84,7 +93,7 @@ class ItemAccountingTest {
 
 	@Test
 	void aJuryThatDidNotConveneIsAnInstrumentFailureWhateverItDecided() {
-		ItemResult marked = item("a", VerdictReading.ACCEPTED).toBuilder()
+		ItemResult marked = item("a", Reading.ACCEPTED).toBuilder()
 			.metadata(Map.of(InstrumentRecord.ITEM_INSTRUMENT_FAILURE, "rosterMismatch"))
 			.build();
 
@@ -126,7 +135,7 @@ class ItemAccountingTest {
 
 	@Test
 	void aReadingTheRecordsOwnFactsContradictIsNeverCounted() {
-		ItemResult contradicted = item("a", VerdictReading.ACCEPTED, ReadingSupport.CONTRADICTED);
+		ItemResult contradicted = item("a", Reading.ACCEPTED, ReadingSupport.CONTRADICTED);
 
 		// The file disputes its own reading. Counting it would publish a number the
 		// record
@@ -141,7 +150,7 @@ class ItemAccountingTest {
 		// Almost every stored verdict predates aggregation evidence. Refusing these would
 		// discard the archive rather than measure it.
 		assertThat(ItemAccounting.COUNT_UNVERIFIED).isTrue();
-		ItemResult unverified = item("a", VerdictReading.ACCEPTED, ReadingSupport.UNDETERMINED);
+		ItemResult unverified = item("a", Reading.ACCEPTED, ReadingSupport.UNDETERMINED);
 
 		assertThat(ItemAccounting.outcomeOf(unverified)).isEqualTo(SubjectOutcome.PASS);
 		assertThat(ItemAccounting.count(List.of(unverified))).isEqualTo(new ItemCounts(1, 0, 0, 0, 0, 0));
@@ -155,14 +164,19 @@ class ItemAccountingTest {
 		assertThat(ItemAccounting.instrumentHealth(noReading)).isEqualTo(InstrumentHealth.UNKNOWN);
 	}
 
-	private static ItemResult item(String id, @Nullable VerdictReading reading) {
+	private static ItemResult item(String id, @Nullable Reading reading) {
 		return item(id, reading, ReadingSupport.SUPPORTED);
 	}
 
-	private static ItemResult item(String id, @Nullable VerdictReading reading, ReadingSupport support,
-			Stage... stages) {
-		Interpretation interpretation = new Interpretation(Interpretation.SCHEMA_VERSION, 1, reading, support, null,
-				stage(null), List.of(stages), List.of(), "for the counting rules");
+	private static ItemResult item(String id, @Nullable Reading reading, ReadingSupport support,
+			com.fasterxml.jackson.databind.JsonNode... stages) {
+		var interpretation = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+		interpretation.put("schemaVersion", 2).put("sourceVersion", 1);
+		if (reading != null)
+			interpretation.put("reading", reading.name());
+		interpretation.put("readingSupport", support.name());
+		interpretation.set("root", stage(null));
+		interpretation.set("stages", new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(List.of(stages)));
 		return ItemResult.builder()
 			.historical(true)
 			.itemId(id)
@@ -173,12 +187,15 @@ class ItemAccountingTest {
 			.build();
 	}
 
-	private static Stage stageThatFailedToRun() {
+	private static com.fasterxml.jackson.databind.JsonNode stageThatFailedToRun() {
 		return stage("jury_execution_failed");
 	}
 
-	private static Stage stage(@Nullable String failure) {
-		return new Stage("s", List.of(), null, null, null, null, failure, null, null, null, null, null, List.of());
+	private static com.fasterxml.jackson.databind.JsonNode stage(@Nullable String failure) {
+		var stage = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+		if (failure != null)
+			stage.put("failure", failure);
+		return stage;
 	}
 
 	/**

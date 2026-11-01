@@ -1,170 +1,73 @@
 package io.github.markpollack.experiment.workflow;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import io.github.markpollack.experiment.agent.AgentInvocationException;
-import io.github.markpollack.experiment.agent.AgentInvoker;
-import io.github.markpollack.experiment.agent.InvocationContext;
-import io.github.markpollack.experiment.agent.InvocationResult;
-import io.github.markpollack.journal.Journal;
-import io.github.markpollack.journal.Run;
-import io.github.markpollack.workflow.core.AgentContext;
-import io.github.markpollack.workflow.flows.workflow.StepTransition;
-import io.github.markpollack.workflow.flows.workflow.TraceRecorder;
-import io.github.markpollack.workflow.flows.workflow.Workflow;
-import io.github.markpollack.workflow.flows.workflow.WorkflowExecutor;
-import io.github.markpollack.workflow.journal.WorkflowJournal;
+import java.nio.file.*;
+import java.time.Duration;
+import java.util.*;
+import io.github.markpollack.experiment.agent.*;
+import io.github.markpollack.experiment.runtime.WorkflowAdapter;
+import io.github.markpollack.experiment.runtime.AgentRecords.Identity;
+import io.github.markpollack.workflow.flows.compiler.ValidatedWorkflow;
+import io.github.markpollack.workflow.batch.durable.*;
 
 /**
- * Base class for experiment invokers backed by the agent-workflow DSL.
- *
- * <p>
- * Wires the experiment loop ({@link AgentInvoker}) to a typed workflow execution,
- * recording each step into the journal and surfacing aggregated cost and token metrics in
- * the returned {@link InvocationResult}.
- *
- * <h2>How to use</h2> <pre>{@code
- * // In package io.github.markpollack.experiment.workflow (or your own package):
- * public class BomSyncInvoker extends WorkflowInvoker<BomSyncState> {
- *
- *     \@Override protected String workflowName() { return "bom-sync"; }
- *
- *     \@Override
- *     protected Workflow<Object, BomSyncState> buildWorkflow(
- *             InvocationContext ctx, WorkflowExecutor executor) {
- *         return Workflow.<Object, BomSyncState>define(workflowName())
- *                 .withExecutor(executor)
- *                 .step(checkMavenCentral)
- *                 .step(updateBomFile)
- *                 .build();
- *     }
- *
- *     \@Override
- *     protected BomSyncState buildInitialState(InvocationContext ctx) {
- *         return new BomSyncState(ctx.workspacePath());
- *     }
- * }
- * }</pre>
- *
- * <p>
- * Each workflow execution opens a journal {@link Run} under the experiment named
- * {@link #workflowName()}. Step completions are recorded as typed
- * {@code WorkflowStepEvent} entries via the journal-backed {@code TraceRecorder}. Cost
- * and token totals flow back into {@link InvocationResult} so the experiment framework
- * can track them normally.
- *
- * <h2>Journal configuration</h2>
- * <p>
- * Configure the journal storage once at startup before creating invokers: <pre>{@code
- * Journal.configure(new JsonFileStorage(Path.of("experiments", "traces", ".agent-journal")));
- * }</pre>
- *
- * @param <S> the workflow state type passed between steps
- * @see WorkflowAgentInvoker
+ * A current typed Workflow run with retained snapshot and explicitly unknown usage
+ * totals.
  */
 public abstract class WorkflowInvoker<S> implements AgentInvoker {
 
-	@Override
-	public final InvocationResult invoke(InvocationContext context) throws AgentInvocationException {
-		WorkflowJournal.registerEventType();
-
-		long start = System.currentTimeMillis();
-		try (Run run = Journal.run(workflowName()).start()) {
-			var costTracker = new CostTrackingRecorder(WorkflowJournal.forRun(run));
-			var executor = new WorkflowExecutor(costTracker);
-
-			Workflow<Object, S> workflow = buildWorkflow(context, executor);
-			S initialState = buildInitialState(context);
-
-			AgentContext agentCtx = AgentContext.withRunId(run.id())
-				.mutate()
-				.with(AgentContext.WORKFLOW_NAME, workflowName())
-				.build();
-
-			workflow.execute(agentCtx, initialState);
-
-			long durationMs = System.currentTimeMillis() - start;
-			Map<String, String> metadata = new HashMap<>(context.metadata());
-			enrichMetadata(context, metadata);
-
-			return InvocationResult.completed(List.of(), 0, (int) costTracker.totalTokens(), 0, costTracker.totalCost(),
-					durationMs, run.id(), metadata);
-		}
-		catch (Exception ex) {
-			throw new AgentInvocationException("Workflow execution failed: " + ex.getMessage(), ex);
-		}
+	/** Per-invocation graph, executable bindings and exact deployment identity. */
+	public record Plan(ValidatedWorkflow definition, StepRegistry steps, ExecutionCompatibility deployment) {
 	}
 
-	/**
-	 * Name of this workflow — used as both the workflow DSL name and the journal
-	 * experiment identifier.
-	 */
 	protected abstract String workflowName();
 
-	/**
-	 * Build the workflow to execute. The {@code executor} is pre-wired with a
-	 * journal-backed {@code TraceRecorder}; inject it via {@code .withExecutor(executor)}
-	 * on the workflow builder.
-	 * @param context the invocation context (workspace, prompt, model, metadata)
-	 * @param executor the journal-backed workflow executor to inject
-	 * @return a fully built {@link Workflow} ready to execute
-	 */
-	protected abstract Workflow<Object, S> buildWorkflow(InvocationContext context, WorkflowExecutor executor);
+	protected abstract Plan buildWorkflow(InvocationContext context);
 
-	/**
-	 * Construct the initial state passed to the first workflow step.
-	 * @param context the invocation context
-	 * @return the starting state for this invocation
-	 */
 	protected abstract S buildInitialState(InvocationContext context);
 
-	/**
-	 * Optionally enrich the result metadata after workflow execution. Override to add
-	 * domain-specific entries (e.g., artifacts produced, version bumped).
-	 * @param context the original invocation context
-	 * @param metadata mutable metadata map to enrich
-	 */
 	protected void enrichMetadata(InvocationContext context, Map<String, String> metadata) {
 	}
 
-	/**
-	 * Wraps a delegate {@link TraceRecorder} and accumulates per-step token and cost
-	 * totals so they can be surfaced in {@link InvocationResult}.
-	 */
-	private static final class CostTrackingRecorder implements TraceRecorder {
+	protected boolean outputSucceeded(Object value) {
+		return true;
+	}
 
-		private final TraceRecorder delegate;
+	protected void terminateProvider() {
+	}
 
-		private long totalTokens = 0;
-
-		private double totalCost = 0.0;
-
-		CostTrackingRecorder(TraceRecorder delegate) {
-			this.delegate = delegate;
+	@Override
+	public final InvocationResult invoke(InvocationContext context) throws AgentInvocationException {
+		long start = System.nanoTime();
+		try {
+			Plan plan = Objects.requireNonNull(buildWorkflow(context));
+			Path root = context.workspacePath().resolve(".experiment-workflow");
+			Files.createDirectories(root);
+			String id = UUID.randomUUID().toString();
+			var identity = Identity.of(context.metadata().getOrDefault("experimentId", id),
+					context.metadata().getOrDefault("itemId", id),
+					context.metadata().getOrDefault("variant", "default"), 0);
+			var execution = new WorkflowAdapter().execute(root.resolve(id), plan.definition(), plan.steps(),
+					plan.deployment(), identity, buildInitialState(context), Duration.ofSeconds(1),
+					this::terminateProvider);
+			var metadata = new LinkedHashMap<>(context.metadata());
+			metadata.put("measurementState", "UNKNOWN");
+			metadata.put("measurementReason", "Workflow completion is not a provider usage measurement");
+			metadata.put("workflowRunId", execution.snapshot().runId());
+			metadata.put("workflowState", execution.snapshot().status().name());
+			metadata.put("workflowLifecycle", execution.lifecycle());
+			metadata.put("workflowSnapshot", execution.snapshotFile().path());
+			metadata.put("workflowSnapshotSha256", execution.snapshotFile().sha256());
+			metadata.put("workflowResult",
+					new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(execution.value()));
+			enrichMetadata(context, metadata);
+			boolean success = execution.accepted() && outputSucceeded(execution.value());
+			return new InvocationResult(success, success ? TerminalStatus.COMPLETED : TerminalStatus.ERROR, List.of(),
+					0, 0, 0, 0, 0, 0.0, (System.nanoTime() - start) / 1_000_000, execution.snapshot().runId(), metadata,
+					success ? null : "Workflow output not accepted");
 		}
-
-		@Override
-		public void record(StepTransition transition) {
-			delegate.record(transition);
-			totalTokens += transition.tokensUsed();
-			totalCost += transition.costUsd();
+		catch (Exception failure) {
+			throw new AgentInvocationException("Workflow execution failed: " + failure.getMessage(), failure);
 		}
-
-		@Override
-		public List<StepTransition> getTrace(String workflowRunId) {
-			return delegate.getTrace(workflowRunId);
-		}
-
-		long totalTokens() {
-			return totalTokens;
-		}
-
-		double totalCost() {
-			return totalCost;
-		}
-
 	}
 
 }

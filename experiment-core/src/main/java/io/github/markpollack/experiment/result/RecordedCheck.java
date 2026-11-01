@@ -1,6 +1,6 @@
 package io.github.markpollack.experiment.result;
 
-import io.github.markpollack.judge.result.Check;
+import io.github.markpollack.judge.judgment.Check;
 import org.jspecify.annotations.Nullable;
 
 /** A complete child judgment with an explicitly historical Boolean compatibility view. */
@@ -21,7 +21,8 @@ public record RecordedCheck(String name, @Nullable Boolean passed, String messag
 			case FAIL -> false;
 			default -> null;
 		};
-		return new RecordedCheck(check.id(), value, check.message(), RecordedJudgment.from(check.judgment()));
+		return new RecordedCheck(check.id(), value, check.judgment().reasoning(),
+				RecordedJudgment.from(check.judgment()));
 	}
 
 	public static RecordedCheck pass(String name, String message) {

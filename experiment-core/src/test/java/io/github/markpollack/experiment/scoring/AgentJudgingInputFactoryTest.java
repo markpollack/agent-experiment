@@ -10,12 +10,12 @@ import io.github.markpollack.experiment.agent.TerminalStatus;
 import io.github.markpollack.experiment.dataset.DatasetItem;
 import io.github.markpollack.experiment.runner.ExperimentConfig;
 import org.junit.jupiter.api.Test;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.experiment.agent.TerminalStatus;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class JudgmentContextFactoryTest {
+class AgentJudgingInputFactoryTest {
 
 	private static final Path WORKSPACE = Path.of("/tmp/workspace");
 
@@ -34,34 +34,34 @@ class JudgmentContextFactoryTest {
 
 	@Test
 	void createsValidContextFromDatasetItemAndInvocationResult() {
-		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), REFERENCE_DIR);
+		AgentJudgingInput ctx = AgentJudgingInputFactory.create(testItem(), WORKSPACE, testInvocation(), REFERENCE_DIR);
 
 		assertThat(ctx.goal()).isEqualTo("Upgrade Spring Boot to 3.x");
 		assertThat(ctx.workspace()).isEqualTo(WORKSPACE);
 		assertThat(ctx.executionTime()).isEqualTo(Duration.ofMillis(3000));
-		assertThat(ctx.status()).isEqualTo(ExecutionStatus.SUCCESS);
+		assertThat(ctx.status()).isEqualTo(TerminalStatus.COMPLETED);
 	}
 
 	@Test
 	void mapsCompletedToSuccess() {
-		assertThat(JudgmentContextFactory.mapStatus(TerminalStatus.COMPLETED)).isEqualTo(ExecutionStatus.SUCCESS);
+		assertThat(AgentJudgingInputFactory.mapStatus(TerminalStatus.COMPLETED)).isEqualTo(TerminalStatus.COMPLETED);
 	}
 
 	@Test
 	void mapsTimeoutToTimeout() {
-		assertThat(JudgmentContextFactory.mapStatus(TerminalStatus.TIMEOUT)).isEqualTo(ExecutionStatus.TIMEOUT);
+		assertThat(AgentJudgingInputFactory.mapStatus(TerminalStatus.TIMEOUT)).isEqualTo(TerminalStatus.TIMEOUT);
 	}
 
 	@Test
 	void mapsErrorToFailed() {
-		assertThat(JudgmentContextFactory.mapStatus(TerminalStatus.ERROR)).isEqualTo(ExecutionStatus.FAILED);
+		assertThat(AgentJudgingInputFactory.mapStatus(TerminalStatus.ERROR)).isEqualTo(TerminalStatus.ERROR);
 	}
 
 	@Test
 	void includesExpectedDirInMetadata() {
 		InvocationResult invocation = InvocationResult.completed(List.of(), 0, 0, 0, 0.0, 1000, null, Map.of());
 
-		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, invocation, REFERENCE_DIR);
+		AgentJudgingInput ctx = AgentJudgingInputFactory.create(testItem(), WORKSPACE, invocation, REFERENCE_DIR);
 
 		assertThat(ctx.metadata()).containsEntry("expectedDir", REFERENCE_DIR);
 	}
@@ -70,12 +70,12 @@ class JudgmentContextFactoryTest {
 	void createsContextWithNullReferenceDir() {
 		InvocationResult invocation = InvocationResult.completed(List.of(), 100, 200, 50, 0.01, 1500, null, Map.of());
 
-		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, invocation, null);
+		AgentJudgingInput ctx = AgentJudgingInputFactory.create(testItem(), WORKSPACE, invocation, null);
 
 		assertThat(ctx.goal()).isEqualTo("Upgrade Spring Boot to 3.x");
 		assertThat(ctx.workspace()).isEqualTo(WORKSPACE);
 		assertThat(ctx.executionTime()).isEqualTo(Duration.ofMillis(1500));
-		assertThat(ctx.status()).isEqualTo(ExecutionStatus.SUCCESS);
+		assertThat(ctx.status()).isEqualTo(TerminalStatus.COMPLETED);
 		assertThat(ctx.metadata()).doesNotContainKey("expectedDir");
 	}
 
@@ -85,16 +85,16 @@ class JudgmentContextFactoryTest {
 	void includesBeforeDirInMetadata() {
 		Path beforeDir = Path.of("/tmp/before");
 
-		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, beforeDir,
-				null, null);
+		AgentJudgingInput ctx = AgentJudgingInputFactory.create(testItem(), WORKSPACE, testInvocation(), null,
+				beforeDir, null, null);
 
 		assertThat(ctx.metadata()).containsEntry("beforeDir", beforeDir);
 	}
 
 	@Test
 	void omitsBeforeDirWhenNull() {
-		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
-				null);
+		AgentJudgingInput ctx = AgentJudgingInputFactory.create(testItem(), WORKSPACE, testInvocation(), null, null,
+				null, null);
 
 		assertThat(ctx.metadata()).doesNotContainKey("beforeDir");
 	}
@@ -113,7 +113,7 @@ class JudgmentContextFactoryTest {
 			.metadata(Map.of("targetBootVersion", "3.0.0", "targetJavaVersion", "17", "targetClassVersion", "61"))
 			.build();
 
-		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), REFERENCE_DIR,
+		AgentJudgingInput ctx = AgentJudgingInputFactory.create(testItem(), WORKSPACE, testInvocation(), REFERENCE_DIR,
 				null, planRoadmap, config);
 
 		assertThat(ctx.metadata()).containsEntry("expectedDir", REFERENCE_DIR);
@@ -127,7 +127,7 @@ class JudgmentContextFactoryTest {
 	void partialEnrichmentOnlyPlan() {
 		String planRoadmap = "# Roadmap";
 
-		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null,
+		AgentJudgingInput ctx = AgentJudgingInputFactory.create(testItem(), WORKSPACE, testInvocation(), null, null,
 				planRoadmap, null);
 
 		assertThat(ctx.metadata()).containsEntry("plan", planRoadmap);
@@ -145,8 +145,8 @@ class JudgmentContextFactoryTest {
 			.metadata(Map.of("targetBootVersion", "3.0.0"))
 			.build();
 
-		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
-				config);
+		AgentJudgingInput ctx = AgentJudgingInputFactory.create(testItem(), WORKSPACE, testInvocation(), null, null,
+				null, config);
 
 		assertThat(ctx.metadata()).containsEntry("targetBootVersion", "3.0.0");
 		assertThat(ctx.metadata()).doesNotContainKey("targetJavaVersion");
@@ -156,12 +156,12 @@ class JudgmentContextFactoryTest {
 
 	@Test
 	void noEnrichmentBackwardCompatible() {
-		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
-				null);
+		AgentJudgingInput ctx = AgentJudgingInputFactory.create(testItem(), WORKSPACE, testInvocation(), null, null,
+				null, null);
 
 		assertThat(ctx.goal()).isEqualTo("Upgrade Spring Boot to 3.x");
 		assertThat(ctx.workspace()).isEqualTo(WORKSPACE);
-		assertThat(ctx.status()).isEqualTo(ExecutionStatus.SUCCESS);
+		assertThat(ctx.status()).isEqualTo(TerminalStatus.COMPLETED);
 		assertThat(ctx.metadata()).isEmpty();
 	}
 
@@ -176,8 +176,8 @@ class JudgmentContextFactoryTest {
 			.metadata(Map.of("someOtherKey", "value"))
 			.build();
 
-		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
-				config);
+		AgentJudgingInput ctx = AgentJudgingInputFactory.create(testItem(), WORKSPACE, testInvocation(), null, null,
+				null, config);
 
 		assertThat(ctx.metadata()).doesNotContainKey("targetBootVersion");
 		assertThat(ctx.metadata()).doesNotContainKey("targetJavaVersion");
@@ -195,8 +195,8 @@ class JudgmentContextFactoryTest {
 			.metadata(Map.of("targetClassVersion", "61"))
 			.build();
 
-		JudgmentContext ctx = JudgmentContextFactory.create(testItem(), WORKSPACE, testInvocation(), null, null, null,
-				config);
+		AgentJudgingInput ctx = AgentJudgingInputFactory.create(testItem(), WORKSPACE, testInvocation(), null, null,
+				null, config);
 
 		Object classVersion = ctx.metadata().get("targetClassVersion");
 		assertThat(classVersion).isInstanceOf(Integer.class);

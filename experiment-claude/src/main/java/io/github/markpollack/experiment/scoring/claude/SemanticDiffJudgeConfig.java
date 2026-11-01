@@ -6,7 +6,10 @@ import java.util.Objects;
 /**
  * Configuration for {@link SemanticDiffJudge}.
  *
- * @param model Claude model name (e.g. "sonnet", "haiku", "opus")
+ * @param model the judging model — this instrument's identity, held constant while the
+ * experiment varies its subject, and recorded in the judgment as {@code judgeModel}.
+ * Passed to the provider untranslated (e.g. "sonnet", "haiku", "opus", or a full model
+ * id).
  * @param maxCriteriaToEvaluate maximum number of VERIFY criteria to evaluate per judgment
  * @param timeout timeout per criterion evaluation
  */

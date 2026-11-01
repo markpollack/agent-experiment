@@ -42,7 +42,6 @@
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
         <!-- Dependency versions -->
-        <claude-code-capture.version>1.10.0</claude-code-capture.version>
         <!--
             A snapshot version names no particular build, so what identifies the library
             that scored a run is not this string: every run records the SHA-256 of the jar
@@ -50,10 +49,10 @@
             repository declared above and never from a local `mvn install`, which can
             replace a version in ~/.m2 with different code under the same name.
         -->
-        <agent-judge.version>0.17.0</agent-judge.version>
-        <claude-code-sdk.version>1.6.0</claude-code-sdk.version>
-        <agent-workflow.version>0.12.3</agent-workflow.version>
-        <agent-client.version>0.30.0</agent-client.version>
+        <agent-judge.version>0.18.0</agent-judge.version>
+        <claude-code-sdk.version>1.8.0-SNAPSHOT</claude-code-sdk.version>
+        <agent-workflow.version>0.14.0</agent-workflow.version>
+        <agent-client.version>0.32.1-SNAPSHOT</agent-client.version>
 
         <!-- Third-party dependency versions -->
         <jackson.version>2.22.2</jackson.version>
@@ -82,6 +81,7 @@
 
     <modules>
         <module>experiment-core</module>
+        <module>experiment-agent-client</module>
         <module>experiment-claude</module>
         <module>experiment-workflow</module>
         <module>experiment-runtime</module>
@@ -123,18 +123,8 @@
                 <artifactId>workflow-flows</artifactId>
                 <version>${agent-workflow.version}</version>
             </dependency>
-            <dependency>
-                <groupId>io.github.markpollack</groupId>
-                <artifactId>workflow-journal</artifactId>
-                <version>${agent-workflow.version}</version>
-            </dependency>
 
             <!-- Journal core -->
-            <dependency>
-                <groupId>io.github.markpollack</groupId>
-                <artifactId>journal-core</artifactId>
-                <version>${claude-code-capture.version}</version>
-            </dependency>
 
             <!-- Agent client -->
             <dependency>
@@ -162,11 +152,6 @@
                 <groupId>io.github.markpollack</groupId>
                 <artifactId>claude-code-sdk</artifactId>
                 <version>${claude-code-sdk.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.github.markpollack</groupId>
-                <artifactId>claude-code-capture</artifactId>
-                <version>${claude-code-capture.version}</version>
             </dependency>
 
             <!-- Null safety -->
@@ -379,8 +364,8 @@
                       chain. Maven does that; licence scanners, SBOM generators and dependency
                       audits frequently do not, and read the artifact's own pom alone.
 
-                      Measured on 2026-08-30: journal-core 1.10.0's published pom declares NO
-                      licence, while agent-journal-parent 1.10.0 declares Business Source License
+                      Measured on 2026-08-30: journal-core 2.0.0-SNAPSHOT's published pom declares NO
+                      licence, while agent-journal-parent 2.0.0-SNAPSHOT declares Business Source License
                       1.1. Nothing was unlicensed - the jar carries META-INF/LICENSE and the parent
                       declares it - but an acquirer's automated crawl read the estate as partly
                       unlicensed, because the surface tools read had nothing on it.

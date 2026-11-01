@@ -3,7 +3,7 @@ package io.github.markpollack.experiment.agent;
 import java.util.List;
 import java.util.Map;
 
-import io.github.markpollack.journal.claude.PhaseCapture;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.github.markpollack.journal.claude.ToolUseRecord;
 import org.junit.jupiter.api.Test;
 
@@ -60,7 +60,7 @@ class InvocationResultTest {
 
 	@Test
 	void phasesListIsDefensiveCopy() {
-		var mutablePhases = new java.util.ArrayList<io.github.markpollack.journal.claude.PhaseCapture>();
+		var mutablePhases = new java.util.ArrayList<JsonNode>();
 
 		InvocationResult result = InvocationResult.completed(mutablePhases, 0, 0, 0, 0.0, 0, null, Map.of());
 
@@ -70,8 +70,8 @@ class InvocationResultTest {
 
 	@Test
 	void fromPhasesAggregatesTokensAndCost() {
-		PhaseCapture phase1 = createPhase("phase1", 100, 50, 20, 0.01, false);
-		PhaseCapture phase2 = createPhase("phase2", 200, 80, 30, 0.02, false);
+		JsonNode phase1 = createPhase("phase1", 100, 50, 20, 0.01, false);
+		JsonNode phase2 = createPhase("phase2", 200, 80, 30, 0.02, false);
 
 		InvocationResult result = InvocationResult.fromPhases(List.of(phase1, phase2), 5000, null, Map.of());
 
@@ -87,7 +87,7 @@ class InvocationResultTest {
 
 	@Test
 	void fromPhasesExtractsSessionIdFromLastPhase() {
-		PhaseCapture phase = createPhaseWithSessionId("invoke", 100, 50, 0, 0.01, false, "session-abc");
+		JsonNode phase = createPhaseWithSessionId("invoke", 100, 50, 0, 0.01, false, "session-abc");
 
 		InvocationResult result = InvocationResult.fromPhases(List.of(phase), 3000, null, Map.of());
 
@@ -96,7 +96,7 @@ class InvocationResultTest {
 
 	@Test
 	void fromPhasesUsesProvidedSessionId() {
-		PhaseCapture phase = createPhaseWithSessionId("invoke", 100, 50, 0, 0.01, false, "session-from-phase");
+		JsonNode phase = createPhaseWithSessionId("invoke", 100, 50, 0, 0.01, false, "session-from-phase");
 
 		InvocationResult result = InvocationResult.fromPhases(List.of(phase), 3000, "explicit-session", Map.of());
 
@@ -105,7 +105,7 @@ class InvocationResultTest {
 
 	@Test
 	void fromPhasesDetectsError() {
-		PhaseCapture errorPhase = createPhase("invoke", 100, 50, 0, 0.005, true);
+		JsonNode errorPhase = createPhase("invoke", 100, 50, 0, 0.005, true);
 
 		InvocationResult result = InvocationResult.fromPhases(List.of(errorPhase), 2000, null,
 				Map.of("itemId", "ITEM-001"));
@@ -143,10 +143,8 @@ class InvocationResultTest {
 
 	@Test
 	void fromPhasesAggregatesCacheTokens() {
-		PhaseCapture phase1 = new PhaseCapture("phase1", "prompt", 10, 100, 0, 2000, 30000, 1000, 800, 0.01, "sess", 2,
-				false, "output", List.of(), List.of(), null, null);
-		PhaseCapture phase2 = new PhaseCapture("phase2", "prompt", 5, 80, 0, 1000, 20000, 1000, 800, 0.01, "sess", 2,
-				false, "output", List.of(), List.of(), null, null);
+		var phase1 = phase("phase1", 10, 100, 0, 2000, 30000, 0.01, "sess", false);
+		var phase2 = phase("phase2", 5, 80, 0, 1000, 20000, 0.01, "sess", false);
 
 		InvocationResult result = InvocationResult.fromPhases(List.of(phase1, phase2), 5000, null, Map.of());
 
@@ -156,15 +154,30 @@ class InvocationResultTest {
 		assertThat(result.totalInputTokens()).isEqualTo(53015); // 15 + 3000 + 50000
 	}
 
-	private static PhaseCapture createPhase(String name, int input, int output, int thinking, double cost,
+	private static JsonNode createPhase(String name, int input, int output, int thinking, double cost,
 			boolean isError) {
 		return createPhaseWithSessionId(name, input, output, thinking, cost, isError, null);
 	}
 
-	private static PhaseCapture createPhaseWithSessionId(String name, int input, int output, int thinking, double cost,
+	private static JsonNode createPhaseWithSessionId(String name, int input, int output, int thinking, double cost,
 			boolean isError, String sessionId) {
-		return new PhaseCapture(name, "prompt", input, output, thinking, 1000, 800, cost, sessionId, 5, isError,
-				"text output", List.of(), List.of(), null);
+		return phase(name, input, output, thinking, 0, 0, cost, sessionId, isError);
+	}
+
+	private static JsonNode phase(String name, int input, int output, int thinking, int cacheWrite, int cacheRead,
+			double cost, String session, boolean error) {
+		var node = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+		node.put("name", name)
+			.put("inputTokens", input)
+			.put("outputTokens", output)
+			.put("thinkingTokens", thinking)
+			.put("cacheCreationInputTokens", cacheWrite)
+			.put("cacheReadInputTokens", cacheRead)
+			.put("totalCostUsd", cost)
+			.put("isError", error);
+		if (session != null)
+			node.put("sessionId", session);
+		return node;
 	}
 
 }

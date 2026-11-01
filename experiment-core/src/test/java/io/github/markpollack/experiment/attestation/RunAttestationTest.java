@@ -14,14 +14,14 @@ import io.github.markpollack.experiment.result.RecordedVerdict;
 import io.github.markpollack.experiment.store.FileSystemResultStore;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
 import io.github.markpollack.judge.jury.CascadedJury;
-import io.github.markpollack.judge.jury.ConsensusStrategy;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.TierPolicy;
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.jury.VotingStrategy;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.VotingStrategy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -29,9 +29,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RunAttestationTest {
 
-	private static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("attestation").build();
+	private static final AgentJudgingInput CONTEXT = AgentJudgingInput.builder().goal("attestation").build();
 
-	private static final Judge THROWS = context -> {
+	private static final Judge THROWS = () -> {
 		throw new IllegalStateException("judge unavailable");
 	};
 
@@ -52,7 +52,7 @@ class RunAttestationTest {
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		ItemAttestation attestation = ItemAttestation.of(item("a").verdict(verdict).build());
 
@@ -73,7 +73,7 @@ class RunAttestationTest {
 			.tier("guardrail", jury(Judges.alwaysPass("built")), TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("quality", jury(Judges.alwaysPass("good"), Judges.alwaysPass("tidy")), TierPolicy.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		ItemAttestation attestation = ItemAttestation.of(item("a").verdict(verdict).build());
 
@@ -88,7 +88,7 @@ class RunAttestationTest {
 			.tier("guardrail", failingJury(), TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("quality", jury(Judges.alwaysPass("good")), TierPolicy.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		ItemAttestation attestation = ItemAttestation.of(item("a").verdict(verdict).build());
 
@@ -133,8 +133,8 @@ class RunAttestationTest {
 
 	@Test
 	void runCountsAreTakenFromWhatWasStoredOnDisk(@TempDir Path dir) {
-		Verdict errored = jury(Judges.alwaysPass("fine"), THROWS).vote(CONTEXT);
-		Verdict passed = jury(Judges.alwaysPass("fine")).vote(CONTEXT);
+		Verdict errored = jury(Judges.alwaysPass("fine"), THROWS).vote();
+		Verdict passed = jury(Judges.alwaysPass("fine")).vote();
 		ExperimentResult result = ExperimentResult.builder()
 			.experimentId("run-1")
 			.experimentName("attestation")
@@ -169,7 +169,7 @@ class RunAttestationTest {
 	}
 
 	private static Jury failingJury() {
-		return new Jury() {
+		return new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
 			public List<Judge> getJudges() {
 				return List.of(Judges.alwaysPass("never asked"));
@@ -181,7 +181,7 @@ class RunAttestationTest {
 			}
 
 			@Override
-			public Verdict vote(JudgmentContext context) {
+			public Verdict vote() {
 				throw new IllegalStateException("tier unavailable");
 			}
 		};

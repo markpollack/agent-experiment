@@ -16,11 +16,10 @@ import io.github.markpollack.experiment.result.RecordedVerdict;
 import io.github.markpollack.experiment.scoring.InstrumentRecorder;
 import io.github.markpollack.experiment.scoring.VerdictExtractor;
 import io.github.markpollack.experiment.store.ResultStore;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.jury.interpretation.Interpretation;
-import io.github.markpollack.judge.jury.interpretation.Verdicts;
+import io.github.markpollack.judge.verdict.Verdict;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -29,7 +28,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>
  * Delegates context reconstruction to a {@link ReEvaluationContextFactory}, which knows
- * how to rebuild {@link JudgmentContext} from stored {@link ItemResult} data for a
+ * how to rebuild {@link AgentJudgingInput} from stored {@link ItemResult} data for a
  * specific experiment type.
  */
 public final class ReEvaluator {
@@ -58,11 +57,13 @@ public final class ReEvaluator {
 	 * @param jury the new jury to apply
 	 * @return a new experiment result with re-evaluated scores
 	 */
-	public ExperimentResult reEvaluate(ExperimentResult original, Jury jury) {
-		InstrumentRecord instrument = InstrumentRecorder.describe(jury);
+	public ExperimentResult reEvaluate(ExperimentResult original,
+			java.util.function.Function<AgentJudgingInput, Jury> jury) {
+		InstrumentRecord instrument = null;
 		List<ItemResult> items = original.items()
 			.stream()
-			.map(item -> InstrumentFailures.mark(reEvaluateItem(item, jury, instrument.specHash()), instrument))
+			.map(item -> InstrumentFailures
+				.mark(reEvaluateItem(item, jury, instrument == null ? null : instrument.specHash()), instrument))
 			.toList();
 
 		Map<String, Double> aggregateScores = aggregateScores(items);
@@ -100,23 +101,27 @@ public final class ReEvaluator {
 	 * @param jury the new jury to apply
 	 * @return a new experiment result with re-evaluated scores
 	 */
-	public ExperimentResult reEvaluate(String experimentId, Jury jury) {
+	public ExperimentResult reEvaluate(String experimentId, java.util.function.Function<AgentJudgingInput, Jury> jury) {
 		ExperimentResult original = resultStore.load(experimentId)
 			.orElseThrow(() -> new IllegalArgumentException("No experiment found with id: " + experimentId));
 		return reEvaluate(original, jury);
 	}
 
-	private ItemResult reEvaluateItem(ItemResult original, Jury jury, @Nullable String instrumentHash) {
-		Optional<JudgmentContext> context = contextFactory.create(original);
+	private ItemResult reEvaluateItem(ItemResult original, java.util.function.Function<AgentJudgingInput, Jury> jury,
+			@Nullable String instrumentHash) {
+		Optional<AgentJudgingInput> context = contextFactory.create(original);
 
 		if (context.isEmpty()) {
 			return preserveAsSkipped(original);
 		}
 
-		Verdict verdict = jury.vote(context.get());
+		Jury configuredJury = java.util.Objects.requireNonNull(jury.apply(context.get()));
+		InstrumentRecord rowInstrument = InstrumentRecorder.describe(configuredJury);
+		Verdict verdict = configuredJury.vote();
 
-		RecordedVerdict recorded = RecordedVerdict.from(verdict, instrumentHash);
-		Interpretation interpretation = Verdicts.interpret(verdict);
+		RecordedVerdict recorded = RecordedVerdict.from(verdict, rowInstrument.specHash());
+		JsonNode interpretation = io.github.markpollack.experiment.recording.InterpretationSnapshot
+			.currentReading(recorded.document());
 		return original.toBuilder()
 			.passed(ItemAccounting.passedFlag(interpretation))
 			.scores(VerdictExtractor.extractScores(verdict))
