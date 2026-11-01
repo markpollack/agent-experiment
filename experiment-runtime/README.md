@@ -1,6 +1,6 @@
 # Typed agent experiment runtime
 
-`io.github.markpollack:experiment-runtime:0.10.0-fresh-v3-SNAPSHOT` provides Client acquisition,
+`io.github.markpollack:experiment-runtime:0.10.0-fresh-v3-qualification-SNAPSHOT` provides Client acquisition,
 Journal final assembly, released Workflow execution and immutable per-item results. It uses
 Workflow 0.14.0 and Judge 0.18.0; Client, SDK and Journal are explicitly unreleased task dependencies.
 Use this module alone for the canonical agent path. The older Experiment modules retain their
@@ -34,7 +34,7 @@ In the invoke Step, construct a `Request` from the prepared item, expanded promp
 provider budget in milliseconds, a unique new attempt directory and explicit permission choice.
 Pass the actual `StepContext` to `client.invoke(request, context)`. The service creates a distinct
 acquisition identity, passes full Experiment/Workflow association to Client capture options, checks
-the sealed receipt and calls Journal `FinalAssembly` once. The return is `Outcome`, carrying the
+the sealed receipt, calls Journal `ClaudeAcquisition.qualify` into a new derivative directory, validates the derivative association and calls Journal `FinalAssembly` once with that qualified manifest. The return is `Outcome`, carrying the
 `Invocation`, workspace ownership state and retained evidence directory.
 
 Build `Workflows.define(...).maxDuration(...).then(prepare).then(invoke).then(measure)` and register
@@ -66,7 +66,7 @@ are non-null scalars, records and concrete lists: do not use Path, Instant, Map 
 change remains a measured value. Preserve baseline and final raw artifacts and scoped measurements
 in your domain result rather than replacing them with a derived total.
 
-`Result(3, "AGENT_CANONICAL", ...)` is saved once via `FileSystemResultStore`. `load`, `list` and
+`Result(AgentRecords.CURRENT_SCHEMA_VERSION, "AGENT_CANONICAL", ...)` (schema 4) is saved once via `FileSystemResultStore`. `load`, `list` and
 `mostRecent` validate current shape and full associations. A result cannot be overwritten. Explicit
 `readHistorical` returns unchanged old JSON and its hash as `LEGACY_UNVERIFIED`, without loading
 retired capture classes or reinterpreting old Judge documents.
@@ -86,3 +86,22 @@ Workflow can remain ACTIVE; the adapter never silently resumes it. Retain the wo
 store while quarantined. On failed execution, use retained invocation outcomes with the original
 prepared identity to call `assess`; it skips the Jury for unaccepted Workflow output and returns an
 explicit incomplete row for the immutable save. Do not rerun the provider to repair evidence.
+
+## Qualification evidence
+
+`Invocation.qualifications()` retains zero or one `Qualification`: original Client manifest reference,
+QUALIFIED/REFUSED state, qualified directory, manifest and assembly expectation references, full retained
+file closure, producer version and error. `acquisitions()` always remains the original Client receipt.
+Qualification and assembly are separate from independently verified source correctness. Refusals preserve
+available partial files and their hashes; no profile fallback or original mutation is performed.
+
+For a qualified row, independently run Journal's packaged reader with the canonical events, qualification
+`directory()`, `--acquisition manifests().getFirst().path()` and
+`--assembly assemblyExpectations().getFirst().path()`. Check its actual result before claiming acceptance.
+`AcquisitionAssembly.pinnedJournal()` is the explicit already-bound replay route. It never runs as a
+fallback after failed fresh qualification. Previous schema3 files remain available through the explicit
+raw historical reader; new writes use schema4. The original Invocation constructor is retained as an
+overload with an empty qualifications list.
+
+The V3 consumer authors 30 minutes total for prepare/baseline/invoke/measure, caps the provider by
+remaining time with measurement/drain reserve, and keeps domain judges' separately configured limits.

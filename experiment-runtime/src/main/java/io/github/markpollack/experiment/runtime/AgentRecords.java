@@ -9,6 +9,8 @@ import java.util.Objects;
  */
 public final class AgentRecords {
 
+	public static final int CURRENT_SCHEMA_VERSION = 4;
+
 	private AgentRecords() {
 	}
 
@@ -101,6 +103,34 @@ public final class AgentRecords {
 		}
 	}
 
+	/** Journal-owned derivative; qualification is not source verification. */
+	public record Qualification(FileRef original, String state, String directory, List<FileRef> manifests,
+			List<FileRef> assemblyExpectations, List<FileRef> retainedFiles, String producer, String error) {
+		public Qualification {
+			Objects.requireNonNull(original);
+			require(original.subject().equals("acquisition-manifest"), "Qualification original subject");
+			require(List.of("QUALIFIED", "REFUSED").contains(state), "Qualification state");
+			text(directory);
+			text(producer);
+			Objects.requireNonNull(error);
+			manifests = List.copyOf(manifests);
+			assemblyExpectations = List.copyOf(assemblyExpectations);
+			retainedFiles = List.copyOf(retainedFiles);
+			require(manifests.size() <= 1 && assemblyExpectations.size() <= 1, "Qualification reference cardinality");
+			require(!state.equals("QUALIFIED") || (manifests.size() == 1 && assemblyExpectations.size() == 1),
+					"Missing qualified evidence");
+			require(retainedFiles.containsAll(manifests) && retainedFiles.containsAll(assemblyExpectations),
+					"Qualification closure missing refs");
+			require(retainedFiles.stream().map(FileRef::path).distinct().count() == retainedFiles.size(),
+					"Duplicate qualification path");
+			manifests.forEach(m -> require(
+					m.subject().equals("qualified-acquisition-manifest") && !m.path().equals(original.path()),
+					"Qualified manifest subject/path"));
+			assemblyExpectations
+				.forEach(e -> require(e.subject().equals("assembly-expectation"), "Expectation subject"));
+		}
+	}
+
 	/**
 	 * Retained before a Workflow commit; late records remain evidence, not accepted
 	 * outputs.
@@ -108,8 +138,23 @@ public final class AgentRecords {
 	public record Invocation(Attempt attempt, String responseState, String processState, List<Integer> exitCodes,
 			String captureState, List<FileRef> acquisitions, List<CanonicalRef> canonical, String assemblyState,
 			List<String> providerSessions, List<Measurement> usage, String responseText, String error,
-			long providerBudgetMs, long elapsedMs) {
+			long providerBudgetMs, long elapsedMs, List<Qualification> qualifications) {
+		public Invocation(Attempt attempt, String responseState, String processState, List<Integer> exitCodes,
+				String captureState, List<FileRef> acquisitions, List<CanonicalRef> canonical, String assemblyState,
+				List<String> providerSessions, List<Measurement> usage, String responseText, String error,
+				long providerBudgetMs, long elapsedMs) {
+			this(attempt, responseState, processState, exitCodes, captureState, acquisitions, canonical, assemblyState,
+					providerSessions, usage, responseText, error, providerBudgetMs, elapsedMs, List.of());
+		}
+
 		public Invocation {
+			qualifications = List.copyOf(qualifications);
+			require(qualifications.size() <= 1, "Qualification cardinality");
+			for (Qualification q : qualifications) {
+				require(acquisitions.equals(List.of(q.original())), "Qualification/original association");
+				require(!assemblyState.equals("ASSEMBLED") || q.state().equals("QUALIFIED"),
+						"Refused qualification assembled");
+			}
 			Objects.requireNonNull(attempt);
 			text(responseState);
 			text(processState);
@@ -216,7 +261,8 @@ public final class AgentRecords {
 	public record Result(int recordingSchemaVersion, String kind, String experimentId, String experimentName,
 			long createdAtEpochMs, List<Row> items, List<FileRef> runtimeArtifacts) {
 		public Result {
-			require(recordingSchemaVersion == 3 && kind.equals("AGENT_CANONICAL"), "Unsupported result version/kind");
+			require(recordingSchemaVersion == CURRENT_SCHEMA_VERSION && kind.equals("AGENT_CANONICAL"),
+					"Unsupported result version/kind");
 			text(experimentId);
 			text(experimentName);
 			require(createdAtEpochMs >= 0, "Invalid timestamp");

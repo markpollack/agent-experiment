@@ -35,6 +35,9 @@ public final class FileSystemResultStore implements ResultStore {
 				if (invocation.captureState().equals("COMPLETE") && !invocation.assemblyState().equals("REFUSED"))
 					AcquisitionAssembly.validateManifest(invocation.acquisitions().getFirst(), invocation.attempt(),
 							true);
+				for (var qualified : invocation.qualifications())
+					if (qualified.state().equals("QUALIFIED"))
+						QualificationEvidence.verify(qualified, invocation.attempt());
 				for (var canonical : invocation.canonical())
 					Evidence.verify(canonical);
 			}
@@ -61,7 +64,8 @@ public final class FileSystemResultStore implements ResultStore {
 
 	private Result read(Path path) throws IOException {
 		JsonNode tree = RuntimeJson.mapper().readTree(path.toFile());
-		if (!tree.path("recordingSchemaVersion").isInt() || tree.path("recordingSchemaVersion").intValue() != 3
+		if (!tree.path("recordingSchemaVersion").isInt()
+				|| tree.path("recordingSchemaVersion").intValue() != AgentRecords.CURRENT_SCHEMA_VERSION
 				|| !tree.path("kind").asText().equals("AGENT_CANONICAL"))
 			throw new IOException("Unsupported current result; use explicit historical reader for old records");
 		return RuntimeJson.mapper().treeToValue(tree, Result.class);
@@ -97,11 +101,16 @@ public final class FileSystemResultStore implements ResultStore {
 		JsonNode tree = RuntimeJson.mapper().readTree(bytes);
 		if (!tree.isObject() || !tree.path("experimentId").isTextual() || !tree.path("items").isArray())
 			throw new IOException("Not a historical Experiment envelope");
-		if (tree.has("recordingSchemaVersion") && (!tree.path("recordingSchemaVersion").isInt()
-				|| tree.path("recordingSchemaVersion").intValue() != 2))
-			throw new IOException("Unsupported historical version");
-		if (tree.has("kind"))
-			throw new IOException("Not an admitted historical kind");
+		boolean previousCanonical = tree.path("recordingSchemaVersion").isInt()
+				&& tree.path("recordingSchemaVersion").intValue() == 3
+				&& tree.path("kind").asText().equals("AGENT_CANONICAL");
+		if (!previousCanonical) {
+			if (tree.has("recordingSchemaVersion") && (!tree.path("recordingSchemaVersion").isInt()
+					|| tree.path("recordingSchemaVersion").intValue() != 2))
+				throw new IOException("Unsupported historical version");
+			if (tree.has("kind"))
+				throw new IOException("Not an admitted historical kind");
+		}
 		return new HistoricalResult(new String(bytes, StandardCharsets.UTF_8), Evidence.sha256(bytes),
 				"LEGACY_UNVERIFIED");
 	}

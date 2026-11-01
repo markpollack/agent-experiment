@@ -52,7 +52,7 @@ class JournalIntegrationTest {
 		Path acquired = temp.resolve("acquisition.json");
 		mapper.writeValue(acquired.toFile(), manifest);
 		var invocation = AcquisitionTest.invocation(attempt, Evidence.reference(acquired, "acquisition-manifest"));
-		var assembled = AcquisitionAssembly.journal().assemble(invocation, temp.resolve("canonical"));
+		var assembled = AcquisitionAssembly.pinnedJournal().assemble(invocation, temp.resolve("canonical"));
 		assertThat(assembled.assemblyState()).as(assembled.error()).isEqualTo("ASSEMBLED");
 		assertThat(assembled.responseState()).isEqualTo("FAILED");
 		assertThat(assembled.exitCodes()).containsExactly(7);

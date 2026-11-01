@@ -34,7 +34,8 @@ class RuntimeStoreTest {
 	}
 
 	static Result result(String run, List<Row> rows) {
-		return new Result(3, "AGENT_CANONICAL", run, "experiment", 100, rows, List.of());
+		return new Result(AgentRecords.CURRENT_SCHEMA_VERSION, "AGENT_CANONICAL", run, "experiment", 100, rows,
+				List.of());
 	}
 
 	@Test

@@ -134,8 +134,8 @@ public class ThreeStageConsumerExampleTest {
 					return () -> Verdict.single("fixture",
 							Judgment.fail("fixture domain fails despite successful orchestration"));
 				});
-		Result result = new Result(3, "AGENT_CANONICAL", identity.runId(), "fixture-example", 100, List.of(row),
-				List.of());
+		Result result = new Result(AgentRecords.CURRENT_SCHEMA_VERSION, "AGENT_CANONICAL", identity.runId(),
+				"fixture-example", 100, List.of(row), List.of());
 		var store = new FileSystemResultStore(temp.resolve("results"));
 		store.save(result);
 		var reopened = new FileSystemResultStore(temp.resolve("results"));

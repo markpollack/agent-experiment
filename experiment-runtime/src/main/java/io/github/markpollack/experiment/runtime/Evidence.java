@@ -55,6 +55,8 @@ public final class Evidence {
 			for (FileRef manifest : invocation.acquisitions())
 				AcquisitionAssembly.validateManifest(manifest, invocation.attempt(),
 						invocation.captureState().equals("COMPLETE"));
+			for (Qualification q : invocation.qualifications())
+				QualificationEvidence.verify(q, invocation.attempt());
 			for (CanonicalRef canonical : invocation.canonical())
 				verify(canonical);
 		}
