@@ -59,15 +59,16 @@ class RecordingExhibitsTest {
 		return items;
 	}
 
-	JudgeExperiment.Builder builder(String candidate, Judge judge, int size) {
+	JudgeExperiment.Builder builder(String candidate, java.util.function.Function<DatasetItem, Judgment> judge,
+			int size) {
 		return JudgeExperiment.builder()
 			.name("exhibits")
 			.runId("run-" + (++runSequence))
 			.candidateId(candidate)
 			.captureMode("FAKE")
-			.candidate(item -> judge)
+			.candidate(item -> () -> judge.apply(item))
 			.items(cases(size))
-			.caseInputIdentity((input, row) -> new CaseInputIdentity("fixture", input.goal(), "v1", null,
+			.caseInputIdentity((input, row) -> new CaseInputIdentity("fixture", input.developerTask(), "v1", null,
 					"effective-case-input:v1"))
 			.truth(item -> JudgeTruth.proposition(true))
 			.scorer(JudgeScorers.propositionMatch())
@@ -117,68 +118,34 @@ class RecordingExhibitsTest {
 
 	static Judgment nativeFinding(boolean value, String reason) {
 		return new Judgment(value ? JudgmentStatus.PASS : JudgmentStatus.FAIL,
-				new Assessment(new Proposition(value), null, null), null, null, null, reason, List.of(), null, null,
-				Map.of());
+				new Finding(new BooleanFinding(value), null, null), null, null, null, reason, List.of(), null, Map.of(),
+				null, List.of(), List.of());
 	}
 
 	@Test
 	void reviewedPolicyFactsNeverBecomeSemanticScores() throws Exception {
 		for (String id : List.of("withheld-rich-negative", "policy-failure")) {
-			Judgment candidate = ProducerDocument.text("VERDICT", RecordingVectorsTest.vectorSource(id))
-				.value(Verdict.class)
-				.aggregated();
-			assertThat(candidate.effectiveScore()).isEmpty();
-			assertThat(RecordedJudgment.from(candidate).effectiveScore()).isEmpty();
-			assertThat(JudgeScorers.exactCategoryMatch()
-				.score(new JudgeScoringInput(cases(1).getFirst(), candidate, "violated"))
-				.scored()).isFalse();
-			for (JudgeScorer scorer : List.of(JudgeScorers.exactCategoryMatch(), JudgeScorers.propositionMatch(),
-					JudgeScorers.identified("custom-category:v1", "1", "CATEGORY",
-							input -> new JudgeScorerResult(true, 1.0, "raw label")))) {
-				var result = run(builder(id, context -> candidate, 1).scorer(scorer)
-					.truth(item -> scorer.truthKind().equals("PROPOSITION") ? JudgeTruth.proposition(false)
-							: JudgeTruth.simple("CATEGORY", "violated")));
-				assertThat(result.agreementRate()).isNull();
-				assertThat(result.meanScore()).isNull();
-				assertThat(detail(result, 0).comparison().unscoredReason())
-					.isEqualTo(id.equals("policy-failure") ? "POLICY_FAILED" : "WITHHELD_ASSESSMENT");
-				assertThat(detail(result, 0).candidateJudgment().label()).isEqualTo("violated");
-				assertThat(detail(result, 0).candidateJudgment().score()).isEqualTo(0.25);
-				assertThat(detail(result, 0).candidateJudgment().effectiveScore()).isEmpty();
-			}
-			var status = run(builder(id, context -> candidate, 1).scorer(JudgeScorers.exactVerdictMatch())
-				.truth(item -> JudgeTruth.simple("STATUS_LABEL", candidate.status().name())));
-			assertThat(status.agreementRate()).isEqualTo(1.0);
+			String text = RecordingVectorsTest.vectorSource(id);
+			var raw = RecordedVerdict.fromProducerJson(text);
+			assertThatThrownBy(() -> raw.document().value(Verdict.class)).isInstanceOf(IllegalArgumentException.class);
+			assertThat(storeSubject(id, raw).items().getFirst().verdict().producerJson()).isEqualTo(text);
 		}
 	}
 
 	@Test
 	void reviewedSingleWrapperMutationIsRejectedOnWriteReadAndReport() throws Exception {
-		var original = run(builder("single", context -> nativeFinding(true, "yes"), 1)).experimentResult();
-		var item = original.items().getFirst();
+		var original = run(builder("single", ctx -> nativeFinding(true, "yes"), 1)).experimentResult();
 		for (Consumer<ObjectNode> mutate : List.<Consumer<ObjectNode>>of(node -> node.put("declaredCardinality", 2),
 				node -> ((ObjectNode) node.path("seats").path(0)).put("verdictKey", "other"),
 				node -> ((ObjectNode) node.path("seats").path(0)).put("execution", "CONTAINED_FAILURE"),
-				node -> ((ObjectNode) node.path("decision")).put("kind", "unknown"))) {
-			ObjectNode node = (ObjectNode) item.verdict().document().node();
-			mutate.accept(node);
-			var changed = item.toBuilder()
-				.verdict(RecordedVerdict.fromProducerJson(node.toString()))
-				.interpretation(null)
-				.passed(null)
-				.build();
-			var invalid = copyRecord(original, Map.of("items", List.of(changed), "counts",
-					io.github.markpollack.experiment.attestation.ItemAccounting.count(List.of(changed))));
-			assertThatThrownBy(() -> store.save(invalid)).hasMessageContaining("single-verdict");
-			assertThatThrownBy(() -> JudgeExperimentResult.from(invalid)).hasMessageContaining("single-verdict");
-			ObjectNode wire = (ObjectNode) mapper.valueToTree(original);
-			((ObjectNode) wire.path("items").path(0)).set("verdict", mapper.valueToTree(changed.verdict()));
-			((ObjectNode) wire.path("items").path(0)).set("interpretation",
-					mapper.valueToTree(changed.interpretationSnapshot()));
-			((ObjectNode) wire.path("items").path(0)).putNull("passed");
-			wire.set("counts", mapper.valueToTree(invalid.counts()));
-			assertThatThrownBy(() -> mapper.readValue(wire.toString(), ExperimentResult.class))
-				.hasStackTraceContaining("single-verdict");
+				node -> ((ObjectNode) node.path("provenance")).put("kind", "unknown"))) {
+			ObjectNode source = (ObjectNode) original.items().getFirst().verdict().document().node();
+			mutate.accept(source);
+			assertThatThrownBy(() -> ItemResult.builder()
+				.itemId("bad")
+				.itemSlug("bad")
+				.verdict(RecordedVerdict.fromProducerJson(source.toString()))
+				.build()).isInstanceOf(IllegalArgumentException.class);
 		}
 	}
 
@@ -188,7 +155,7 @@ class RecordingExhibitsTest {
 		AtomicInteger calls = new AtomicInteger();
 		try {
 			System.clearProperty("experiment.writer.revision");
-			assertThatThrownBy(() -> builder("preflight", context -> {
+			assertThatThrownBy(() -> builder("preflight", ctx -> {
 				calls.incrementAndGet();
 				return nativeFinding(true, "yes");
 			}, 2).build().run()).hasMessageContaining("experiment.writer.revision");
@@ -204,7 +171,7 @@ class RecordingExhibitsTest {
 	@Test
 	void orchestratorFailureRetainsCompletedRowsAndSavesOnePartialRun() throws Exception {
 		AtomicInteger calls = new AtomicInteger();
-		var result = run(builder("orchestration", context -> {
+		var result = run(builder("orchestration", ctx -> {
 			calls.incrementAndGet();
 			return nativeFinding(true, "yes");
 		}, 3).afterRow(item -> {
@@ -229,7 +196,7 @@ class RecordingExhibitsTest {
 
 	@Test
 	void outerEnvelopeRejectsTrailingJson() throws Exception {
-		var original = run(builder("trailing", context -> nativeFinding(true, "yes"), 1)).experimentResult();
+		var original = run(builder("trailing", ctx -> nativeFinding(true, "yes"), 1)).experimentResult();
 		String json = mapper.writeValueAsString(original);
 		assertThatThrownBy(() -> mapper.readValue(json + " {}", ExperimentResult.class))
 			.hasMessageContaining("Trailing");
@@ -244,7 +211,8 @@ class RecordingExhibitsTest {
 		var loaded = storeSubject("associations", verdict).items().getFirst();
 		assertThat(loaded.verdict().producerJson()).isEqualTo(source);
 		assertThat(loaded.verdict().document().associations()).hasSize(2);
-		assertThat(loaded.interpretation().readingSupport().name()).isEqualTo("SUPPORTED");
+		assertThat(loaded.historical()).isTrue();
+		assertThat(loaded.interpretation()).isNull();
 		assertThat(loaded.verdict().document().node().has("instrumentHash")).isFalse();
 	}
 
@@ -255,7 +223,7 @@ class RecordingExhibitsTest {
 		assertThat(detail(result, 0).candidateJudgment()
 			.document()
 			.node()
-			.at("/assessment/proposition/value")
+			.at("/finding/booleanFinding/value")
 			.booleanValue()).isFalse();
 		assertThat(result.experimentResult().items().getFirst().passed()).isFalse();
 		assertThat(detail(result, 0).comparison().match()).isTrue();
@@ -265,12 +233,12 @@ class RecordingExhibitsTest {
 	@Test
 	void E03_scoredOnlyDenominator() throws Exception {
 		var result = run(builder("mixed",
-				ctx -> ctx.goal().endsWith("0") ? nativeFinding(true, "yes") : Judgment.abstain("unknown"), 2));
+				ctx -> ctx.id().endsWith("0") ? nativeFinding(true, "yes") : Judgment.abstain("unknown"), 2));
 		assertThat(result.agreementRate()).isEqualTo(1.0);
 		assertThat(result.scoredCount()).isEqualTo(1);
 		assertThat(result.unscoredCount()).isEqualTo(1);
 		assertThat(result.disagreements()).isEmpty();
-		assertThat(result.experimentResult().counts().passRate()).hasValue(0.5);
+		assertThat(result.experimentResult().counts().passRate()).hasValue(1.0);
 	}
 
 	@Test
@@ -300,9 +268,9 @@ class RecordingExhibitsTest {
 	@Test
 	void E06_returnedErrorThrownAndNullAreDistinct() throws Exception {
 		var result = run(builder("errors", ctx -> {
-			if (ctx.goal().endsWith("0"))
+			if (ctx.id().endsWith("0"))
 				return Judgment.error("returned");
-			if (ctx.goal().endsWith("1"))
+			if (ctx.id().endsWith("1"))
 				throw new IllegalStateException("thrown");
 			return null;
 		}, 3).truth(item -> JudgeTruth.status("ERROR")).scorer(JudgeScorers.exactVerdictMatch()));
@@ -339,10 +307,10 @@ class RecordingExhibitsTest {
 
 	@Test
 	void E08_inputFailureRetainsEntireDeclaredPopulation() throws Exception {
-		var result = run(builder("input", ctx -> nativeFinding(true, "ok"), 3).input(item -> {
+		var result = run(builder("input", ctx -> nativeFinding(true, "ok"), 3).candidate(item -> {
 			if (item.id().endsWith("0"))
 				throw new IllegalArgumentException("bad input");
-			return AgentJudgingInput.builder().goal(item.id()).build();
+			return () -> nativeFinding(true, "ok");
 		}));
 		assertThat(result.experimentResult().declaredRows()).isEqualTo(3);
 		assertThat(result.experimentResult().attemptedRows()).isEqualTo(3);
@@ -357,7 +325,7 @@ class RecordingExhibitsTest {
 	void E09_cancellationRetainsCapturedReturnAndRemainingDeclarations() throws Exception {
 		for (boolean afterReturn : List.of(false, true)) {
 			var b = builder("cancel", ctx -> {
-				if (!afterReturn && ctx.goal().endsWith("1")) {
+				if (!afterReturn && ctx.id().endsWith("1")) {
 					Thread.currentThread().interrupt();
 					throw new java.util.concurrent.CancellationException("stop");
 				}
@@ -391,7 +359,7 @@ class RecordingExhibitsTest {
 
 	@Test
 	void cancellationFlagWithoutExceptionStillMarksTheCurrentCapturedRow() throws Exception {
-		var result = builder("flag", context -> nativeFinding(true, "captured"), 3).truth(item -> {
+		var result = builder("flag", ctx -> nativeFinding(true, "captured"), 3).truth(item -> {
 			if (item.id().endsWith("1"))
 				Thread.currentThread().interrupt();
 			return JudgeTruth.proposition(true);
@@ -413,7 +381,8 @@ class RecordingExhibitsTest {
 		Files.writeString(root.resolve("results/exhibits/index.json"), "malformed-index");
 		assertThatThrownBy(() -> builder("failed", ctx -> nativeFinding(true, "ok"), 1).build().run())
 			.isInstanceOf(ResultStoreException.class);
-		assertThat(store.load("run-2")).isEmpty();
+		assertThat(store.load("run-2")).isPresent(); // immutable publication retained
+														// despite index failure
 		assertThat(Files.readAllBytes(file)).isEqualTo(before);
 	}
 
@@ -540,8 +509,8 @@ class RecordingExhibitsTest {
 			.contextFactory(item -> Optional.empty())
 			.build();
 		var derivative = reevaluator.reEvaluate(historical,
-				io.github.markpollack.judge.jury.SimpleJury.builder()
-					.judge(context -> nativeFinding(true, "unused"), 1.0)
+				ignored -> io.github.markpollack.judge.jury.SimpleJury.builder()
+					.judge(() -> nativeFinding(true, "unused"), 1.0)
 					.votingStrategy(new io.github.markpollack.judge.voting.MajorityVotingStrategy())
 					.build());
 		var loaded = store.load(derivative.experimentId()).orElseThrow();
@@ -582,17 +551,17 @@ class RecordingExhibitsTest {
 
 	@Test
 	void E19_unknownNullAndAbsentAssessmentKeepSourceSpelling() throws Exception {
-		Judgment unknown = new Judgment(JudgmentStatus.PASS, new Assessment(new Proposition(null), null, null), null,
-				null, null, "unknown", List.of(), null, null, Map.of());
+		Judgment unknown = new Judgment(JudgmentStatus.PASS, new Finding(new BooleanFinding(null), null, null), null,
+				null, null, "unknown", List.of(), null, Map.of(), null, List.of(), List.of());
 		var result = run(builder("unknown", ctx -> unknown, 1));
 		JsonNode live = detail(result, 0).candidateJudgment().document().node();
-		assertThat(live.at("/assessment/proposition").isObject()).isTrue();
-		assertThat(live.at("/assessment/proposition").isEmpty()).isTrue();
+		assertThat(live.at("/finding/booleanFinding").isObject()).isTrue();
+		assertThat(live.at("/finding/booleanFinding").isEmpty()).isTrue();
 		assertThat(result.scoredCount()).isZero();
 		ObjectNode explicit = (ObjectNode) ProducerDocument
 			.parse(ProducerDocument.json(Verdict.single("candidate", unknown)));
-		for (String pointer : List.of("/aggregated/assessment/proposition", "/individual/0/assessment/proposition",
-				"/individualByName/candidate/assessment/proposition"))
+		for (String pointer : List.of("/judgment/finding/booleanFinding", "/individual/0/finding/booleanFinding",
+				"/individualByName/candidate/finding/booleanFinding"))
 			((ObjectNode) explicit.at(pointer)).putNull("value");
 		var loaded = storeSubject("explicit-null", RecordedVerdict.fromProducerJson(explicit.toString()));
 		assertThat(loaded.items()
@@ -600,30 +569,28 @@ class RecordingExhibitsTest {
 			.verdict()
 			.document()
 			.node()
-			.at("/aggregated/assessment/proposition")
+			.at("/judgment/finding/booleanFinding")
 			.has("value")).isTrue();
 		var absent = storeSubject("absent",
 				RecordedVerdict.from(Verdict.single("candidate", Judgment.notApplicable("absent"))));
-		assertThat(absent.items().getFirst().verdict().document().node().path("aggregated").has("assessment"))
-			.isFalse();
+		assertThat(absent.items().getFirst().verdict().document().node().path("judgment").has("finding")).isFalse();
 	}
 
 	@Test
 	void E20_outOfRangeCardinalityAndFractionalProducerVersionAreNotCoerced() throws Exception {
 		ObjectNode source = (ObjectNode) ProducerDocument
-			.parse(RecordingVectorsTest.vectorSource("negative-ordinal-identity"));
+			.parse(ProducerDocument.json(Verdict.single("fixture", nativeFinding(false, "negative"))));
 		source.put("declaredCardinality", 2147483648L);
-		var large = storeSubject("large", RecordedVerdict.fromProducerJson(source.toString())).items().getFirst();
-		assertThat(large.verdict().document().node().path("declaredCardinality").longValue()).isEqualTo(2147483648L);
-		assertThat(large.interpretation().reading()).isNull();
-		assertThat(large.interpretation().readingSupport().name()).isEqualTo("UNDETERMINED");
-		var fractional = storeSubject("fractional",
-				RecordedVerdict.fromProducerJson(RecordingVectorsTest.vectorSource("fractional-version")))
-			.items()
-			.getFirst();
-		assertThat(fractional.verdict().document().node().path("schemaVersion").doubleValue()).isEqualTo(2.9);
-		assertThat(fractional.interpretation().sourceVersion()).isEqualTo(-1);
-		assertThat(fractional.passed()).isNull();
+		assertThat(source.path("declaredCardinality").longValue()).isEqualTo(2147483648L);
+		assertThatThrownBy(() -> ItemResult.builder()
+			.itemId("large")
+			.itemSlug("large")
+			.verdict(RecordedVerdict.fromProducerJson(source.toString()))
+			.build()).isInstanceOf(IllegalArgumentException.class);
+		source.put("schemaVersion", 6.9);
+		assertThatThrownBy(() -> {
+			RecordedVerdict.fromProducerJson(source.toString()).document().value(Verdict.class);
+		}).isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
@@ -668,7 +635,7 @@ class RecordingExhibitsTest {
 	void E24_knownChangedEffectiveInputsRejectBeforeCandidateDeltas() throws Exception {
 		var baseline = run(builder("old", ctx -> nativeFinding(false, "no"), 1));
 		var changed = run(builder("new", ctx -> nativeFinding(true, "yes"), 1).caseInputIdentity(
-				(ctx, row) -> new CaseInputIdentity("fixture", ctx.goal(), "v2", null, "effective-case-input:v1")));
+				(ctx, row) -> new CaseInputIdentity("fixture", ctx.id(), "v2", null, "effective-case-input:v1")));
 		assertThatThrownBy(() -> new DefaultComparisonEngine(store).compare(changed.experimentResult(),
 				baseline.experimentResult()))
 			.isInstanceOf(IncomparableConditionsException.class)
@@ -676,9 +643,9 @@ class RecordingExhibitsTest {
 			.hasMessageContaining(baseline.experimentResult().experimentId())
 			.hasMessageContaining(changed.experimentResult().items().getFirst().itemId());
 		var a = run(builder("a", ctx -> nativeFinding(false, "no"), 1).caseInputIdentity((ctx,
-				row) -> new CaseInputIdentity("fixture", ctx.goal(), "v1", "a".repeat(64), "effective-case-input:v1")));
+				row) -> new CaseInputIdentity("fixture", ctx.id(), "v1", "a".repeat(64), "effective-case-input:v1")));
 		var b = run(builder("b", ctx -> nativeFinding(true, "yes"), 1).caseInputIdentity((ctx,
-				row) -> new CaseInputIdentity("fixture", ctx.goal(), "v1", "b".repeat(64), "effective-case-input:v1")));
+				row) -> new CaseInputIdentity("fixture", ctx.id(), "v1", "b".repeat(64), "effective-case-input:v1")));
 		assertThatThrownBy(() -> new DefaultComparisonEngine(store).compare(a.experimentResult(), b.experimentResult()))
 			.hasMessageContaining("INCOMPATIBLE");
 	}
@@ -691,11 +658,11 @@ class RecordingExhibitsTest {
 		var bothMissing = run(
 				builder("also-missing", ctx -> nativeFinding(true, "yes"), 1).caseInputIdentity((ctx, row) -> null));
 		var asymmetric = run(builder("digest", ctx -> nativeFinding(true, "yes"), 1).caseInputIdentity((ctx,
-				row) -> new CaseInputIdentity("fixture", ctx.goal(), "v1", "a".repeat(64), "effective-case-input:v1")));
+				row) -> new CaseInputIdentity("fixture", ctx.id(), "v1", "a".repeat(64), "effective-case-input:v1")));
 		for (var pair : List.of(List.of(known, missing), List.of(missing, bothMissing), List.of(known, asymmetric)))
 			assertThatThrownBy(() -> new DefaultComparisonEngine(store).compare(pair.get(0).experimentResult(),
 					pair.get(1).experimentResult()))
-				.hasMessageContaining("UNKNOWN");
+				.hasMessageContaining("effective input");
 		assertThat(missing.agreementRate()).isEqualTo(1.0);
 	}
 

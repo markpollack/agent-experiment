@@ -104,7 +104,7 @@ class RawSessionArchiveTest {
 
 		JsonNode manifest = new ObjectMapper().readTree(runDir.resolve("raw/MANIFEST.json").toFile());
 		assertThat(manifest.get("archived").asBoolean()).isFalse();
-		assertThat(manifest.get("provider_session_id").asText()).isEqualTo(ExperimentJournal.NO_PROVIDER_SESSION);
+		assertThat(manifest.get("provider_session_id").asText()).isEqualTo("none");
 		assertThat(manifest.get("reason").asText()).contains("no session id");
 	}
 

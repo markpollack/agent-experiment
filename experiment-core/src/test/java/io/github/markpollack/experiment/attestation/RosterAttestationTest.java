@@ -22,7 +22,7 @@ import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.verdict.RoutingRule;
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.voting.VotingStrategy;
 import org.junit.jupiter.api.Test;
@@ -55,12 +55,12 @@ class RosterAttestationTest {
 		Jury silentlyShort = new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
 			public List<Judge> getJudges() {
-				return listed.getJudges();
+				return ((io.github.markpollack.judge.jury.VotingJury) listed).getJudges();
 			}
 
 			@Override
 			public VotingStrategy getVotingStrategy() {
-				return listed.getVotingStrategy();
+				return ((io.github.markpollack.judge.jury.VotingJury) listed).getVotingStrategy();
 			}
 
 			@Override
@@ -88,8 +88,8 @@ class RosterAttestationTest {
 	@Test
 	void cascadeIsCheckedPerEnteredTierAndAnUnenteredTierIsNotAVote() {
 		CascadedJury cascade = CascadedJury.builder()
-			.tier("guardrail", jury(Judges.alwaysFail("broken")), TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("quality", jury(Judges.alwaysPass("good"), Judges.alwaysPass("tidy")), TierPolicy.FINAL_TIER)
+			.tier("guardrail", jury(Judges.alwaysFail("broken")), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
+			.tier("quality", jury(Judges.alwaysPass("good"), Judges.alwaysPass("tidy")), RoutingRule.FINAL_TIER)
 			.build();
 		InstrumentRecord instrument = InstrumentRecorder.describe(cascade);
 
@@ -126,7 +126,7 @@ class RosterAttestationTest {
 						new RecordedCompositeAttempt("second", "meta_member", null, member, null)),
 				"meta-hash");
 
-		ItemAttestation attestation = ItemAttestation.of(item("a").verdict(meta).build(), instrument);
+		ItemAttestation attestation = ItemAttestation.of(item("a").historical(true).verdict(meta).build(), instrument);
 
 		assertThat(attestation.votes()).extracting(VoteCount::rosterCount).containsExactly(2, 2, 2);
 		assertThat(attestation.attestability()).isEqualTo(Attestability.ATTESTED);
@@ -167,7 +167,9 @@ class RosterAttestationTest {
 		Map<String, Object> roster = Map.of("kind", "SIMPLE", "seats", List.of(Map.of(), Map.of(), Map.of()));
 		InstrumentRecord instrument = new InstrumentRecord(1, "hash", roster, null, Map.of(), Map.of());
 
-		ItemAttestation attestation = ItemAttestation.of(item("a").verdict(verdict).build(), instrument);
+		ItemAttestation attestation = ItemAttestation.of(
+				item("a").historical(!verdict.document().node().has("schemaVersion")).verdict(verdict).build(),
+				instrument);
 
 		// The jury recorded three seats and two submitted judgments. That contradiction
 		// stands whether or not it also recorded how many errored.

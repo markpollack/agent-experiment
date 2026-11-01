@@ -15,9 +15,20 @@ public final class JevObservations {
 	 * caller-owned.
 	 */
 	public static InvocationObservation extract(RecordedJudgment judgment, InvocationObservation observation) {
-		var value = judgment.document().value(io.github.markpollack.judge.judgment.Judgment.class);
-		var owners = io.github.markpollack.judge.verdict.InvocationRecords
-			.of(io.github.markpollack.judge.verdict.Verdict.single("candidate", value));
+		return extract(
+				io.github.markpollack.experiment.result.RecordedVerdict
+					.from(io.github.markpollack.judge.verdict.Verdict.single("candidate",
+							judgment.document().value(io.github.markpollack.judge.judgment.Judgment.class))),
+				observation);
+	}
+
+	/**
+	 * Read all owned native observations, including root roster/shared/refused originals.
+	 */
+	public static InvocationObservation extract(io.github.markpollack.experiment.result.RecordedVerdict verdict,
+			InvocationObservation observation) {
+		var current = verdict.document().value(io.github.markpollack.judge.verdict.Verdict.class).requireUsable();
+		var owners = io.github.markpollack.judge.verdict.InvocationRecords.of(current);
 		var usage = new java.util.ArrayList<UsageObservation>();
 		var artifacts = new java.util.LinkedHashSet<>(observation.artifacts());
 		for (var owner : owners) {
@@ -54,6 +65,19 @@ public final class JevObservations {
 		return new InvocationObservation(observation.invocationId(), observation.captureMode(), observation.startedAt(),
 				observation.endedAt(), observation.elapsedNanos(), observation.transportAttempts(),
 				observation.requestId(), observation.transportElapsedNanos(), usage, List.copyOf(artifacts));
+	}
+
+	/**
+	 * Recompute C2 usage from frozen producer owners before trusting a stored summary.
+	 */
+	public static void validate(RecordedJudgment candidate, InvocationObservation observation) {
+		var expected = extract(candidate, observation).usage();
+		var stored = observation.usage()
+			.stream()
+			.filter(value -> "typesafe.jev".equals(value.providerScope()))
+			.toList();
+		if (!expected.equals(stored))
+			throw new IllegalArgumentException("Stored Jev usage differs from retained native owner");
 	}
 
 	/**

@@ -250,6 +250,10 @@ public record ItemResult(String itemId, String itemSlug, boolean success, @Nulla
 		}
 
 		public ItemResult build() {
+			if (verdict != null && historical && interpretationSnapshot == null)
+				interpretationSnapshot = new InterpretationSnapshot("LEGACY_UNVERIFIED", verdict.sha256(), null, null,
+						interpretation == null ? com.fasterxml.jackson.databind.node.NullNode.instance
+								: interpretation);
 			if (verdict != null && !historical && interpretationSnapshot == null) {
 				interpretationSnapshot = InterpretationSnapshot.capture(verdict.document(), RuntimeIdentity.judge());
 				if (interpretation == null)

@@ -14,6 +14,7 @@ import io.github.markpollack.experiment.recording.*;
 import io.github.markpollack.experiment.store.*;
 import io.github.markpollack.experiment.scoring.AgentJudgingInput;
 import io.github.markpollack.judge.judgment.*;
+import io.github.markpollack.judge.provenance.ArtifactRef;
 import io.github.markpollack.judge.jev.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -59,11 +60,16 @@ class JevRecordingFixtureTest {
 					"fixture-selected-evidence:v1".getBytes(StandardCharsets.UTF_8));
 			var selected = new JevEvidence(evidence, bundle, manifest,
 					ProducerDocument.hash(goal.getBytes(StandardCharsets.UTF_8)), true);
-			var judge = new JevJudge("fixture-key", "jev-1.13.0",
+			var runtime = new JevRuntime("fixture-key", "jev-1.13.0",
 					URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v1/systemone"),
 					Duration.ofSeconds(3), 16000, 32000,
 					new JevQuestion.Noul("Evaluate state.requirement using only state.evidence.", "fixture:v1", true),
 					http, capture);
+			var judge = JevJudge.builder()
+				.runtime(runtime)
+				.requirement(io.github.markpollack.judge.requirement.Requirement.text("fixture", "v1", goal))
+				.evidence(selected)
+				.build();
 			var store = new FileSystemResultStore(directory);
 			var result = JudgeExperiment.builder()
 				.name("jev-fixture")
@@ -72,8 +78,8 @@ class JevRecordingFixtureTest {
 				.captureMode("FIXTURE")
 				.items(List.of(new DatasetItem("case", "case", goal, "fixture", "A", false, List.of(), List.of(),
 						"active", directory, null, null)))
-				.candidate(ctx -> {
-					Judgment actual = judge.judge(ctx);
+				.candidate(item -> () -> {
+					Judgment actual = judge.judge();
 					return actual.toBuilder().check(new Check("repeat", actual)).build();
 				})
 				.truth(item -> JudgeTruth.proposition(false))

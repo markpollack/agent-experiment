@@ -43,23 +43,22 @@ class VerdictExtractorTest {
 
 	@Test
 	void passedReturnsTrueForPassingVerdict() {
-		Verdict verdict = Verdict.builder().aggregated(Judgment.pass("All good")).decision(Decision.own()).build();
+		Verdict verdict = Verdict.single("fixture", Judgment.pass("All good"));
 
 		assertThat(VerdictExtractor.passed(verdict)).isTrue();
 	}
 
 	@Test
 	void passedReturnsFalseForFailingVerdict() {
-		Verdict verdict = Verdict.builder().aggregated(Judgment.fail("Build failed")).decision(Decision.own()).build();
+		Verdict verdict = Verdict.single("fixture", Judgment.fail("Build failed"));
 
 		assertThat(VerdictExtractor.passed(verdict)).isFalse();
 	}
 
 	@Test
 	void handlesEmptyIndividualByName() {
-		Verdict verdict = Verdict.builder()
-			.aggregated(Judgment.pass("No individual judges"))
-			.decision(Decision.own())
+		Verdict verdict = new Verdict.Builder().judgment(Judgment.pass("No individual judges"))
+			.provenance(VerdictProvenance.own())
 			.build();
 
 		assertThat(VerdictExtractor.extractScores(verdict)).isEmpty();

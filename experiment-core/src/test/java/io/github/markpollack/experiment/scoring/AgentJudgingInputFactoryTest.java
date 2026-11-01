@@ -120,7 +120,7 @@ class AgentJudgingInputFactoryTest {
 		assertThat(ctx.metadata()).containsEntry("plan", planRoadmap);
 		assertThat(ctx.metadata()).containsEntry("targetBootVersion", "3.0.0");
 		assertThat(ctx.metadata()).containsEntry("targetJavaVersion", "17");
-		assertThat(ctx.metadata()).containsEntry("targetClassVersion", 61);
+		assertThat(ctx.metadata()).containsEntry("targetClassVersion", "61");
 	}
 
 	@Test
@@ -185,7 +185,7 @@ class AgentJudgingInputFactoryTest {
 	}
 
 	@Test
-	void targetClassVersionParsedAsInteger() {
+	void targetClassVersionPreservedAsString() {
 		ExperimentConfig config = ExperimentConfig.builder()
 			.experimentName("test")
 			.datasetDir(Path.of("/dataset"))
@@ -199,8 +199,8 @@ class AgentJudgingInputFactoryTest {
 				null, config);
 
 		Object classVersion = ctx.metadata().get("targetClassVersion");
-		assertThat(classVersion).isInstanceOf(Integer.class);
-		assertThat(classVersion).isEqualTo(61);
+		assertThat(classVersion).isInstanceOf(String.class);
+		assertThat(classVersion).isEqualTo("61");
 	}
 
 }

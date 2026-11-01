@@ -9,7 +9,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.jspecify.annotations.Nullable;
 
 /**
- * How an item counts.
+ * How an item counts. Current V6 INCONCLUSIVE remains UNATTESTABLE; original historical
+ * readings retain their original populations.
  *
  * <p>
  * One place decides it, because a rule applied in three places becomes three rules. The

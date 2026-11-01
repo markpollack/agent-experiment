@@ -55,7 +55,7 @@ class ConformanceFixturesTest {
 		Fixture fixture = write(dir, "nothing-scored",
 				List.of(item("a", RecordedJudgmentStatus.NOT_APPLICABLE), item("b", RecordedJudgmentStatus.ERROR)));
 
-		assertThat(fixture.counts()).isEqualTo(new ItemCounts(0, 0, 2, 1, 0, 0));
+		assertThat(fixture.counts()).isEqualTo(new ItemCounts(0, 0, 1, 0, 0, 1));
 		assertThat(fixture.counts().passRate()).isEmpty();
 		// Both items, named individually: an explicit null, not an omission and not
 		// false.
@@ -114,7 +114,7 @@ class ConformanceFixturesTest {
 		Path committed = FIXTURES.resolve(name + ".json");
 		assertThat(committed).as("immutable supported historical fixture").exists();
 		assertThat(passedByItem(written)).isEqualTo(passedByItem(Files.readString(committed)));
-		assertThat(JSON.readTree(written).path("recordingSchemaVersion").intValue()).isEqualTo(2);
+		assertThat(JSON.readTree(written).path("recordingSchemaVersion").intValue()).isEqualTo(3);
 
 		// No stored rate anywhere: a reader has to derive one, and deriving forces it to
 		// handle a denominator of zero.
@@ -147,7 +147,7 @@ class ConformanceFixturesTest {
 			case ERROR -> Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "recorded");
 		};
 		Verdict verdict = Verdict.single("recorded", judgment);
-		VerdictAnalysis interpretation = io.github.markpollack.experiment.recording.InterpretationSnapshot
+		JsonNode interpretation = io.github.markpollack.experiment.recording.InterpretationSnapshot
 			.currentReading(RecordedVerdict.from(verdict).document());
 		// Derived the same way the runner derives it, so the fixture shows what a real
 		// run writes: absent when the jury decided nothing, false only when it decided

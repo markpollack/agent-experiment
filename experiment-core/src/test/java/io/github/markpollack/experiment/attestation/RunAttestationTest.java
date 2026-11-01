@@ -19,7 +19,7 @@ import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.verdict.RoutingRule;
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.voting.VotingStrategy;
 import org.junit.jupiter.api.Test;
@@ -70,8 +70,8 @@ class RunAttestationTest {
 	@Test
 	void cascadeReadsEachEnteredTierOnceAndNotItsCopiedAggregate() {
 		Verdict verdict = CascadedJury.builder()
-			.tier("guardrail", jury(Judges.alwaysPass("built")), TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("quality", jury(Judges.alwaysPass("good"), Judges.alwaysPass("tidy")), TierPolicy.FINAL_TIER)
+			.tier("guardrail", jury(Judges.alwaysPass("built")), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
+			.tier("quality", jury(Judges.alwaysPass("good"), Judges.alwaysPass("tidy")), RoutingRule.FINAL_TIER)
 			.build()
 			.vote();
 
@@ -85,8 +85,8 @@ class RunAttestationTest {
 	@Test
 	void tierThatFailedToExecuteLeavesTheDenominatorUnattested() {
 		Verdict verdict = CascadedJury.builder()
-			.tier("guardrail", failingJury(), TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("quality", jury(Judges.alwaysPass("good")), TierPolicy.FINAL_TIER)
+			.tier("guardrail", failingJury(), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
+			.tier("quality", jury(Judges.alwaysPass("good")), RoutingRule.FINAL_TIER)
 			.build()
 			.vote();
 
@@ -106,7 +106,7 @@ class RunAttestationTest {
 		RecordedVerdict legacy = new RecordedVerdict(judgment(RecordedJudgmentStatus.PASS, Map.of()), List.of(),
 				Map.of(), Map.of(), List.of());
 
-		ItemAttestation attestation = ItemAttestation.of(item("a").verdict(legacy).build());
+		ItemAttestation attestation = ItemAttestation.of(item("a").historical(true).verdict(legacy).build());
 
 		assertThat(attestation.attestability()).isEqualTo(Attestability.NO_VOTE_EVIDENCE);
 		assertThat(attestation.votes()).singleElement().satisfies(votes -> {
@@ -125,7 +125,7 @@ class RunAttestationTest {
 				Map.of(), List.of(new RecordedCompositeAttempt("first", "meta_member", null, member, null),
 						new RecordedCompositeAttempt("second", "meta_member", null, member, null)));
 
-		ItemAttestation attestation = ItemAttestation.of(item("a").verdict(meta).build());
+		ItemAttestation attestation = ItemAttestation.of(item("a").historical(true).verdict(meta).build());
 
 		assertThat(attestation.votes()).extracting(VoteCount::scope).containsExactly("jury", "first", "second");
 		assertThat(attestation.attestability()).isEqualTo(Attestability.VOTES_WITHOUT_ROSTER);

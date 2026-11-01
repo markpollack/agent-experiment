@@ -115,8 +115,8 @@ public class AgentClientInvoker implements AgentInvoker {
 	}
 
 	/**
-	 * Converts a client response into an {@link InvocationResult}, preferring the
-	 * provider's own phase capture. Package-private for testability.
+	 * Converts a bare Client response into an explicitly unmeasured invocation. Canonical
+	 * capture belongs to the acquisition runtime.
 	 */
 	InvocationResult toResult(AgentClientResponse response, InvocationContext context, long start) {
 		long durationMs = System.currentTimeMillis() - start;

@@ -102,6 +102,10 @@ public final class RecordedVerdict {
 		return source.sha256();
 	}
 
+	public RecordedJudgment judgment() {
+		return aggregated();
+	}
+
 	public RecordedJudgment aggregated() {
 		return RecordedJudgment.fromProducerJson(
 				(source.node().has("judgment") ? source.node().path("judgment") : source.node().path("aggregated"))
@@ -140,7 +144,8 @@ public final class RecordedVerdict {
 	}
 
 	public @Nullable RecordedDecision decision() {
-		JsonNode n = source.node().path("decision");
+		JsonNode n = source.node().has("provenance") ? source.node().path("provenance")
+				: source.node().path("decision");
 		return n.isObject()
 				? new RecordedDecision(n.path("kind").asText(), n.path("tier").textValue(), n.path("basis").textValue())
 				: null;
@@ -150,8 +155,8 @@ public final class RecordedVerdict {
 		List<RecordedCompositeAttempt> result = new ArrayList<>();
 		for (JsonNode n : source.node().path("compositeAttempts")) {
 			result.add(new RecordedCompositeAttempt(n.path("name").asText(), n.path("relation").asText(),
-					n.path("policy").textValue(), n.path("disposition").textValue(),
-					n.path("dispositionReason").textValue(),
+					(n.has("routingRule") ? n.path("routingRule") : n.path("policy")).textValue(),
+					n.path("disposition").textValue(), n.path("dispositionReason").textValue(),
 					n.hasNonNull("verdict") ? fromProducerJson(n.get("verdict").toString()) : null,
 					n.hasNonNull("failureCode") ? n.get("failureCode").textValue()
 							: n.path("failure").path("code").textValue()));

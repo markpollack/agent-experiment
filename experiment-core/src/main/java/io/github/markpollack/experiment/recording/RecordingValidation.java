@@ -131,6 +131,8 @@ public final class RecordingValidation {
 						"Unattempted row has invocation observation");
 				require(detail.observation().invocationId().equals(row.runId() + ":" + row.rowId()),
 						"Observation/row identity mismatch");
+				if (detail.candidateJudgment() != null)
+					JevObservations.validate(detail.candidateJudgment(), detail.observation());
 				observations.add(detail.observation());
 			}
 			else

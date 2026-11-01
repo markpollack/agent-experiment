@@ -9,13 +9,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Reads a stored verdict of any age by asking the library that produced it.
- *
- * <p>
- * The whole of this class is handing a parsed map over and serialising what comes back.
- * That is the point: what a verdict says — which stage decided, what it says about the
- * subject, what the record is missing — is the library's to answer, and nothing here
- * inspects the verdict or second-guesses the answer.
+ * Reads only current V6 through the producer codec; older sources remain raw and
+ * unsupported.
  */
 final class StoredVerdictInterpreter implements InterpretationReExport.VerdictInterpreter {
 

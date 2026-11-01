@@ -35,10 +35,13 @@ public class WorkflowAgentInvoker extends AbstractTemplateAgentInvoker {
 		invoker = api == null ? new AgentClientInvoker() : new AgentClientInvoker(api);
 	}
 
-	public record Request(String workspace, String prompt, String model, long timeoutMs, Map<String, String> metadata) {
+	public record Entry(String key, String value) {
 	}
 
-	public record Reply(boolean successful, String response, Map<String, String> metadata) {
+	public record Request(String workspace, String prompt, String model, long timeoutMs, List<Entry> metadata) {
+	}
+
+	public record Reply(boolean successful, String response, List<Entry> metadata) {
 	}
 
 	public static final class Invoke implements Step<Request, Reply> {
@@ -56,9 +59,16 @@ public class WorkflowAgentInvoker extends AbstractTemplateAgentInvoker {
 					.prompt(request.prompt())
 					.model(request.model())
 					.timeout(Duration.ofMillis(request.timeoutMs()))
-					.metadata(request.metadata())
+					.metadata(request.metadata()
+						.stream()
+						.collect(java.util.stream.Collectors.toMap(Entry::key, Entry::value)))
 					.build());
-				return new Reply(value.success(), value.metadata().getOrDefault("agentResponse", ""), value.metadata());
+				return new Reply(value.success(), value.metadata().getOrDefault("agentResponse", ""),
+						value.metadata()
+							.entrySet()
+							.stream()
+							.map(entry -> new Entry(entry.getKey(), entry.getValue()))
+							.toList());
 			}
 			catch (AgentInvocationException failure) {
 				throw new IllegalStateException(failure);
@@ -88,7 +98,12 @@ public class WorkflowAgentInvoker extends AbstractTemplateAgentInvoker {
 
 			protected Request buildInitialState(InvocationContext value) {
 				return new Request(value.workspacePath().toString(), value.prompt(), value.model(),
-						value.timeout().toMillis(), value.metadata());
+						value.timeout().toMillis(),
+						value.metadata()
+							.entrySet()
+							.stream()
+							.map(entry -> new Entry(entry.getKey(), entry.getValue()))
+							.toList());
 			}
 
 			protected boolean outputSucceeded(Object value) {

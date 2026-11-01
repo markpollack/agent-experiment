@@ -45,7 +45,7 @@ import io.github.markpollack.judge.judgment.Judgment;
  * produced a score is therefore written into the judgment metadata as {@code judgeModel},
  * because a score is not interpretable without it.
  */
-public class SemanticDiffJudge implements Judge {
+public class SemanticDiffJudge implements io.github.markpollack.judge.JudgeWithMetadata {
 
 	private static final Logger logger = LoggerFactory.getLogger(SemanticDiffJudge.class);
 
@@ -63,11 +63,11 @@ public class SemanticDiffJudge implements Judge {
 
 	private final @Nullable AgentApi agentApi;
 
-	private final String plan;
+	private final @Nullable String plan;
 
-	private final Path workspace;
+	private final @Nullable Path workspace;
 
-	public SemanticDiffJudge(SemanticDiffJudgeConfig config, String plan, Path workspace) {
+	public SemanticDiffJudge(SemanticDiffJudgeConfig config, @Nullable String plan, @Nullable Path workspace) {
 		this(config, plan, workspace, null);
 	}
 
@@ -77,15 +77,26 @@ public class SemanticDiffJudge implements Judge {
 	 * @param agentApi the model to drive, or null for the {@link ClaudeAgentModel}
 	 * default; when non-null the caller owns its lifecycle
 	 */
-	public SemanticDiffJudge(SemanticDiffJudgeConfig config, String plan, Path workspace, @Nullable AgentApi agentApi) {
+	public SemanticDiffJudge(SemanticDiffJudgeConfig config, @Nullable String plan, @Nullable Path workspace,
+			@Nullable AgentApi agentApi) {
 		this.config = config;
 		this.agentApi = agentApi;
-		this.plan = java.util.Objects.requireNonNull(plan);
-		this.workspace = java.util.Objects.requireNonNull(workspace);
+		this.plan = plan;
+		this.workspace = workspace;
+	}
+
+	@Override
+	public io.github.markpollack.judge.JudgeMetadata metadata() {
+		return new io.github.markpollack.judge.JudgeMetadata("semantic_diff", "Semantic criteria",
+				io.github.markpollack.judge.JudgeType.LLM_POWERED);
 	}
 
 	@Override
 	public Judgment judge() {
+		if (plan == null)
+			return Judgment.abstain("No plan roadmap supplied");
+		if (workspace == null)
+			return Judgment.abstain("No workspace path supplied");
 		String roadmapMarkdown = plan;
 
 		// Extract criteria from roadmap

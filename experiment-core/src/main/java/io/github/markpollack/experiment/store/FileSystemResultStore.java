@@ -48,8 +48,25 @@ public class FileSystemResultStore implements ResultStore {
 		this.objectMapper = java.util.Objects.requireNonNull(objectMapper, "objectMapper must not be null");
 	}
 
+	/** One writer per store root; concurrent publication attempts fail before writing. */
 	@Override
 	public void save(ExperimentResult result) {
+		try {
+			Files.createDirectories(baseDir);
+			try (var channel = java.nio.channels.FileChannel.open(baseDir.resolve(".writer.lock"),
+					java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE);
+					var lock = channel.tryLock()) {
+				if (lock == null)
+					throw new IOException("Another writer owns this result store");
+				saveUnlocked(result);
+			}
+		}
+		catch (IOException | java.nio.channels.OverlappingFileLockException failure) {
+			throw new ResultStoreException("Result store requires one writer: " + baseDir, failure);
+		}
+	}
+
+	private void saveUnlocked(ExperimentResult result) {
 		io.github.markpollack.experiment.recording.RecordingValidation.validate(result);
 		if (result.recordingSchemaVersion() == null)
 			throw new ResultStoreException("Historical recordings are read-only; create an explicit derivative",
@@ -81,13 +98,9 @@ public class FileSystemResultStore implements ResultStore {
 				updateIndex(indexFile, result);
 			}
 			catch (IOException indexFailure) {
-				try {
-					Files.deleteIfExists(resultFile);
-				}
-				catch (IOException cleanup) {
-					indexFailure.addSuppressed(cleanup);
-				}
-				throw indexFailure;
+				// Publication already retained immutable source. An index error must not
+				// erase it.
+				throw new IOException("Result retained at " + resultFile + "; index update failed", indexFailure);
 			}
 
 			logger.debug("Saved result {} to {}", result.experimentId(), resultFile);

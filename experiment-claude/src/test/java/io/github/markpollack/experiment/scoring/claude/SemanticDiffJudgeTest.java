@@ -16,11 +16,11 @@ import io.github.markpollack.agents.model.AgentGeneration;
 import io.github.markpollack.agents.model.AgentGenerationMetadata;
 import io.github.markpollack.agents.model.AgentResponse;
 import io.github.markpollack.judge.JudgeType;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.experiment.agent.TerminalStatus;
+import io.github.markpollack.experiment.scoring.AgentJudgingInput;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,11 +32,11 @@ class SemanticDiffJudgeTest {
 
 	private RuntimeException providerFailure;
 
-	private SemanticDiffJudge judge;
+	private SemanticDiffFixture judge;
 
 	/**
-	 * A stub provider: no Claude, no CLI, no subclassing of the judge. Proves the judge
-	 * drives whatever {@link AgentApi} it is given.
+	 * A stub provider: no Claude or CLI; the helper only configures the actual
+	 * no-argument judge. Proves the judge drives whatever {@link AgentApi} it is given.
 	 */
 	private final AgentApi stubProvider = request -> {
 		if (providerFailure != null) {
@@ -51,7 +51,7 @@ class SemanticDiffJudgeTest {
 	void setUp() {
 		cannedOutputs.clear();
 		providerFailure = null;
-		judge = new SemanticDiffJudge(SemanticDiffJudgeConfig.defaults(), stubProvider);
+		judge = new SemanticDiffFixture(SemanticDiffJudgeConfig.defaults(), stubProvider);
 	}
 
 	@Test
@@ -62,7 +62,7 @@ class SemanticDiffJudgeTest {
 
 	@Test
 	void abstainsWhenNoPlanInMetadata() {
-		JudgmentContext context = contextWithMetadata(Map.of());
+		AgentJudgingInput context = contextWithMetadata(Map.of());
 
 		Judgment judgment = judge.judge(context);
 
@@ -73,7 +73,7 @@ class SemanticDiffJudgeTest {
 	@Test
 	void abstainsWhenPlanHasNoVerifyCriteria() {
 		String plan = planWithRoadmap("## Step 1\n- [ ] Do something\n");
-		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
+		AgentJudgingInput context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
 
@@ -84,12 +84,11 @@ class SemanticDiffJudgeTest {
 	@Test
 	void abstainsWhenWorkspaceIsNull() {
 		String plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile");
-		JudgmentContext context = JudgmentContext.builder()
+		AgentJudgingInput context = AgentJudgingInput.builder()
 			.goal("test")
 			.workspace(null)
 			.executionTime(Duration.ofSeconds(1))
-			.startedAt(Instant.now())
-			.status(ExecutionStatus.SUCCESS)
+			.status(TerminalStatus.COMPLETED)
 			.metadata("plan", plan)
 			.build();
 
@@ -106,14 +105,14 @@ class SemanticDiffJudgeTest {
 				- [ ] VERIFY: ./mvnw compile
 				- [ ] VERIFY: ./mvnw test
 				""");
-		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
+		AgentJudgingInput context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.score()).isEqualTo(1.0);
 		assertThat(judgment.checks()).hasSize(2);
-		assertThat(judgment.checks()).allSatisfy(check -> assertThat(check.passed()).isTrue());
+		assertThat(judgment.checks()).allSatisfy(check -> assertThat(check.judgment().pass()).isTrue());
 	}
 
 	@Test
@@ -124,7 +123,7 @@ class SemanticDiffJudgeTest {
 				- [ ] VERIFY: criterion B
 				- [ ] VERIFY: criterion C
 				""");
-		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
+		AgentJudgingInput context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
 
@@ -136,7 +135,7 @@ class SemanticDiffJudgeTest {
 	void failWhenAllCriteriaFail() {
 		mockStructuredResponses("FAIL", "not satisfied", "FAIL", "not satisfied");
 		String plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile\n- [ ] VERIFY: ./mvnw test\n");
-		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
+		AgentJudgingInput context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
 
@@ -148,7 +147,7 @@ class SemanticDiffJudgeTest {
 	void diagnosticMetadataContainsCriteriaCounts() {
 		mockStructuredResponses("PASS", "ok", "PASS", "ok");
 		String plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile\n- [ ] VERIFY: ./mvnw test\n");
-		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
+		AgentJudgingInput context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
 
@@ -160,22 +159,22 @@ class SemanticDiffJudgeTest {
 	void checksListHasOneCheckPerCriterion() {
 		mockStructuredResponses("PASS", "ok", "FAIL", "nope");
 		String plan = planWithRoadmap("- [ ] VERIFY: criterion A\n- [ ] VERIFY: criterion B\n");
-		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
+		AgentJudgingInput context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
 
 		List<Check> checks = judgment.checks();
 		assertThat(checks).hasSize(2);
-		assertThat(checks.get(0).name()).isEqualTo("criterion A");
-		assertThat(checks.get(0).passed()).isTrue();
-		assertThat(checks.get(1).name()).isEqualTo("criterion B");
-		assertThat(checks.get(1).passed()).isFalse();
+		assertThat(checks.get(0).id()).isEqualTo("criterion A");
+		assertThat(checks.get(0).judgment().pass()).isTrue();
+		assertThat(checks.get(1).id()).isEqualTo("criterion B");
+		assertThat(checks.get(1).judgment().pass()).isFalse();
 	}
 
 	@Test
 	void maxCriteriaToEvaluateCapsEvaluatedCount() {
 		SemanticDiffJudgeConfig limitedConfig = new SemanticDiffJudgeConfig("sonnet", 2, Duration.ofMinutes(2));
-		SemanticDiffJudge limitedJudge = new SemanticDiffJudge(limitedConfig, stubProvider);
+		SemanticDiffFixture limitedJudge = new SemanticDiffFixture(limitedConfig, stubProvider);
 		mockStructuredResponses("PASS", "ok", "PASS", "ok");
 		String plan = planWithRoadmap("""
 				- [ ] VERIFY: criterion A
@@ -183,7 +182,7 @@ class SemanticDiffJudgeTest {
 				- [ ] VERIFY: criterion C
 				- [ ] VERIFY: criterion D
 				""");
-		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
+		AgentJudgingInput context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = limitedJudge.judge(context);
 
@@ -195,24 +194,24 @@ class SemanticDiffJudgeTest {
 	void parsesJsonStructuredOutput() {
 		mockStructuredResponses("PASS", "Build compiles successfully", "FAIL", "Tests not passing");
 		String plan = planWithRoadmap("- [ ] VERIFY: compile\n- [ ] VERIFY: test\n");
-		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
+		AgentJudgingInput context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS); // 1/2 >= 0.5
 		assertThat(judgment.score()).isEqualTo(0.5);
 		List<Check> checks = judgment.checks();
-		assertThat(checks.get(0).passed()).isTrue();
-		assertThat(checks.get(0).message()).isEqualTo("Build compiles successfully");
-		assertThat(checks.get(1).passed()).isFalse();
-		assertThat(checks.get(1).message()).isEqualTo("Tests not passing");
+		assertThat(checks.get(0).judgment().pass()).isTrue();
+		assertThat(checks.get(0).judgment().reasoning()).isEqualTo("Build compiles successfully");
+		assertThat(checks.get(1).judgment().pass()).isFalse();
+		assertThat(checks.get(1).judgment().reasoning()).isEqualTo("Tests not passing");
 	}
 
 	@Test
 	void llmExceptionReturnsErrorJudgment() {
 		providerFailure = new RuntimeException("LLM unavailable");
 		String plan = planWithRoadmap("- [ ] VERIFY: ./mvnw compile\n");
-		JudgmentContext context = contextWithMetadata(Map.of("plan", plan));
+		AgentJudgingInput context = contextWithMetadata(Map.of("plan", plan));
 
 		Judgment judgment = judge.judge(context);
 
@@ -223,7 +222,7 @@ class SemanticDiffJudgeTest {
 	@Test
 	void judgeModelIsRecordedInTheJudgment() {
 		mockStructuredResponses("PASS", "ok");
-		JudgmentContext context = contextWithMetadata(Map.of("plan", planWithRoadmap("- [ ] VERIFY: compile\n")));
+		AgentJudgingInput context = contextWithMetadata(Map.of("plan", planWithRoadmap("- [ ] VERIFY: compile\n")));
 
 		Judgment judgment = judge.judge(context);
 
@@ -233,7 +232,7 @@ class SemanticDiffJudgeTest {
 
 	@Test
 	void theJudgeDoesNotInheritTheSubjectsModel() {
-		SemanticDiffJudge haikuJudge = new SemanticDiffJudge(
+		SemanticDiffFixture haikuJudge = new SemanticDiffFixture(
 				new SemanticDiffJudgeConfig("haiku", 20, Duration.ofMinutes(2)), stubProvider);
 		mockStructuredResponses("PASS", "ok");
 
@@ -256,13 +255,13 @@ class SemanticDiffJudgeTest {
 	@Test
 	void proseIsStillParsedButRecordsLowerConfidence() {
 		cannedOutputs.add("PASS - the build compiles cleanly");
-		JudgmentContext context = contextWithMetadata(Map.of("plan", planWithRoadmap("- [ ] VERIFY: compile\n")));
+		AgentJudgingInput context = contextWithMetadata(Map.of("plan", planWithRoadmap("- [ ] VERIFY: compile\n")));
 
 		Judgment judgment = judge.judge(context);
 
 		// A provider that ignores the schema still scores, and the fallback is visible.
 		assertThat(judgment.checks()).hasSize(1);
-		assertThat(judgment.checks().get(0).passed()).isTrue();
+		assertThat(judgment.checks().get(0).judgment().pass()).isTrue();
 	}
 
 	/**
@@ -282,15 +281,34 @@ class SemanticDiffJudgeTest {
 		}
 	}
 
-	private JudgmentContext contextWithMetadata(Map<String, Object> metadata) {
-		return JudgmentContext.builder()
+	private AgentJudgingInput contextWithMetadata(Map<String, Object> metadata) {
+		return AgentJudgingInput.builder()
 			.goal("test migration")
 			.workspace(Path.of("/tmp/test-workspace"))
 			.executionTime(Duration.ofSeconds(30))
-			.startedAt(Instant.now())
-			.status(ExecutionStatus.SUCCESS)
+			.status(TerminalStatus.COMPLETED)
 			.metadata(metadata)
 			.build();
+	}
+
+	/** Test adaptation configures a fresh production Judge from each explicit input. */
+	private static final class SemanticDiffFixture extends SemanticDiffJudge {
+
+		private final SemanticDiffJudgeConfig selected;
+
+		private final AgentApi api;
+
+		SemanticDiffFixture(SemanticDiffJudgeConfig config, AgentApi api) {
+			super(config, null, null, api);
+			selected = config;
+			this.api = api;
+		}
+
+		Judgment judge(AgentJudgingInput input) {
+			return new SemanticDiffJudge(selected, (String) input.metadata().get("plan"), input.workspace(), api)
+				.judge();
+		}
+
 	}
 
 	private String planWithRoadmap(String roadmap) {

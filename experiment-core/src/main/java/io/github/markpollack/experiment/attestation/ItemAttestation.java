@@ -54,8 +54,14 @@ public record ItemAttestation(String itemId, String itemSlug, boolean invocation
 
 		List<VoteCount> votes = new ArrayList<>();
 		collect(verdict, "jury", null, rosterFor(verdict, instrument), votes);
-		return new ItemAttestation(item.itemId(), item.itemSlug(), item.success(), verdict.aggregated().status(),
-				classify(votes), votes);
+		RecordedJudgmentStatus status;
+		try {
+			status = verdict.aggregated().status();
+		}
+		catch (IllegalArgumentException unsupported) {
+			status = null;
+		}
+		return new ItemAttestation(item.itemId(), item.itemSlug(), item.success(), status, classify(votes), votes);
 	}
 
 	private static @Nullable Map<?, ?> rosterFor(RecordedVerdict verdict, @Nullable InstrumentRecord instrument) {

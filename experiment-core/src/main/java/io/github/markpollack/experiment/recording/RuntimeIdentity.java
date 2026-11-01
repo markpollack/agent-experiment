@@ -45,7 +45,9 @@ public record RuntimeIdentity(String revision, Map<String, String> artifacts) {
 	 * explicitly named.
 	 */
 	public static RuntimeIdentity writer() {
-		return new RuntimeIdentity(System.getProperty("experiment.writer.revision", "source-revision:UNAVAILABLE"),
+		return new RuntimeIdentity(
+				Objects.requireNonNull(System.getProperty("experiment.writer.revision"),
+						"Set experiment.writer.revision or supply a writer identity"),
 				Map.of("experiment-core", artifact(RuntimeIdentity.class)));
 	}
 

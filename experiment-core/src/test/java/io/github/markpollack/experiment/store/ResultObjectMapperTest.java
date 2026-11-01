@@ -23,7 +23,7 @@ import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.CompositeFailure;
 import io.github.markpollack.judge.verdict.CompositeFailureCode;
 import io.github.markpollack.judge.verdict.CompositeRelation;
-import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.verdict.RoutingRule;
 import io.github.markpollack.judge.verdict.VerdictProvenance;
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.judgment.Check;
@@ -60,12 +60,12 @@ class ResultObjectMapperTest {
 		assertThat(restored.experimentId()).isEqualTo("legacy-exp-013");
 		assertThat(restored.items()).hasSize(1);
 		ItemResult item = restored.items().getFirst();
-		assertThat(item.verdict().aggregated().pass()).isTrue();
+		assertThat(item.verdict().judgment().pass()).isTrue();
 		assertThat(item.verdict().individualByName().get("quality").score()).isEqualTo(0.75);
 		assertThat(item.verdict().compositeAttempts()).singleElement().satisfies(attempt -> {
 			assertThat(attempt.name()).isEqualTo("legacy-sub-verdict-0");
 			assertThat(attempt.relation()).isEqualTo("legacy_sub_verdict");
-			assertThat(attempt.verdict().aggregated().status()).isEqualTo(RecordedJudgmentStatus.FAIL);
+			assertThat(attempt.verdict().judgment().status()).isEqualTo(RecordedJudgmentStatus.FAIL);
 		});
 		var judgeDetail = (io.github.markpollack.experiment.judge.JudgeExecutionDetail) item.executionDetail();
 		assertThat(judgeDetail.candidateJudgment().label()).isEqualTo("good");
@@ -149,20 +149,19 @@ class ResultObjectMapperTest {
 		String json = mapper.writeValueAsString(original);
 		RecordedVerdict restored = mapper.readValue(json, RecordedVerdict.class);
 
-		assertThat(restored.aggregated().pass()).isTrue();
-		assertThat(restored.aggregated().reasoning()).isEqualTo("All checks passed");
+		assertThat(restored.judgment().pass()).isTrue();
+		assertThat(restored.judgment().reasoning()).isEqualTo("All checks passed");
 		assertThat(restored.individualByName()).containsKey("build_judge");
-		assertThat(restored.aggregated().checks()).hasSize(1);
+		assertThat(restored.judgment().checks()).hasSize(1);
 	}
 
 	@Test
 	void recordsAndRoundTripsCompositeFailureCode() throws Exception {
 		Judgment failure = Judgment.error("tier did not return a verdict");
-		Verdict live = Verdict.builder()
-			.aggregated(failure)
+		Verdict live = new Verdict.Builder().judgment(failure)
 			.compositeAttempts(List.of(CompositeAttempt.executionFailed("tier-1", CompositeRelation.CASCADE_TIER,
-					TierPolicy.FINAL_TIER, new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED))))
-			.decision(Decision.own())
+					RoutingRule.FINAL_TIER, new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED))))
+			.provenance(VerdictProvenance.own())
 			.build();
 
 		RecordedVerdict restored = mapper.readValue(mapper.writeValueAsString(RecordedVerdict.from(live)),
@@ -269,7 +268,7 @@ class ResultObjectMapperTest {
 	void roundTripsItemResultWithInvocationAndVerdict() throws Exception {
 		InvocationResult invocation = InvocationResult.completed(List.of(), 100, 200, 50, 0.05, 5000, "session-1",
 				Map.of("model", "opus"));
-		Verdict verdict = Verdict.of(Judgment.pass("OK"), Map.of("build", Judgment.pass("compiled")));
+		Verdict verdict = Verdict.single("build", Judgment.pass("compiled"));
 
 		ItemResult original = ItemResult.builder()
 			.itemId("ITEM-001")
@@ -295,7 +294,7 @@ class ResultObjectMapperTest {
 		assertThat(restored.executionDetail()).isInstanceOf(InvocationResult.class);
 		assertThat(((InvocationResult) restored.executionDetail()).totalTokens()).isEqualTo(350);
 		assertThat(restored.verdict()).isNotNull();
-		assertThat(restored.verdict().aggregated().pass()).isTrue();
+		assertThat(restored.verdict().judgment().pass()).isTrue();
 	}
 
 	@Test
@@ -437,7 +436,7 @@ class ResultObjectMapperTest {
 		// look
 		// unmeasured rather than broken.
 		Verdict verdict = Verdict.single("gate", Judgment.fail("no bounded contexts"));
-		VerdictAnalysis interpretation = io.github.markpollack.experiment.recording.InterpretationSnapshot
+		JsonNode interpretation = io.github.markpollack.experiment.recording.InterpretationSnapshot
 			.currentReading(RecordedVerdict.from(verdict).document());
 		ItemResult item = ItemResult.builder()
 			.itemId("a")
@@ -451,9 +450,10 @@ class ResultObjectMapperTest {
 		ItemResult readBack = mapper.readValue(mapper.writeValueAsString(item), ItemResult.class);
 
 		assertThat(readBack.interpretation()).isNotNull();
-		assertThat(readBack.interpretation().reading()).isEqualTo(interpretation.reading());
-		assertThat(readBack.interpretation().readingSupport()).isEqualTo(interpretation.readingSupport());
-		assertThat(readBack.interpretation().defects()).hasSameSizeAs(interpretation.defects());
+		assertThat(readBack.interpretation().get("conclusion")).isEqualTo(interpretation.get("conclusion"));
+		assertThat(readBack.interpretation().get("accountingVersion"))
+			.isEqualTo(interpretation.get("accountingVersion"));
+		assertThat(readBack.interpretation()).isEqualTo(interpretation);
 	}
 
 }

@@ -24,8 +24,10 @@ class AgentExperimentJournalTest {
 	private ExperimentConfig.Builder config() {
 		return ExperimentConfig.builder()
 			.experimentName("unknown-replies")
-			.datasetPath(Path.of("src/test/resources/test-dataset").toAbsolutePath())
+			.datasetDir(Path.of("src/test/resources/test-dataset").toAbsolutePath())
 			.model("fixture")
+			.promptTemplate("{{task}}")
+			.perItemTimeout(java.time.Duration.ofSeconds(5))
 			.requireCleanGit(false);
 	}
 
@@ -35,7 +37,10 @@ class AgentExperimentJournalTest {
 		var factories = new AtomicInteger();
 		var runner = new AgentExperiment(new FileSystemDatasetManager(), input -> {
 			factories.incrementAndGet();
-			return SimpleJury.builder().judge("fixture", () -> Judgment.pass("fixture")).build();
+			return SimpleJury.builder()
+				.judge("fixture", () -> Judgment.pass("fixture"))
+				.votingStrategy(new io.github.markpollack.judge.voting.ConsensusStrategy())
+				.build();
 		}, store, config().outputDir(root.resolve("artifacts")).build());
 		var result = runner.run(input -> new InvocationResult(true, TerminalStatus.COMPLETED, List.of(), 0, 0, 0, 0, 0,
 				0.0, 1, "provider-session", Map.of("measurementState", "UNKNOWN", "measurementReason",
@@ -64,7 +69,10 @@ class AgentExperimentJournalTest {
 	@Test
 	void explicitlyRequestedRetiredWriterRefusesAtConstruction() {
 		assertThatThrownBy(() -> new AgentExperiment(new FileSystemDatasetManager(),
-				input -> SimpleJury.builder().judge("fixture", () -> Judgment.pass("fixture")).build(),
+				input -> SimpleJury.builder()
+					.judge("fixture", () -> Judgment.pass("fixture"))
+					.votingStrategy(new io.github.markpollack.judge.voting.ConsensusStrategy())
+					.build(),
 				new FileSystemResultStore(root), config().journalEnabled(true).build()))
 			.hasMessageContaining("Legacy phase writer retired");
 	}

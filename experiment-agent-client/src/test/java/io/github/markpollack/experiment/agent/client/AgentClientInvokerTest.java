@@ -13,7 +13,7 @@ import io.github.markpollack.agents.model.AgentGenerationMetadata;
 import io.github.markpollack.agents.model.AgentOptions;
 import io.github.markpollack.agents.model.AgentResponse;
 import io.github.markpollack.agents.model.AgentResponseMetadata;
-import io.github.markpollack.journal.claude.PhaseCapture;
+
 import org.junit.jupiter.api.Test;
 
 import io.github.markpollack.experiment.agent.InvocationContext;
@@ -35,9 +35,8 @@ class AgentClientInvokerTest {
 			.build();
 	}
 
-	private static PhaseCapture capture(boolean isError) {
-		return new PhaseCapture("invoke", "do the task", 1000, 200, 50, 0, 0, 1500L, 1200L, 0.02, "session-abc", 3,
-				isError, "all done", List.of(), List.of(), "result text", List.of(), List.of(), List.of());
+	private static Object capture(boolean error) {
+		return Map.of("isError", error, "totalCostUsd", 99);
 	}
 
 	private static AgentClientResponse response(Object phaseCapture, boolean successful) {
@@ -94,29 +93,27 @@ class AgentClientInvokerTest {
 	}
 
 	@Test
-	void resultIsBuiltFromTheProvidersOwnCapture() {
+	void legacyProviderCaptureCannotManufactureCurrentMeasurements() {
 		InvocationResult result = new AgentClientInvoker().toResult(response(capture(false), true), context(),
 				System.currentTimeMillis());
 
 		assertThat(result.success()).isTrue();
 		assertThat(result.status()).isEqualTo(TerminalStatus.COMPLETED);
-		assertThat(result.phases()).hasSize(1);
-		assertThat(result.inputTokens()).isEqualTo(1000);
-		assertThat(result.outputTokens()).isEqualTo(200);
-		assertThat(result.thinkingTokens()).isEqualTo(50);
-		assertThat(result.totalCostUsd()).isEqualTo(0.02);
-		assertThat(result.sessionId()).isEqualTo("session-abc");
-		assertThat(result.metadata()).containsEntry("itemId", "item-1");
+		assertThat(result.phases()).isEmpty();
+		assertThat(result.sessionId()).isEqualTo("session-from-metadata");
+		assertThat(result.metadata()).containsEntry("itemId", "item-1")
+			.containsEntry("measurementState", "UNKNOWN")
+			.containsEntry("agentResponse", "all done");
 	}
 
 	@Test
-	void anErroredCaptureIsReportedAsAnErrorResult() {
+	void legacyCaptureDoesNotReplaceTheActualClientResponse() {
 		InvocationResult result = new AgentClientInvoker().toResult(response(capture(true), true), context(),
 				System.currentTimeMillis());
 
-		assertThat(result.success()).isFalse();
-		assertThat(result.status()).isEqualTo(TerminalStatus.ERROR);
-		assertThat(result.phases()).hasSize(1);
+		assertThat(result.success()).isTrue();
+		assertThat(result.status()).isEqualTo(TerminalStatus.COMPLETED);
+		assertThat(result.phases()).isEmpty();
 	}
 
 	@Test
@@ -138,7 +135,7 @@ class AgentClientInvokerTest {
 
 		assertThat(result.success()).isFalse();
 		assertThat(result.status()).isEqualTo(TerminalStatus.ERROR);
-		assertThat(result.errorMessage()).contains("no phase capture");
+		assertThat(result.errorMessage()).contains("Agent reported failure");
 	}
 
 	@Test
@@ -158,8 +155,8 @@ class AgentClientInvokerTest {
 			.invoke(context());
 
 		assertThat(result.success()).isTrue();
-		assertThat(result.phases()).hasSize(1);
-		assertThat(result.inputTokens()).isEqualTo(1000);
+		assertThat(result.phases()).isEmpty();
+		assertThat(result.metadata()).containsEntry("measurementState", "UNKNOWN");
 	}
 
 	@Test

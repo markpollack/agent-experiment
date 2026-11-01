@@ -39,7 +39,7 @@ class ReEvaluatorTest {
 
 		// Re-evaluate with a failing jury
 		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
-		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(failingJudge()));
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, ignored -> juryWith(failingJudge()));
 
 		assertThat(reEvaluated.experimentId()).isNotEqualTo(original.experimentId());
 		assertThat(reEvaluated.experimentName()).isEqualTo(original.experimentName());
@@ -63,7 +63,7 @@ class ReEvaluatorTest {
 		resultStore.save(original);
 
 		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
-		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(passingJudge()));
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, ignored -> juryWith(passingJudge()));
 
 		ItemResult skipped = reEvaluated.items().get(0);
 		assertThat(skipped.metadata()).containsEntry("reEvaluationSkipped", "true");
@@ -77,7 +77,7 @@ class ReEvaluatorTest {
 		resultStore.save(original);
 
 		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
-		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(passingJudge()));
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, ignored -> juryWith(passingJudge()));
 
 		assertThat(reEvaluated.metadata()).containsEntry("reEvaluatedFrom", original.experimentId());
 		assertThat(reEvaluated.metadata()).containsEntry("systemReinvoked", "false");
@@ -95,7 +95,8 @@ class ReEvaluatorTest {
 		resultStore.save(original);
 
 		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
-		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original.experimentId(), juryWith(passingJudge()));
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original.experimentId(),
+				ignored -> juryWith(passingJudge()));
 
 		assertThat(reEvaluated.metadata()).containsEntry("reEvaluatedFrom", original.experimentId());
 	}
@@ -104,7 +105,7 @@ class ReEvaluatorTest {
 	void loadByIdThrowsForMissing() {
 		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
 
-		assertThatThrownBy(() -> reEvaluator.reEvaluate("nonexistent", juryWith(passingJudge())))
+		assertThatThrownBy(() -> reEvaluator.reEvaluate("nonexistent", ignored -> juryWith(passingJudge())))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("nonexistent");
 	}
@@ -124,7 +125,7 @@ class ReEvaluatorTest {
 
 		ReEvaluator reEvaluator = ReEvaluator.builder().resultStore(resultStore).contextFactory(customFactory).build();
 
-		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(passingJudge()));
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, ignored -> juryWith(passingJudge()));
 
 		assertThat(reEvaluated.items().get(0).passed()).isTrue();
 	}
@@ -135,7 +136,7 @@ class ReEvaluatorTest {
 		resultStore.save(original);
 
 		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
-		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(passingJudge()));
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, ignored -> juryWith(passingJudge()));
 
 		// Both original and re-evaluated should be in the store
 		assertThat(resultStore.size()).isEqualTo(2);
@@ -148,7 +149,7 @@ class ReEvaluatorTest {
 		resultStore.save(original);
 
 		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
-		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(passingJudge()));
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, ignored -> juryWith(passingJudge()));
 
 		assertThat(reEvaluated.totalCostUsd()).isNull();
 		assertThat(reEvaluated.metadata()).containsEntry("originalCostUsd", String.valueOf(original.totalCostUsd()));
@@ -161,7 +162,7 @@ class ReEvaluatorTest {
 
 		// Re-evaluate with a passing jury
 		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
-		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(passingJudge()));
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, ignored -> juryWith(passingJudge()));
 
 		// Compare original vs re-evaluated via ComparisonEngine
 		var engine = new io.github.markpollack.experiment.comparison.DefaultComparisonEngine(resultStore);
@@ -178,7 +179,7 @@ class ReEvaluatorTest {
 		resultStore.save(original);
 
 		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
-		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(failingJudge()));
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, ignored -> juryWith(failingJudge()));
 
 		assertThat(reEvaluated.instrument()).isNotNull();
 		assertThat(reEvaluated.instrument().specHash()).isNotNull();
@@ -188,7 +189,7 @@ class ReEvaluatorTest {
 
 	@Test
 	void skippedItemKeepsTheInstrumentItWasScoredByAndIsNotCheckedAgainstTheNewOne() {
-		Verdict originalVerdict = juryWith(passingJudge()).vote(AgentJudgingInput.builder().goal("original").build());
+		Verdict originalVerdict = juryWith(passingJudge()).vote();
 		ItemResult failedButJudged = ItemResult.builder()
 			.itemId("ITEM-FAILED")
 			.itemSlug("failed-item")
@@ -199,11 +200,12 @@ class ReEvaluatorTest {
 		resultStore.save(original);
 
 		ReEvaluator reEvaluator = ReEvaluator.agentDefaults(resultStore);
-		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, juryWith(passingJudge()));
+		ExperimentResult reEvaluated = reEvaluator.reEvaluate(original, ignored -> juryWith(passingJudge()));
 
 		ItemResult skipped = reEvaluated.items().get(0);
-		assertThat(skipped.verdict().instrumentHash()).isEqualTo("original-instrument")
-			.isNotEqualTo(reEvaluated.instrument().specHash());
+		assertThat(skipped.verdict().instrumentHash()).isEqualTo("original-instrument");
+		assertThat(reEvaluated.instrument()).isNull(); // No eligible item caused a new
+														// configured jury to exist.
 		assertThat(io.github.markpollack.experiment.attestation.RunAttestation.of(reEvaluated)
 			.items()
 			.get(0)
@@ -228,7 +230,7 @@ class ReEvaluatorTest {
 		// travelled with the item, the repair could never take effect: the run would keep
 		// counting an instrument failure and keep failing.
 		ExperimentResult repaired = ReEvaluator.agentDefaults(resultStore)
-			.reEvaluate(original, juryWith(passingJudge()));
+			.reEvaluate(original, ignored -> juryWith(passingJudge()));
 
 		assertThat(repaired.items().get(0).metadata())
 			.doesNotContainKey(io.github.markpollack.experiment.result.InstrumentRecord.ITEM_INSTRUMENT_FAILURE)

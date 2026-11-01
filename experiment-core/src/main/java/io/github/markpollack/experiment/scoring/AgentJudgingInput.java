@@ -52,6 +52,11 @@ public record AgentJudgingInput(String goal, @Nullable Path workspace, Duration 
 			return this;
 		}
 
+		public Builder metadata(java.util.Map<String, Object> values) {
+			metadata.putAll(values);
+			return this;
+		}
+
 		public Builder metadata(String key, Object value) {
 			metadata.put(key, value);
 			return this;

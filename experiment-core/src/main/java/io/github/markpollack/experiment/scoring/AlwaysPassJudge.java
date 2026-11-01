@@ -9,9 +9,15 @@ import io.github.markpollack.judge.judgment.Judgment;
  * {@link io.github.markpollack.judge.jury.CascadedJury} until real Tier 2/3 judges are
  * implemented.
  */
-class AlwaysPassJudge implements Judge {
+class AlwaysPassJudge implements io.github.markpollack.judge.JudgeWithMetadata {
 
 	AlwaysPassJudge() {
+	}
+
+	@Override
+	public io.github.markpollack.judge.JudgeMetadata metadata() {
+		return new io.github.markpollack.judge.JudgeMetadata("always_pass", "Fixture placeholder",
+				io.github.markpollack.judge.JudgeType.DETERMINISTIC);
 	}
 
 	@Override

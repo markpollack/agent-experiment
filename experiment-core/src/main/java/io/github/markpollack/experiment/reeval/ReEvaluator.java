@@ -87,7 +87,7 @@ public final class ReEvaluator {
 			.totalCostUsd((Double) null)
 			.totalTokens((Long) null)
 			.totalDurationMs((Long) null)
-			.instrument(instrument)
+			.instrument(InstrumentRecorder.common(items))
 			.build();
 
 		resultStore.save(result);
@@ -133,8 +133,9 @@ public final class ReEvaluator {
 			.durationMs((Long) null)
 			.interpretation(interpretation)
 			.metadata(merge(withoutInstrumentFailure(original.metadata()),
-					Map.of("reEvaluated", "true", "systemReinvoked", "false", "originalCostUsd",
-							String.valueOf(original.costUsd()), "reEvaluationJury", jury.getClass().getSimpleName())))
+					Map.of("configuredInstrument", rowInstrument, "reEvaluated", "true", "systemReinvoked", "false",
+							"originalCostUsd", String.valueOf(original.costUsd()), "reEvaluationJury",
+							jury.getClass().getSimpleName())))
 			.build();
 	}
 
@@ -174,7 +175,7 @@ public final class ReEvaluator {
 		return kept;
 	}
 
-	private static Map<String, Object> merge(Map<String, Object> base, Map<String, String> overlay) {
+	private static Map<String, Object> merge(Map<String, Object> base, Map<String, ?> overlay) {
 		Map<String, Object> merged = new HashMap<>(base);
 		merged.putAll(overlay);
 		return merged;

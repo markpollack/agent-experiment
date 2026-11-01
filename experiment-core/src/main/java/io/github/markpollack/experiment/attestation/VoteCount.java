@@ -82,7 +82,14 @@ public record VoteCount(String scope, @Nullable String relation, @Nullable Recor
 	static VoteCount of(String scope, @Nullable String relation,
 			io.github.markpollack.experiment.result.RecordedVerdict verdict, @Nullable Integer rosterCount) {
 
-		return of(scope, relation, verdict.aggregated(), rosterCount);
+		var base = of(scope, relation, verdict.aggregated(), rosterCount);
+		var node = verdict.document().node();
+		if (node.path("schemaVersion").isInt() && node.path("schemaVersion").intValue() == 6)
+			return new VoteCount(scope, relation, base.outcome(), base.failureCode(), base.strategy(),
+					base.errorPolicy(), node.path("individual").isArray() ? node.path("individual").size() : null,
+					base.eligibleCount(), base.explicitAbstainCount(), base.errorCount(), rosterCount,
+					node.path("declaredCardinality").isInt() ? node.path("declaredCardinality").intValue() : null);
+		return base;
 	}
 
 	static VoteCount of(String scope, @Nullable String relation, RecordedJudgment aggregated,

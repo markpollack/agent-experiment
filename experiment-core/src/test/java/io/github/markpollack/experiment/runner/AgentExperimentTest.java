@@ -392,12 +392,12 @@ class AgentExperimentTest {
 		Jury silentlyShort = new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
 			public List<Judge> getJudges() {
-				return listed.getJudges();
+				return ((io.github.markpollack.judge.jury.VotingJury) listed).getJudges();
 			}
 
 			@Override
 			public io.github.markpollack.judge.voting.VotingStrategy getVotingStrategy() {
-				return listed.getVotingStrategy();
+				return ((io.github.markpollack.judge.jury.VotingJury) listed).getVotingStrategy();
 			}
 
 			@Override

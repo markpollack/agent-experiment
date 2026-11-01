@@ -76,6 +76,21 @@ public final class InstrumentRecorder {
 		}
 	}
 
+	/**
+	 * A common run instrument exists only when all freshly configured item instruments
+	 * agree.
+	 */
+	public static @org.jspecify.annotations.Nullable InstrumentRecord common(
+			java.util.List<io.github.markpollack.experiment.result.ItemResult> items) {
+		var records = items.stream()
+			.map(item -> item.metadata().get("configuredInstrument"))
+			.filter(InstrumentRecord.class::isInstance)
+			.map(InstrumentRecord.class::cast)
+			.toList();
+		return records.isEmpty() || records.stream().map(InstrumentRecord::specHash).distinct().count() != 1 ? null
+				: records.getFirst();
+	}
+
 	static String hash(Map<String, Object> description) {
 		try {
 			return sha256(CANONICAL.writeValueAsString(description).getBytes(StandardCharsets.UTF_8));

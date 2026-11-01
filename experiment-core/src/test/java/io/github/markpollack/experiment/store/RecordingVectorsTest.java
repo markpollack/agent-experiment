@@ -76,27 +76,15 @@ public class RecordingVectorsTest {
 		assertThat(loaded.items().getFirst().verdict().producerJson()).isEqualTo(vector.source());
 		assertThat(loaded.items().getFirst().verdict().sha256())
 			.isEqualTo(ProducerDocument.hash(vector.source().getBytes(StandardCharsets.UTF_8)));
-		var reading = loaded.items().getFirst().interpretation();
-		assertThat(reading.reading() == null ? null : reading.reading().name())
-			.isEqualTo(vector.expected().path("reading").isNull() ? null : vector.expected().path("reading").asText());
-		assertThat(reading.readingSupport().name()).isEqualTo(vector.expected().path("readingSupport").asText());
-		JsonNode interpreted = JSON.valueToTree(reading);
-		for (var expected : vector.expected().path("expectedPaths").properties())
-			assertThat(interpreted.at(expected.getKey())).as(expected.getKey()).isEqualTo(expected.getValue());
+		assertThat(loaded.items().getFirst().historical()).isTrue();
+		assertThat(loaded.items().getFirst().passed()).isNull();
+		assertThatThrownBy(() -> verdict.document().value(Verdict.class)).isInstanceOf(IllegalArgumentException.class);
 		assertThat(store.listByName("vectors")).containsExactly(loaded);
 		assertThat(store.mostRecent("vectors")).contains(loaded);
 		assertThat(loaded.items().getFirst().interpretationSnapshot())
 			.isEqualTo(result.items().getFirst().interpretationSnapshot());
 		io.github.markpollack.experiment.attestation.RunAttestation.of(loaded);
-		if (vector.id().equals("contained-invocation")) {
-			assertThat(loaded.items().getFirst().passed()).isFalse();
-			assertThat(io.github.markpollack.experiment.attestation.ItemAccounting
-				.instrumentHealth(loaded.items().getFirst())
-				.name()).isEqualTo("FAILED");
-			assertThat(interpreted.at("/root/judges/0/execution").asText()).isEqualTo("CONTAINED_FAILURE");
-		}
-		if (vector.id().equals("valid-returned-identical-error"))
-			assertThat(interpreted.at("/root/judges/0/execution").asText()).isEqualTo("RETURNED");
+
 		if (vector.id().equals("negative-ordinal-identity"))
 			assertRichFacts(ProducerDocument.parse(loaded.items().getFirst().verdict().producerJson()));
 		preserveEvidence(root.resolve("vectors").resolve(vector.id() + ".json"), "vectors/" + vector.id() + ".json");
@@ -105,20 +93,12 @@ public class RecordingVectorsTest {
 	@ParameterizedTest(name = "live factory {0}")
 	@MethodSource("liveVectors")
 	void constructibleVectorsAlsoUseActualLiveFactory(Vector vector) throws Exception {
-		Verdict live = JSON.readValue(vector.source(), Verdict.class);
-		RecordedVerdict recorded = RecordedVerdict.from(live);
-		assertThat(recorded.aggregated().effectiveScore()).isEqualTo(live.aggregated().effectiveScore());
-		FileSystemResultStore store = new FileSystemResultStore(root);
-		store.save(subject(vector.id(), recorded));
-		var loaded = store.load(vector.id()).orElseThrow();
-		assertThat(loaded.items().getFirst().verdict().aggregated().effectiveScore())
-			.isEqualTo(live.aggregated().effectiveScore());
-		assertThat(ProducerDocument.parse(loaded.items().getFirst().verdict().producerJson()))
-			.isEqualTo(ProducerDocument.parse(vector.source()));
-		assertThat(loaded.items().getFirst().interpretation().reading().name())
-			.isEqualTo(vector.expected().path("reading").asText());
-		if (vector.id().equals("negative-ordinal-identity"))
-			assertRichFacts(ProducerDocument.parse(loaded.items().getFirst().verdict().producerJson()));
+		var raw = RecordedVerdict.fromProducerJson(vector.source());
+		assertThatThrownBy(() -> raw.document().value(Verdict.class)).isInstanceOf(IllegalArgumentException.class);
+		var before = raw.producerJson();
+		var store = new FileSystemResultStore(root);
+		store.save(subject(vector.id(), raw));
+		assertThat(store.load(vector.id()).orElseThrow().items().getFirst().verdict().producerJson()).isEqualTo(before);
 	}
 
 	static List<Vector> liveVectors() throws Exception {
@@ -180,7 +160,18 @@ public class RecordingVectorsTest {
 	}
 
 	public static ExperimentResult subject(String id, RecordedVerdict verdict) {
-		ItemResult item = ItemResult.builder().itemId("case").itemSlug("case").verdict(verdict).build();
+		boolean current = verdict.document().node().path("schemaVersion").isInt()
+				&& verdict.document().node().path("schemaVersion").intValue() == 6;
+		var builder = ItemResult.builder()
+			.itemId("case")
+			.itemSlug("case")
+			.historical(!current)
+			.verdictRole("SUBJECT")
+			.verdict(verdict);
+		if (!current)
+			builder.interpretationSnapshot(new InterpretationSnapshot("LEGACY_UNVERIFIED", verdict.sha256(), null, null,
+					com.fasterxml.jackson.databind.node.NullNode.instance));
+		ItemResult item = builder.build();
 		return ExperimentResult.builder()
 			.experimentId(id)
 			.experimentName("vectors")

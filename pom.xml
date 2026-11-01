@@ -55,8 +55,8 @@
         <agent-client.version>0.32.1-SNAPSHOT</agent-client.version>
 
         <!-- Third-party dependency versions -->
-        <jackson.version>2.22.2</jackson.version>
-        <jackson3.version>3.2.2</jackson3.version>
+        <jackson.version>2.22.4</jackson.version>
+        <jackson3.version>3.2.4</jackson3.version>
         <slf4j.version>2.0.18</slf4j.version>
         <jspecify.version>1.0.1</jspecify.version>
 
@@ -229,6 +229,11 @@
                     <version>${maven-surefire-plugin.version}</version>
                     <configuration>
                         <excludedGroups>${surefire.excludedGroups}</excludedGroups>
+                        <systemPropertyVariables>
+                            <!-- Synthetic test recordings; production writers supply actual source identity. -->
+                            <experiment.writer.revision>TEST-ONLY:fixture-source</experiment.writer.revision>
+                            <experiment.judge.revision>released:agent-judge:0.18.0</experiment.judge.revision>
+                        </systemPropertyVariables>
                         <environmentVariables>
                             <!-- Prevent Claude CLI "nested session" error when tests
                                  invoke claude from within a Claude Code session -->
