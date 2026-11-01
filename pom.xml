@@ -6,7 +6,7 @@
 
     <groupId>io.github.markpollack</groupId>
     <artifactId>agent-experiment-parent</artifactId>
-    <version>0.9.0-SNAPSHOT</version>
+    <version>0.10.0-fresh-v3-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>Agent Experiment Parent</name>
@@ -34,19 +34,6 @@
         <developerConnection>scm:git:git@github.com:markpollack/agent-experiment.git</developerConnection>
     </scm>
 
-    <repositories>
-        <!-- agent-judge is consumed as a published snapshot; Maven does not search this by default. -->
-        <repository>
-            <id>central-snapshots</id>
-            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-        </repository>
-    </repositories>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -66,7 +53,7 @@
         -->
         <agent-judge.version>0.17.0</agent-judge.version>
         <claude-code-sdk.version>1.6.0</claude-code-sdk.version>
-        <agent-workflow.version>0.12.2</agent-workflow.version>
+        <agent-workflow.version>0.12.3</agent-workflow.version>
         <agent-client.version>0.30.0</agent-client.version>
 
         <!-- Third-party dependency versions -->
@@ -98,6 +85,7 @@
         <module>experiment-core</module>
         <module>experiment-claude</module>
         <module>experiment-workflow</module>
+        <module>experiment-runtime</module>
     </modules>
 
     <dependencyManagement>
