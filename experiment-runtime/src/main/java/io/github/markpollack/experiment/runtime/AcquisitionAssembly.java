@@ -23,10 +23,19 @@ public final class AcquisitionAssembly {
 
 	private final String writerVersion;
 
+	private final Set<String> selected = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
 	public AcquisitionAssembly(Assembler assembler, String writerVersion) {
 		this.assembler = Objects.requireNonNull(assembler);
 		AgentRecords.text(writerVersion);
 		this.writerVersion = writerVersion;
+	}
+
+	/** Production binding to Journal's one canonical writer. */
+	public static AcquisitionAssembly journal() {
+		return new AcquisitionAssembly((manifest,
+				output) -> io.github.markpollack.journal.ocsf.writer.FinalAssembly.assemble(manifest, output).name(),
+				"journal-ocsf-writer:2.0.0-fresh-v3-SNAPSHOT");
 	}
 
 	public static Map<String, String> provenance(Attempt attempt) {
@@ -70,6 +79,9 @@ public final class AcquisitionAssembly {
 			throw new IllegalArgumentException("Assembly already selected");
 		try {
 			JsonNode manifest = validateManifest(invocation.acquisitions().getFirst(), invocation.attempt(), true);
+			if (!selected
+				.add(invocation.attempt().invocationId() + ":" + invocation.acquisitions().getFirst().sha256()))
+				throw new IOException("Acquisition already selected for assembly");
 			if (Files.exists(freshOutput))
 				throw new IOException("Refusing existing canonical output");
 			String state = assembler.assemble(Path.of(invocation.acquisitions().getFirst().path()), freshOutput);

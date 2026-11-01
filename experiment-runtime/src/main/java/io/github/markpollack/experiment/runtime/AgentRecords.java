@@ -73,7 +73,7 @@ public final class AgentRecords {
 			values = List.copyOf(values);
 			require(List.of("MEASURED", "UNKNOWN").contains(state), "Unknown measurement state");
 			require(values.size() == (state.equals("MEASURED") ? 1 : 0), "Measurement cardinality");
-			values.forEach(v -> require(Double.isFinite(v) && v >= 0, "Invalid measurement"));
+			values.forEach(v -> require(Double.isFinite(v), "Invalid measurement"));
 		}
 
 		public static Measurement unknown(String name, String unit, String reason, String scope) {
@@ -169,10 +169,27 @@ public final class AgentRecords {
 		}
 	}
 
+	public record WorkflowProof(Identity row, String runId, String state, String lifecycle, FileRef snapshot,
+			List<Attempt> attempts) {
+		public WorkflowProof {
+			Objects.requireNonNull(row);
+			text(runId);
+			text(state);
+			text(lifecycle);
+			Objects.requireNonNull(snapshot);
+			require(snapshot.subject().equals("workflow-snapshot"), "Wrong Workflow hash subject");
+			attempts = List.copyOf(attempts);
+			attempts.forEach(
+					a -> require(a.row().equals(row) && a.workflowRunId().equals(runId), "Workflow proof association"));
+		}
+	}
+
 	public record Row(Identity identity, List<Invocation> invocations, String workflowState, Domain domain,
-			List<VerdictDocument> verdicts, String judgeState, String error, String workspaceState) {
+			List<VerdictDocument> verdicts, String judgeState, String error, String workspaceState,
+			List<WorkflowProof> workflowProof) {
 		public Row {
 			Objects.requireNonNull(identity);
+			workflowProof = List.copyOf(workflowProof);
 			invocations = List.copyOf(invocations);
 			Objects.requireNonNull(domain);
 			verdicts = List.copyOf(verdicts);
@@ -185,6 +202,14 @@ public final class AgentRecords {
 			invocations.forEach(i -> require(i.attempt().row().equals(identity), "Full row association mismatch"));
 			require(invocations.stream().map(i -> i.attempt().invocationId()).distinct().count() == invocations.size(),
 					"Duplicate acquisition identity");
+
+			require(workflowProof.size() == (workflowState.equals("NOT_STARTED") ? 0 : 1), "Workflow proof missing");
+			for (WorkflowProof proof : workflowProof) {
+				require(proof.row().equals(identity) && proof.state().equals(workflowState),
+						"Workflow proof row/state mismatch");
+				invocations
+					.forEach(i -> require(proof.attempts().contains(i.attempt()), "Wrong persisted Workflow attempt"));
+			}
 		}
 	}
 

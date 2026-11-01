@@ -45,3 +45,10 @@
 - `io.github.markpollack.experiment.reeval` — ReEvaluationContextFactory, AgentReEvaluationContextFactory, ReEvaluator
 - `io.github.markpollack.experiment.judge` — JudgeExperiment, JudgeScorer, JudgeScorers, JudgeExecutionDetail
 - `io.github.markpollack.experiment.journal` — ExperimentJournal, RunJournal (run-journal lifecycle; owns per-item `Run` on `JsonFileStorage`)
+
+## Canonical typed runtime
+- `experiment-runtime` is the selected canonical agent path; build with `./mvnw -pl experiment-runtime -am verify`.
+- It consumes released Workflow 0.14.0/Judge 0.18.0 and explicitly versioned Client/SDK/Journal task artifacts.
+- Its records and historical raw reader have no retired PhaseCapture dependency. Legacy modules above retain their existing contracts.
+- Client seals acquisition; Experiment calls Journal FinalAssembly once and records distinct acquisition/canonical hashes. Complete usage/cost evidence remains in the canonical sources; unavailable totals are UNKNOWN.
+- Per-item Jury factory runs after typed preparation/measurement; see `experiment-runtime/README.md` and the compiling three-stage consumer test.

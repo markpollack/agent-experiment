@@ -29,8 +29,8 @@ class RuntimeStoreTest {
 	}
 
 	static Row row(Identity id) {
-		return new Row(id, List.of(missing(id)), "SUCCEEDED", new Domain(List.of(), List.of()), List.of(),
-				"NOT_ASSESSED", "", "RETAINED");
+		return new Row(id, List.of(missing(id)), "NOT_STARTED", new Domain(List.of(), List.of()), List.of(),
+				"NOT_ASSESSED", "", "RETAINED", List.of());
 	}
 
 	static Result result(String run, List<Row> rows) {
@@ -90,8 +90,8 @@ class RuntimeStoreTest {
 		var json = RuntimeJson.mapper().readTree(file.toFile());
 		((com.fasterxml.jackson.databind.node.ObjectNode) json.at("/items/0/identity")).remove("runId");
 		RuntimeJson.mapper().writeValue(file.toFile(), json);
-		assertThatThrownBy(() -> store.load("one")).hasMessageContaining("Required text missing");
-		assertThatThrownBy(store::list).hasMessageContaining("Required text missing");
+		assertThatThrownBy(() -> store.load("one")).hasMessageContaining("runId");
+		assertThatThrownBy(store::list).hasMessageContaining("runId");
 	}
 
 	@Test
@@ -99,12 +99,15 @@ class RuntimeStoreTest {
 		var id = identity("run", 0);
 		var prepared = new PreparedItem(id, temp.toString(),
 				List.of(Measurement.measured("baseline", "percent", 0, "report", "item")), List.of());
-		var domain = new Domain(List.of(Measurement.unknown("coverage", "percent", "build failed", "item")), List.of());
-		var failedDomain = JudgeRecording.assess(prepared, List.of(missing(id)), "SUCCEEDED", domain,
-				(p, d) -> () -> Verdict.single("build", Judgment.fail("actual failing domain outcome")));
-		var thrown = JudgeRecording.assess(prepared, List.of(missing(id)), "SUCCEEDED", domain, (p, d) -> {
+		var domain = new Domain(
+				List.of(Measurement.unknown("coverage", "percent", "build failed", "item"),
+						Measurement.measured("coverageDelta", "percentage-point", -5, "fixture regression", "item")),
+				List.of());
+		var failedDomain = JudgeRecording.assess(prepared, List.of(missing(id)), "NOT_STARTED", domain,
+				(p, d) -> () -> Verdict.single("build", Judgment.fail("actual failing domain outcome")), List.of());
+		var thrown = JudgeRecording.assess(prepared, List.of(missing(id)), "NOT_STARTED", domain, (p, d) -> {
 			throw new IllegalStateException("judge failed after capture");
-		});
+		}, List.of());
 		assertThat(failedDomain.verdicts().getFirst().conclusion()).isEqualTo("FAIL");
 		assertThat(thrown.judgeState()).isEqualTo("THREW");
 		assertThat(thrown.invocations()).containsExactly(missing(id));
@@ -133,6 +136,17 @@ class RuntimeStoreTest {
 		assertThatThrownBy(() -> Evidence.verify(c)).hasMessageContaining("Hash mismatch");
 		Files.delete(linked);
 		assertThatThrownBy(() -> Evidence.verify(c)).isInstanceOf(java.io.IOException.class);
+	}
+
+	@Test
+	void actualHistoricalFixtureNeedsNoRetiredClasses() throws Exception {
+		Path fixture = Path.of("src/test/resources/historical/experiment-result-0.5-judge-0.13.json");
+		var historical = FileSystemResultStore.readHistorical(fixture);
+		assertThat(historical.originalJson()).isEqualTo(Files.readString(fixture));
+		assertThat(historical.sha256()).isEqualTo(Evidence.sha256(fixture));
+		assertThat(historical.state()).isEqualTo("LEGACY_UNVERIFIED");
+		assertThatThrownBy(() -> Class.forName("io.github.markpollack.journal.claude.PhaseCapture"))
+			.isInstanceOf(ClassNotFoundException.class);
 	}
 
 	@Test

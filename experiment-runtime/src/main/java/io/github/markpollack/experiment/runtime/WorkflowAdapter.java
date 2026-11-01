@@ -15,7 +15,8 @@ import io.github.markpollack.experiment.runtime.AgentRecords.*;
  */
 public final class WorkflowAdapter {
 
-	public record Execution(RunSnapshot snapshot, Object value, String lifecycle, FileRef snapshotFile) {
+	public record Execution(Identity identity, RunSnapshot snapshot, Object value, String lifecycle,
+			FileRef snapshotFile) {
 		public boolean accepted() {
 			return snapshot.status() == RunSnapshot.Status.SUCCEEDED && lifecycle.equals("DRAINED");
 		}
@@ -81,7 +82,7 @@ public final class WorkflowAdapter {
 			throw new IOException("Workflow admission failed; retained fresh store at " + freshDirectory);
 		Path receipt = freshDirectory.resolve("snapshot.json");
 		Files.write(receipt, RuntimeJson.mapper().writeValueAsBytes(snapshot), StandardOpenOption.CREATE_NEW);
-		return new Execution(snapshot, value, drained ? "DRAINED" : "QUARANTINED",
+		return new Execution(identity, snapshot, value, drained ? "DRAINED" : "QUARANTINED",
 				Evidence.reference(receipt, "workflow-snapshot"));
 	}
 
@@ -94,6 +95,7 @@ public final class WorkflowAdapter {
 	 * snapshot.
 	 */
 	public static void validateAttempt(Execution execution, Attempt attempt, boolean requireCommitted) {
+		AgentRecords.require(execution.identity().equals(attempt.row()), "Wrong full Workflow row");
 		AgentRecords.require(execution.snapshot().runId().equals(attempt.workflowRunId()), "Wrong Workflow run");
 		var logical = execution.snapshot()
 			.invocations()
@@ -117,15 +119,20 @@ public final class WorkflowAdapter {
 	 */
 	public static Row assess(Execution execution, PreparedItem prepared, List<Invocation> invocations, Domain measured,
 			JudgeRecording.ItemJuryFactory factory) {
+		AgentRecords.require(execution.identity().equals(prepared.identity()), "Prepared/Workflow row mismatch");
 		for (Invocation invocation : invocations) {
 			AgentRecords.require(invocation.attempt().row().equals(prepared.identity()), "Prepared/row mismatch");
 			validateAttempt(execution, invocation.attempt(), execution.accepted());
 		}
+		List<WorkflowProof> proof = List.of(new WorkflowProof(prepared.identity(), execution.snapshot().runId(),
+				execution.snapshot().status().name(), execution.lifecycle(), execution.snapshotFile(),
+				invocations.stream().map(Invocation::attempt).toList()));
 		if (!execution.accepted())
 			return new Row(prepared.identity(), invocations, execution.snapshot().status().name(), measured, List.of(),
 					"NOT_ASSESSED", "Workflow did not produce an accepted result",
-					execution.lifecycle().equals("DRAINED") ? "RETAINED" : "QUARANTINED");
-		return JudgeRecording.assess(prepared, invocations, execution.snapshot().status().name(), measured, factory);
+					execution.lifecycle().equals("DRAINED") ? "RETAINED" : "QUARANTINED", proof);
+		return JudgeRecording.assess(prepared, invocations, execution.snapshot().status().name(), measured, factory,
+				proof);
 	}
 
 }

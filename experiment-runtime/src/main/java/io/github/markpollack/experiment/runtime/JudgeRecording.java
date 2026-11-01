@@ -35,7 +35,11 @@ public final class JudgeRecording {
 
 	public static Verdict read(VerdictDocument document) {
 		try {
-			return RuntimeJson.mapper().readValue(document.producerJson(), Verdict.class);
+			// Judge V6 omits its optional fields; keep that producer-owned codec contract
+			// separate from mandatory Experiment envelope fields.
+			return RuntimeJson.mapper()
+				.disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)
+				.readValue(document.producerJson(), Verdict.class);
 		}
 		catch (Exception e) {
 			throw new IllegalArgumentException("Unsupported Judge document", e);
@@ -48,16 +52,16 @@ public final class JudgeRecording {
 	}
 
 	public static Row assess(PreparedItem prepared, List<Invocation> invocations, String workflowState, Domain measured,
-			ItemJuryFactory factory) {
+			ItemJuryFactory factory, List<WorkflowProof> proof) {
 		try {
 			Jury jury = java.util.Objects.requireNonNull(factory.create(prepared, measured));
 			VerdictDocument verdict = capture(java.util.Objects.requireNonNull(jury.vote()));
 			return new Row(prepared.identity(), invocations, workflowState, measured, List.of(verdict), "RETURNED", "",
-					"RETAINED");
+					"RETAINED", proof);
 		}
 		catch (Exception e) {
 			return new Row(prepared.identity(), invocations, workflowState, measured, List.of(), "THREW",
-					e.getClass().getName() + ": " + String.valueOf(e.getMessage()), "RETAINED");
+					e.getClass().getName() + ": " + String.valueOf(e.getMessage()), "RETAINED", proof);
 		}
 	}
 

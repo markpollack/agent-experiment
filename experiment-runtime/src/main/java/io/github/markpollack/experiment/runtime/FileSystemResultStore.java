@@ -30,6 +30,15 @@ public final class FileSystemResultStore implements ResultStore {
 		// Encode/validate before acquiring the immutable run directory.
 		byte[] bytes = RuntimeJson.mapper().writeValueAsBytes(result);
 		RuntimeJson.mapper().readValue(bytes, Result.class);
+		for (var row : result.items()) {
+			for (var invocation : row.invocations()) {
+				if (invocation.captureState().equals("COMPLETE") && !invocation.assemblyState().equals("REFUSED"))
+					AcquisitionAssembly.validateManifest(invocation.acquisitions().getFirst(), invocation.attempt(),
+							true);
+				for (var canonical : invocation.canonical())
+					Evidence.verify(canonical);
+			}
+		}
 		Files.createDirectories(root);
 		Path dir = directory(result.experimentId());
 		Files.createDirectory(dir); // exclusive; existing failed/incomplete saves cannot

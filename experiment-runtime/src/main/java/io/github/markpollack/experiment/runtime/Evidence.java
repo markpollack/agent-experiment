@@ -46,6 +46,47 @@ public final class Evidence {
 			verify(file);
 	}
 
+	/**
+	 * Call before treating retained references as available evidence; never implied by
+	 * load().
+	 */
+	public static void verify(Row row) throws IOException {
+		for (Invocation invocation : row.invocations()) {
+			for (FileRef manifest : invocation.acquisitions())
+				AcquisitionAssembly.validateManifest(manifest, invocation.attempt(),
+						invocation.captureState().equals("COMPLETE"));
+			for (CanonicalRef canonical : invocation.canonical())
+				verify(canonical);
+		}
+		for (WorkflowProof proof : row.workflowProof()) {
+			verify(proof.snapshot());
+			var snapshot = RuntimeJson.mapper().readTree(Path.of(proof.snapshot().path()).toFile());
+			if (!snapshot.path("runId").asText().equals(proof.runId())
+					|| !snapshot.path("status").asText().equals(proof.state()))
+				throw new IOException("Workflow snapshot identity/state mismatch");
+			for (Attempt attempt : proof.attempts()) {
+				boolean found = false;
+				for (var logical : snapshot.path("invocations")) {
+					if (!logical.path("invocationId").asText().equals(attempt.workflowInvocationId()))
+						continue;
+					for (var physical : logical.path("attempts")) {
+						if (physical.path("attemptId").asText().equals(attempt.workflowAttemptId())
+								&& physical.path("number").asInt() == attempt.attemptNumber()) {
+							if (proof.state().equals("SUCCEEDED")
+									&& !physical.path("disposition").asText().equals("COMMITTED"))
+								throw new IOException("Uncommitted Workflow output");
+							found = true;
+						}
+					}
+				}
+				if (!found)
+					throw new IOException("Wrong Workflow attempt in snapshot");
+			}
+		}
+		for (FileRef artifact : row.domain().artifacts())
+			verify(artifact);
+	}
+
 	private static MessageDigest digest() {
 		try {
 			return MessageDigest.getInstance("SHA-256");

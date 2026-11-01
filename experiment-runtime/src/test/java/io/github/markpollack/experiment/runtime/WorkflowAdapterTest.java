@@ -133,4 +133,44 @@ class WorkflowAdapterTest {
 		}
 	}
 
+	public static final class InterruptedStep implements Step<String, String> {
+
+		public String execute(StepContext context, String input) {
+			Thread.currentThread().interrupt();
+			return "retained before interrupted resume";
+		}
+
+	}
+
+	@Test
+	void interruptedActiveResumeIsNotAcceptedOrSilentlyResumed() throws Exception {
+		var interrupted = new InterruptedStep();
+		var next = new Successor();
+		var definition = Workflows.define("interrupted")
+			.maxDuration(Duration.ofSeconds(5))
+			.then(interrupted)
+			.then(next)
+			.terminate(WorkflowModel.Terminal.SUCCEEDED)
+			.build();
+		var registry = StepRegistry.builder().register("interrupt-v1", interrupted).register("next-v1", next).build();
+		var identity = Identity.of("interrupted-run", "item", "simple", 0);
+		var execution = new WorkflowAdapter().execute(temp.resolve("interrupted"), definition, registry, deployment(),
+				identity, "input", Duration.ofSeconds(1), () -> {
+				});
+		assertThat(execution.snapshot().status()).isEqualTo(RunSnapshot.Status.ACTIVE);
+		assertThat(execution.accepted()).isFalse();
+		assertThat(next.calls).hasValue(0);
+		var row = WorkflowAdapter.assess(execution, new PreparedItem(identity, temp.toString(), List.of(), List.of()),
+				List.of(), new Domain(List.of(Measurement.unknown("coverage", "percent", "resume interrupted", "item")),
+						List.of()),
+				(p, d) -> {
+					throw new AssertionError("must not judge unaccepted output");
+				});
+		var store = new FileSystemResultStore(temp.resolve("interrupted-results"));
+		store.save(RuntimeStoreTest.result(identity.runId(), List.of(row)));
+		assertThat(new FileSystemResultStore(temp.resolve("interrupted-results")).mostRecent().orElseThrow().items())
+			.containsExactly(row);
+		Evidence.verify(row);
+	}
+
 }

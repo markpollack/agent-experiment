@@ -31,6 +31,34 @@ public final class ClaudeInvocationService {
 	public record Outcome(Invocation invocation, String workspaceState, String evidenceDirectory) {
 	}
 
+	/** Fails the Workflow Step so no successor can mutate an unsettled workspace. */
+	public static final class QuarantinedInvocationException extends IllegalStateException {
+
+		private final Outcome outcome;
+
+		public QuarantinedInvocationException(Outcome outcome) {
+			super("Provider termination/drain unconfirmed; retain workspace and evidence at "
+					+ outcome.evidenceDirectory());
+			this.outcome = outcome;
+		}
+
+		public Outcome outcome() {
+			return outcome;
+		}
+
+	}
+
+	/**
+	 * Recovery of immutable evidence only; this does not resume or retry provider work.
+	 */
+	public static Outcome readOutcome(Path attemptDirectory) throws IOException {
+		return RuntimeJson.mapper().readValue(attemptDirectory.resolve("outcome.json").toFile(), Outcome.class);
+	}
+
+	public static Invocation readDelivery(Path attemptDirectory) throws IOException {
+		return RuntimeJson.mapper().readValue(attemptDirectory.resolve("delivery.json").toFile(), Invocation.class);
+	}
+
 	public record Delivery(String responseState, String responseText, List<FileRef> acquisition, boolean complete,
 			List<String> sessions, List<Measurement> usage, String error) {
 	}
@@ -48,6 +76,7 @@ public final class ClaudeInvocationService {
 
 	}
 
+	/** Construct a handle without starting external work; invoke owns the start. */
 	@FunctionalInterface
 	public interface ProviderFactory {
 
@@ -95,10 +124,21 @@ public final class ClaudeInvocationService {
 			throw new java.io.UncheckedIOException("New attempt directory required", e);
 		}
 		long started = System.nanoTime();
-		ProviderCall provider = providers.open(request, attempt, directory.resolve("acquired"), budget);
+		ProviderCall provider;
+		try {
+			provider = Objects.requireNonNull(providers.open(request, attempt, directory.resolve("acquired"), budget));
+		}
+		catch (RuntimeException failure) {
+			// Factory must not start external work before returning its owned handle.
+			Outcome refused = new Outcome(unknown(attempt, "THREW", "MISSING", budget, elapsed(started),
+					"Provider admission failed: " + failure), "RETAINED", directory.toString());
+			retainOutcome(directory, refused);
+			return refused;
+		}
 		active.add(provider);
 		ExecutorService executor = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().factory());
 		AtomicReference<Invocation> returned = new AtomicReference<>();
+		java.util.concurrent.atomic.AtomicBoolean closeFailed = new java.util.concurrent.atomic.AtomicBoolean();
 		Future<Invocation> future = executor.submit(() -> {
 			Invocation invocation;
 			try {
@@ -110,10 +150,20 @@ public final class ClaudeInvocationService {
 			returned.set(invocation);
 			// Retain before accepting the output; failure to retain is an invocation
 			// failure, not success.
-			Files.write(directory.resolve("delivery.json"), RuntimeJson.mapper().writeValueAsBytes(invocation),
-					StandardOpenOption.CREATE_NEW);
-			provider.close();
-			active.remove(provider);
+			try {
+				Files.write(directory.resolve("delivery.json"), RuntimeJson.mapper().writeValueAsBytes(invocation),
+						StandardOpenOption.CREATE_NEW);
+			}
+			finally {
+				try {
+					provider.close();
+					active.remove(provider);
+				}
+				catch (RuntimeException failure) {
+					closeFailed.set(true);
+					throw failure;
+				}
+			}
 			return invocation;
 		});
 		executor.shutdown();
@@ -159,22 +209,30 @@ public final class ClaudeInvocationService {
 			// No assembly and no accepted successor output when physical work is
 			// unsettled.
 		}
-		else if (drained && invocation.responseState().matches("SUCCEEDED|FAILED")
+		else if (drained && !closeFailed.get() && invocation.responseState().matches("SUCCEEDED|FAILED")
 				&& invocation.captureState().equals("COMPLETE")) {
 			invocation = assembly.assemble(invocation, directory.resolve("canonical"));
 		}
+		drained = drained && !closeFailed.get();
 		if (drained)
 			active.remove(provider);
+		Outcome outcome = new Outcome(invocation, drained ? "RETAINED" : "QUARANTINED", directory.toString());
+		retainOutcome(directory, outcome);
+		if (interrupted)
+			Thread.currentThread().interrupt();
+		if (!drained)
+			throw new QuarantinedInvocationException(outcome);
+		return outcome;
+	}
+
+	private static void retainOutcome(Path directory, Outcome outcome) {
 		try {
-			Files.write(directory.resolve("outcome.json"), RuntimeJson.mapper().writeValueAsBytes(invocation),
+			Files.write(directory.resolve("outcome.json"), RuntimeJson.mapper().writeValueAsBytes(outcome),
 					StandardOpenOption.CREATE_NEW);
 		}
 		catch (IOException e) {
 			throw new java.io.UncheckedIOException("Cannot retain invocation outcome", e);
 		}
-		if (interrupted)
-			Thread.currentThread().interrupt();
-		return new Outcome(invocation, drained ? "RETAINED" : "QUARANTINED", directory.toString());
 	}
 
 	private static long elapsed(long start) {
@@ -186,10 +244,23 @@ public final class ClaudeInvocationService {
 		String process = "UNKNOWN";
 		List<Integer> codes = List.of();
 		if (!delivery.acquisition().isEmpty()) {
-			JsonProcess p = process(
-					AcquisitionAssembly.validateManifest(delivery.acquisition().getFirst(), attempt, false));
-			process = p.state();
-			codes = p.codes();
+			try {
+				var manifest = AcquisitionAssembly.validateManifest(delivery.acquisition().getFirst(), attempt, false);
+				if (manifest.path("complete").booleanValue() != delivery.complete())
+					throw new IOException("Client completeness receipt differs from manifest");
+				var observedSession = manifest.path("run").path("session_uid");
+				if (!delivery.sessions()
+					.equals(observedSession.isTextual() ? List.of(observedSession.textValue()) : List.of()))
+					throw new IOException("Client session receipt differs from manifest");
+				JsonProcess p = process(manifest);
+				process = p.state();
+				codes = p.codes();
+			}
+			catch (IOException failure) {
+				return new Invocation(attempt, delivery.responseState(), "UNKNOWN", List.of(), "INCOMPLETE",
+						delivery.acquisition(), List.of(), "REFUSED", delivery.sessions(), delivery.usage(),
+						delivery.responseText(), failure.toString(), budget, elapsed);
+			}
 		}
 		return new Invocation(attempt, delivery.responseState(), process, codes,
 				delivery.acquisition().isEmpty() ? "MISSING" : delivery.complete() ? "COMPLETE" : "INCOMPLETE",

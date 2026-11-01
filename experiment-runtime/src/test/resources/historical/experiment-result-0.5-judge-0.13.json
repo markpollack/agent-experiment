@@ -1,0 +1,97 @@
+{
+  "experimentId": "legacy-exp-013",
+  "experimentName": "agent-experiment-0.5-fixture",
+  "datasetVersion": "0123456789abcdef",
+  "datasetDirty": false,
+  "datasetSemanticVersion": "0.5.0",
+  "knowledgeManifest": null,
+  "timestamp": "2026-02-21T10:00:00Z",
+  "items": [
+    {
+      "itemId": "LEGACY-001",
+      "itemSlug": "judge-013-result",
+      "success": true,
+      "passed": true,
+      "costUsd": 0.04,
+      "totalTokens": 321,
+      "durationMs": 4567,
+      "scores": {
+        "quality": 0.75
+      },
+      "metrics": {},
+      "executionDetail": {
+        "candidateJudgment": {
+          "score": {
+            "value": "good",
+            "allowedValues": ["poor", "fair", "good"]
+          },
+          "status": "PASS",
+          "reasoning": "Legacy categorical judgment",
+          "checks": [],
+          "metadata": {}
+        },
+        "expectedLabel": "PASS",
+        "scorerResult": {
+          "match": true,
+          "score": 1.0,
+          "reasoning": "Expected PASS, got PASS"
+        }
+      },
+      "verdict": {
+        "aggregated": {
+          "score": {"value": true},
+          "status": "PASS",
+          "reasoning": "Legacy aggregate passed",
+          "checks": [
+            {"name": "build", "passed": true, "message": "compiled"}
+          ],
+          "metadata": {"format": "judge-0.13"}
+        },
+        "individual": [
+          {
+            "score": {"value": 7.5, "min": 0.0, "max": 10.0},
+            "status": "PASS",
+            "reasoning": "Legacy ranged score",
+            "checks": [],
+            "metadata": {}
+          }
+        ],
+        "individualByName": {
+          "quality": {
+            "score": {"value": 7.5, "min": 0.0, "max": 10.0},
+            "status": "PASS",
+            "reasoning": "Legacy ranged score",
+            "checks": [],
+            "metadata": {}
+          }
+        },
+        "weights": {"quality": 1.0},
+        "subVerdicts": [
+          {
+            "aggregated": {
+              "score": {"value": false},
+              "status": "FAIL",
+              "reasoning": "Legacy nested verdict",
+              "checks": [],
+              "metadata": {}
+            },
+            "individual": [],
+            "individualByName": {},
+            "weights": {},
+            "subVerdicts": []
+          }
+        ]
+      },
+      "metadata": {"source": "compatibility-fixture"},
+      "workspacePath": null
+    }
+  ],
+  "metadata": {"producer": "agent-experiment-0.5"},
+  "aggregateScores": {"quality": 0.75},
+  "passRate": 1.0,
+  "totalCostUsd": 0.04,
+  "totalTokens": 321,
+  "totalDurationMs": 4567,
+  "codeVersion": "fedcba9876543210",
+  "codeDirty": false
+}

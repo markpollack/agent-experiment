@@ -16,6 +16,7 @@ final class RuntimeJson {
 		mapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
 		mapper.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 		mapper.enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES);
+		mapper.enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES);
 		mapper.disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT);
 		mapper.disable(MapperFeature.ALLOW_COERCION_OF_SCALARS);
 		return mapper;
