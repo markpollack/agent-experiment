@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <parent><groupId>io.github.markpollack</groupId><artifactId>agent-experiment-parent</artifactId><version>0.10.0-fresh-v3-qualification-SNAPSHOT</version></parent>
+  <parent><groupId>io.github.markpollack</groupId><artifactId>agent-experiment-parent</artifactId><version>0.10.0-SNAPSHOT</version></parent>
   <artifactId>experiment-runtime</artifactId>
   <name>Experiment canonical runtime</name>
   <description>Typed Workflow execution, canonical acquisition references and immutable experiment results</description>
@@ -9,7 +9,7 @@
     <jackson.version>2.22.4</jackson.version><jackson3.version>3.2.4</jackson3.version>
     <agent-judge.version>0.18.0</agent-judge.version><agent-workflow.version>0.14.0</agent-workflow.version>
     <agent-client.version>0.32.1-fresh-v3-SNAPSHOT</agent-client.version>
-    <claude-code-sdk.version>1.8.0-fresh-v3-SNAPSHOT</claude-code-sdk.version>
+    <claude-code-sdk.version>1.8.0-SNAPSHOT</claude-code-sdk.version>
     <journal.version>2.0.0-fresh-v3-qualification-SNAPSHOT</journal.version>
   </properties>
   <dependencies>

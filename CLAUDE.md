@@ -1,8 +1,10 @@
 # agent-experiment
 
 ## Build
-- Multi-module Maven project: `experiment-core` (abstractions + runner), `experiment-claude` (Claude SDK impl), and `experiment-workflow` (Agent Workflow adapter)
-- Build: `./mvnw test` or `./mvnw verify`
+- Multi-module Maven project: `experiment-core` (abstractions + runner), `experiment-claude` (Claude SDK impl), `experiment-workflow` (legacy Agent Workflow adapter), and `experiment-runtime` (canonical typed runtime)
+- Full reactor: `./mvnw test` or `./mvnw verify`. A `-pl experiment-runtime -am` check covers only the parent and canonical runtime; it does not qualify the full repository.
+- Ordinary tests exclude the `integration` tag and opt-in `*IT` provider classes. Keep those exclusions for deterministic checks.
+- Follow `RECORDING-PRINCIPLE.md` when changing persisted observations.
 - Java 21
 
 ## Architecture
@@ -28,11 +30,10 @@
 - Atomic file writes in ResultStore (temp + move)
 
 ## Dependencies
-- All dependencies use `io.github.markpollack` groupId (migrated from org.springaicommunity)
-- agent-judge-core/exec: 0.15.1. Runtime code uses normalized `Judgment`/`Verdict`; persisted results use Agent Experiment-owned `RecordedJudgment`/`RecordedVerdict` projections. The result mapper reads the legacy 0.5/Judge 0.13 score and `subVerdicts` shapes and writes only the normalized format.
-- claude-code-sdk: 1.5.1, package `io.github.markpollack.claude.agent.sdk.*`
-- agent-journal (`journal-core` + `claude-code-capture`): 1.8.2. `journal-core` is a direct `experiment-core` dependency (`Journal`, `Run`, `JsonFileStorage`, `StepCostEvent`, `AttributionMethod`).
-- agent-workflow: 0.12.1; agent-client: 0.29.3 (`provided` in `experiment-workflow`)
+- POMs are authoritative for declared versions; command-line property overrides change the tested closure and must be reported explicitly.
+- The parent legacy modules declare Judge 0.17.0, SDK 1.6.0, Journal/capture 1.10.0, Workflow 0.12.3 and Client 0.30.0.
+- `experiment-runtime/pom.xml` separately declares released Judge 0.18.0 and Workflow 0.14.0 plus versioned Client/SDK/Journal acquisition artifacts. Runtime-only checks do not verify the legacy modules' different dependencies.
+- Persisted results use Experiment-owned projections; canonical runtime records carry complete producer documents and distinct acquisition/canonical references.
 
 ## Key Packages
 - `io.github.markpollack.experiment.result` — ExperimentResult, ItemResult, ExecutionDetail, RecordedJudgment, RecordedVerdict
@@ -47,7 +48,7 @@
 - `io.github.markpollack.experiment.journal` — ExperimentJournal, RunJournal (run-journal lifecycle; owns per-item `Run` on `JsonFileStorage`)
 
 ## Canonical typed runtime
-- `experiment-runtime` is the selected canonical agent path; build with `./mvnw -pl experiment-runtime -am verify`.
+- `experiment-runtime` provides the canonical agent path; its focused build is `./mvnw -pl experiment-runtime -am verify`.
 - It consumes released Workflow 0.14.0/Judge 0.18.0 and explicitly versioned Client/SDK/Journal task artifacts.
 - Its records and historical raw reader have no retired PhaseCapture dependency. Legacy modules above retain their existing contracts.
 - Client seals acquisition; Experiment calls Journal FinalAssembly once and records distinct acquisition/canonical hashes. Complete usage/cost evidence remains in the canonical sources; unavailable totals are UNKNOWN.
