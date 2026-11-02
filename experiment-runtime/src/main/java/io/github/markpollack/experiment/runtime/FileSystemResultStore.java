@@ -32,6 +32,8 @@ public final class FileSystemResultStore implements ResultStore {
 		RuntimeJson.mapper().readValue(bytes, Result.class);
 		for (var row : result.items()) {
 			for (var invocation : row.invocations()) {
+				if (NativeRecordingEvidence.verifyIfNative(invocation))
+					continue;
 				if (invocation.captureState().equals("COMPLETE") && !invocation.assemblyState().equals("REFUSED"))
 					AcquisitionAssembly.validateManifest(invocation.acquisitions().getFirst(), invocation.attempt(),
 							true);

@@ -52,6 +52,8 @@ public final class Evidence {
 	 */
 	public static void verify(Row row) throws IOException {
 		for (Invocation invocation : row.invocations()) {
+			if (NativeRecordingEvidence.verifyIfNative(invocation))
+				continue;
 			for (FileRef manifest : invocation.acquisitions())
 				AcquisitionAssembly.validateManifest(manifest, invocation.attempt(),
 						invocation.captureState().equals("COMPLETE"));

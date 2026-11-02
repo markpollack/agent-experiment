@@ -13,6 +13,7 @@
     <journal.version>2.0.0-SNAPSHOT</journal.version>
   </properties>
   <dependencies>
+    <dependency><groupId>io.github.markpollack</groupId><artifactId>agent-client-journal</artifactId><version>${agent-client.version}</version><scope>test</scope></dependency>
     <dependency><groupId>io.github.markpollack</groupId><artifactId>journal-ocsf-writer</artifactId><version>${journal.version}</version></dependency>
     <dependency><groupId>io.github.markpollack</groupId><artifactId>journal-capture-tck</artifactId><version>${journal.version}</version></dependency>
     <dependency><groupId>io.github.markpollack</groupId><artifactId>agent-client-core</artifactId><version>${agent-client.version}</version></dependency>
