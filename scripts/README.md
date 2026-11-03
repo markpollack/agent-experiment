@@ -22,7 +22,7 @@ future expiry, `nativeAuthorization: true` and exactly one approved submission. 
 itself remains false/zero. This is trusted workflow custody, not cryptographic proof of a human identity.
 Do not create an activation merely to test with a real model. Deterministic tests use local fixtures.
 
-The manifest and its exact bytes are read once. All runtime JARs, the caller source and executable are
+The manifest and its exact bytes are read once. The running guard, all runtime JARs, the caller source and executable are
 hash checked; the command's classpath must equal the declared closure. The installed integration proof
 must report original-D equality, a meaningful foreign-identity refusal, and acceptance by a packaged
 reader excluding Client, SDK and writer. Partial or unknown producer closures cannot launch.
@@ -39,7 +39,7 @@ separate in `guard-receipt.json`.
 replay. A caller's zero exit is insufficient: `native-proof.json` must retain exact original and
 independently decoded decision bytes, complete source/identity verification, packaged-reader success,
 one generation/submission and the expected observed response. Linked evidence is hash checked within
-the owned output, and protected input hashes are rechecked. Native source, qualification, accounting and
+the owned output, and the complete protected workspace inventory is rechecked. Native source, qualification, accounting and
 reader semantics remain with their owning libraries. Missing cost defaults to UNKNOWN, never zero.
 
 The wrapper supplies no dollar, token or internal-model-turn bound and makes no new sandbox guarantee.
@@ -56,3 +56,26 @@ It covers missing/changed/expired activation, input/artifact and classpath chang
 shared deadlines, normal parent exit leaving a child, timeout without signaling an unrelated group,
 combined primary/cleanup failure, no replay, foreign decision rejection and exit-zero without reader
 postconditions. Java library code is unchanged by this standalone supervisor.
+
+`CodexOneRead.java` adapts the installed Client public archive example to a single actual invocation.
+Its positional arguments are output, workspace, CLI, native-sessions directory, model, effort, prompt
+file, expected response, shared deadline epoch milliseconds, Java executable, reader classpath, and
+`ReadCodexOneRead.java` source. The guard binds every argument and referenced artifact in the packet.
+It uses a 120-second Client deadline, 15-second cleanup, and the remaining outer deadline for subsequent
+delivery and reader work. It never retries the provider. Exact retry of immutable recorder/receiver
+bytes checks storage idempotency only; it does not submit another task.
+
+The public evidence-only recorder owns original decision encoding. That original package stays intact;
+the qualified source enters a separate fresh receiver as an initial completed Codex envelope. The
+separate reader JVM uses only the TCK and its runtime dependencies, rejects Client/SDK/writer classes,
+compares original decision and native identity/source bytes, runs the full packaged reader, and only
+then writes decoded decision evidence. The outer guard rejects missing or failed reader postconditions.
+On failure, the entire output and original recorder/capture files remain available; absent response,
+usage or cost stays unknown. The caller does not repair or relabel failed output as complete.
+
+Installed checks compile both Java sources against the offered JAR closure, then exercise the same
+source-launch command with `tests/codex_read_fixture.py` as the selected executable. This fixture reads
+one local marker and emits synthetic native protocol records from the checked-in synthetic template;
+it asserts exact model/effort/sandbox arguments and never executes a model. A foreign source archive
+must be rejected by the separate reader, and the same output must refuse replay. These checks are
+consumer linkage/evidence tests, never native CLI/authentication/sandbox qualification.
