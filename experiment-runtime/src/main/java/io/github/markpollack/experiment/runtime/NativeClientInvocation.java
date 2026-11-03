@@ -87,8 +87,7 @@ public final class NativeClientInvocation {
 		JsonNode exit = manifest.path("process").path("exit_code");
 		NativeRecordingEvidence.require(exit.isNull() || exit.isIntegralNumber(),
 				"Unsupported process exit projection");
-		var invocation = new Invocation(started.attempt(), "SUCCEEDED",
-				NativeRecordingEvidence.requiredText(manifest.path("process"), "status"),
+		var invocation = new Invocation(started.attempt(), "SUCCEEDED", NativeRecordingEvidence.processState(manifest),
 				exit.isNull() ? List.of() : List.of(exit.intValue()), "COMPLETE", List.of(original), List.of(canonical),
 				"ASSEMBLED", List.of(NativeRecordingEvidence.requiredText(manifest.path("run"), "session_uid")),
 				List.of(Measurement.unknown("cost", "USD", "No qualified scoped accounting selected",

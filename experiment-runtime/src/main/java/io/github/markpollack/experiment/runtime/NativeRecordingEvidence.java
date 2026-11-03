@@ -19,6 +19,8 @@ final class NativeRecordingEvidence {
 
 	static final String PROFILE = "client-terminal-claude-2.1.316/1";
 
+	static final String CODEX_PROFILE = "client-terminal-codex-0.166.0/1";
+
 	private NativeRecordingEvidence() {
 	}
 
@@ -75,7 +77,9 @@ final class NativeRecordingEvidence {
 		var terminal = pkg.declarations.run().member("terminal_binding");
 		require(terminal != null, "Missing native terminal binding");
 		JsonNode envelope = RuntimeJson.mapper().readTree(terminal.member("terminalEnvelope").text());
-		require(PROFILE.equals(envelope.path("profile").asText()), "Unsupported terminal native profile");
+		String terminalProfile = envelope.path("profile").asText();
+		require(PROFILE.equals(terminalProfile) || CODEX_PROFILE.equals(terminalProfile),
+				"Unsupported terminal native profile");
 		var binding = TerminalBindingReader.read(pkg.declarations);
 		require(binding != null && binding.originalBindingId() == null, "One original one-shot binding required");
 		JsonNode decision = RuntimeJson.mapper().readTree(binding.decision());
@@ -103,10 +107,14 @@ final class NativeRecordingEvidence {
 		require(Evidence.sha256(prepared.resolve("sources/acquisition.json")).equals(q.manifests().getFirst().sha256()),
 				"Protected qualified acquisition substitution");
 		equal(qualified, "profile_id", c.profileId());
+		String expectedProfile = CODEX_PROFILE.equals(terminalProfile) ? "codex-cli/0.166.0/exec-stdio+rollout"
+				: "claude-code/2.1.316/sdk-stdio+session-file";
+		equal(original, "profile_id", expectedProfile);
+		equal(qualified, "profile_id", expectedProfile);
 		sourceCopies(original, qualified);
 		require(i.providerSessions().equals(List.of(requiredText(original.path("run"), "session_uid"))),
 				"Native session projection mismatch");
-		equal(original.path("process"), "status", i.processState());
+		require(processState(original).equals(i.processState()), "Process state projection mismatch");
 		JsonNode exit = original.path("process").path("exit_code");
 		require(exit.isNull() || exit.isIntegralNumber(), "Unsupported process exit projection");
 		require(i.exitCodes().equals(exit.isNull() ? List.of() : List.of(exit.intValue())),
@@ -206,6 +214,17 @@ final class NativeRecordingEvidence {
 		require(file.startsWith(root) && root.equals(root.toRealPath()) && file.equals(file.toRealPath()),
 				"Escaping/linked source path");
 		return file;
+	}
+
+	static String processState(JsonNode manifest) throws IOException {
+		if ("codex-cli/0.166.0/exec-stdio+rollout".equals(manifest.path("profile_id").asText())) {
+			JsonNode process = manifest.path("process");
+			require(process.path("sealed").asBoolean(false) && process.path("exit_code").isIntegralNumber()
+					&& process.path("observed_resources_terminated").asBoolean(false),
+					"Codex process settlement is incomplete");
+			return "sealed_exit_observed";
+		}
+		return requiredText(manifest.path("process"), "status");
 	}
 
 	static String requiredText(JsonNode object, String key) throws IOException {

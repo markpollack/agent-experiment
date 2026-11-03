@@ -278,6 +278,22 @@ class NativeClientInvocationTest {
 		}
 	}
 
+	@Test
+	void codexProcessProjectionRequiresOriginalSealedExitAndCleanup() throws Exception {
+		var manifest = json.readTree("""
+				{"profile_id":"codex-cli/0.166.0/exec-stdio+rollout", "process":
+				{"sealed":true,"exit_code":0,"observed_resources_terminated":true}}
+				""");
+		assertThat(NativeRecordingEvidence.processState(manifest)).isEqualTo("sealed_exit_observed");
+		for (String field : List.of("sealed", "exit_code", "observed_resources_terminated")) {
+			var missing = manifest.deepCopy();
+			((com.fasterxml.jackson.databind.node.ObjectNode) missing.path("process")).remove(field);
+			assertThatThrownBy(() -> NativeRecordingEvidence.processState(missing)).isInstanceOf(IOException.class)
+				.hasMessageContaining("Codex process settlement is incomplete");
+		}
+		assertThat(manifest.path("process").has("status")).isFalse();
+	}
+
 	private ClaudeAcquisition source(Path fixtureRoot, ExecutionDecision decision) throws Exception {
 		Path raw = Files.createDirectory(fixtureRoot.resolve("raw"));
 		Files.writeString(raw.resolve("stdin.bin"),
