@@ -40,6 +40,15 @@ def checked_ref(ref):
     return str(path)
 
 
+def check_workspace(manifest):
+    workspace = Path(manifest["workspace"]).resolve(strict=True)
+    require(str(workspace) == manifest["workspace"] and workspace.is_dir(), "Exact workspace required")
+    expected = {checked_ref(ref) for ref in manifest["protectedInputs"]}
+    actual = {str(p) for p in workspace.rglob("*") if p.is_file()}
+    require(expected == actual and not any(p.is_symlink() for p in workspace.rglob("*")), "Workspace inventory changed")
+    return workspace
+
+
 def validate(manifest, output):
     require(manifest.get("kind") == "codex-one-read-launch/1", "Unknown launch manifest")
     require(manifest.get("nativeAuthorization") is False and manifest.get("approvedSubmissions") == 0,
@@ -51,11 +60,8 @@ def validate(manifest, output):
     require(set(environment) == SAFE_ENVIRONMENT and not FORBIDDEN_ENVIRONMENT.intersection(environment),
             "Exact safe environment allowlist required")
     require(all(isinstance(v, str) and "\0" not in v for v in environment.values()), "Invalid safe environment")
-    workspace = Path(manifest["workspace"]).resolve(strict=True)
-    require(str(workspace) == manifest["workspace"] and workspace.is_dir(), "Exact workspace required")
-    expected = {checked_ref(ref) for ref in manifest["protectedInputs"]}
-    actual = {str(p) for p in workspace.rglob("*") if p.is_file()}
-    require(expected == actual and not any(p.is_symlink() for p in workspace.rglob("*")), "Workspace inventory changed")
+    workspace = check_workspace(manifest)
+    require(checked_ref(manifest["launcher"]) == str(Path(__file__).resolve()), "Manifest names another launcher")
     checked_ref(manifest["cli"])
     checked_ref(manifest["nativeExecutable"])
     require(output.is_absolute() and output.parent.resolve(strict=True) == output.parent, "Resolved output parent required")
@@ -203,8 +209,7 @@ def postconditions(output, manifest):
     for ref in record["retainedEvidence"]:
         checked_ref(ref)
     require(record.get("submissions") == 1 and record.get("generations") == 1, "Unexpected native submission/generation count")
-    for ref in manifest["protectedInputs"]:
-        checked_ref(ref)
+    check_workspace(manifest)
     require(record.get("observedResponse") == manifest["expectedResponse"], "Observed read result differs")
     return {"accepted": True, "originalDecisionSha256": digest(original.read_bytes()),
             "readerExit": 0, "costState": record.get("costState", "UNKNOWN")}

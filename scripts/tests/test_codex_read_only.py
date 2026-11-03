@@ -42,6 +42,7 @@ class GuardTests(unittest.TestCase):
             "kind": "codex-one-read-launch/1", "nativeAuthorization": False, "approvedSubmissions": 0,
             "proposedSubmissions": 1, "generations": 1, "retries": 0, "resume": False, "wholeRunSeconds": 240,
             "workspace": str(self.workspace), "environment": {k: "fixture" for k in launcher.SAFE_ENVIRONMENT},
+            "launcher": ref(SOURCE),
             "protectedInputs": [ref(self.item)], "cli": ref(self.cli), "nativeExecutable": ref(self.cli),
             "cliVersionOutput": "codex-cli 0.166.0", "runtimeClasspath": [str(self.jar)],
             "artifacts": [ref(Path(sys.executable).resolve()), ref(self.caller), ref(self.jar)],
@@ -91,6 +92,15 @@ class GuardTests(unittest.TestCase):
         self.item.write_text("changed")
         with self.assertRaisesRegex(ValueError, "hash changed"):
             launcher.validate(self.manifest, self.output)
+
+    def test_launcher_identity_and_new_workspace_files_refuse(self):
+        self.manifest["launcher"] = ref(self.cli)
+        with self.assertRaisesRegex(ValueError, "another launcher"):
+            launcher.validate(self.manifest, self.output)
+        self.manifest["launcher"] = ref(SOURCE)
+        (self.workspace / "added.txt").write_text("unexpected write")
+        with self.assertRaisesRegex(ValueError, "inventory changed"):
+            launcher.check_workspace(self.manifest)
 
     def test_inspection_uses_allowlist_not_ambient_and_bounded_status(self):
         with patch.dict(os.environ, {"OPENAI_API_KEY": "SYNTHETIC_SENTINEL", "CODEX_API_KEY": "SYNTHETIC_SENTINEL"}):
