@@ -49,3 +49,6 @@ build/
 
 # Experiment results (local artifacts)
 results/
+
+# Local Python launcher test bytecode
+__pycache__/
