@@ -1,8 +1,10 @@
 package io.github.markpollack.experiment.judge;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import io.github.markpollack.experiment.comparison.DefaultComparisonEngine;
 import io.github.markpollack.experiment.dataset.DatasetItem;
@@ -30,6 +32,42 @@ class JudgeExperimentTest {
 						"active", Path.of("/tmp/test"), null, null),
 				new DatasetItem("neg-1", "negative-case", "Summarize report", "judge", "A", false, List.of(), List.of(),
 						"active", Path.of("/tmp/test"), null, null));
+	}
+
+	@Test
+	void resolvesAndInvokesTheSameCandidateOncePerDeclaredRow() {
+		var factoryCalls = new AtomicInteger();
+		var configuredAtIdentity = new ArrayList<Integer>();
+		var invokedCandidates = new ArrayList<Integer>();
+		JudgeExperimentResult result = JudgeExperiment.builder()
+			.captureMode("FAKE")
+			.candidateId("fixture-candidate")
+			.caseInputIdentity((context, row) -> {
+				configuredAtIdentity.add(factoryCalls.get());
+				return new io.github.markpollack.experiment.recording.CaseInputIdentity("fixture", row.caseId(), "1",
+						null, "effective-case-input:v1");
+			})
+			.name("once-per-row")
+			.candidate(item -> {
+				int configured = factoryCalls.incrementAndGet();
+				return () -> {
+					invokedCandidates.add(configured);
+					return Judgment.pass("Candidate " + configured);
+				};
+			})
+			.items(testItems)
+			.replicateCount(3)
+			.expected(item -> "PASS")
+			.scorer(JudgeScorers.exactVerdictMatch())
+			.resultStore(resultStore)
+			.build()
+			.run();
+
+		assertThat(factoryCalls.get()).isEqualTo(6);
+		assertThat(configuredAtIdentity).containsExactly(1, 2, 3, 4, 5, 6);
+		assertThat(invokedCandidates).containsExactlyElementsOf(configuredAtIdentity);
+		assertThat(result.asExperimentResult().items()).hasSize(6);
+		assertThat(result.agreementRate()).isEqualTo(1.0);
 	}
 
 	@Test

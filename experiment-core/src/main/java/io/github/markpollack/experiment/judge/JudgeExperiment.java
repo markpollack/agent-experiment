@@ -217,9 +217,7 @@ public final class JudgeExperiment {
 				Instant started = Instant.now();
 				long before = System.nanoTime();
 				try {
-					actual = Objects
-						.requireNonNull(config.candidate.apply(item), "Configured candidate factory returned null")
-						.judge();
+					actual = configuredCandidate.judge();
 					invocation = actual == null ? "NULL_RETURN" : "RETURNED";
 				}
 				catch (RuntimeException error) {
