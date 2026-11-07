@@ -46,7 +46,7 @@
             A snapshot version names no particular build, so what identifies the library
             that scored a run is not this string: every run records the SHA-256 of the jar
             each library was actually loaded from. Resolve from the published snapshots
-            repository declared above and never from a local `mvn install`, which can
+            repository declared below and never from a local `mvn install`, which can
             replace a version in ~/.m2 with different code under the same name.
         -->
         <agent-judge.version>0.18.0</agent-judge.version>
@@ -488,6 +488,23 @@
             </build>
         </profile>
     </profiles>
+
+    <repositories>
+        <repository>
+            <id>central-snapshots</id>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <!-- Re-check snapshots on every build. Client, Journal and the SDK publish a snapshot on every push to
+                 their main, and CI and the publish workflow restore a cached ~/.m2: with the default daily policy
+                 they would keep an older snapshot for up to a day. -->
+            <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>always</updatePolicy>
+            </snapshots>
+        </repository>
+    </repositories>
 
     <distributionManagement>
         <snapshotRepository>
