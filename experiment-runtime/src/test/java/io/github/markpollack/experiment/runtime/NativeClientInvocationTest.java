@@ -58,6 +58,18 @@ class NativeClientInvocationTest {
 						return CaptureAcquisition.COMPLETED;
 					}
 
+					public Optional<NativeGeneration> generation(ExecutionDecision decision) {
+						try {
+							var captured = source(base, decision);
+							original[0] = captured.manifest();
+							return Optional.of(NativeGeneration.oneShot("claude-code-2.1.316-sdk-stdio-session-file",
+									decision, captured.manifest(), captured.sha256(), true, ""));
+						}
+						catch (Exception e) {
+							throw new IllegalStateException(e);
+						}
+					}
+
 					public void stop(boolean interrupt) {
 					}
 				};
@@ -66,17 +78,7 @@ class NativeClientInvocationTest {
 			public void close() {
 			}
 		};
-		ExecutionRecorder recorder = decision -> {
-			try {
-				var captured = source(base, decision);
-				original[0] = captured.manifest();
-				return JournalExecutionRecorder.claude(store, "native-mapping-fixture")
-					.prepare(decision, Map.of("claudeAcquisition", captured));
-			}
-			catch (Exception e) {
-				throw new IllegalStateException(e);
-			}
-		};
+		var recorder = new JournalExecutionRecorder(store, "native-mapping-fixture");
 		var client = AgentClient.builder(provider).executionRecorder(recorder).build();
 		var identity = Identity.of("run-" + name, "item", "variant", 0);
 		var attempt = new Attempt(identity, "experiment-" + name, "workflow-" + name, "step-" + name,
