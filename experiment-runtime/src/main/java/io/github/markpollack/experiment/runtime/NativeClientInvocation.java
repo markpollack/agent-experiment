@@ -68,12 +68,19 @@ public final class NativeClientInvocation {
 						&& recording.evidence().acquisition() == CaptureAcquisition.COMPLETED
 						&& recording.delivery() instanceof TerminalDelivery.Completed,
 				"Incomplete or unrelated terminal recording");
+		var nativeRecording = recording.nativeRecording()
+			.orElseThrow(() -> new IOException("Client reported no native recording outcome"));
+		NativeRecordingEvidence.require(nativeRecording.outcome() == NativeRecording.Outcome.ATTACHED,
+				"Journal did not qualify the native sources: " + nativeRecording.outcome() + " "
+						+ nativeRecording.detail());
 		var completed = (TerminalDelivery.Completed) recording.delivery();
 		var response = execution.result(Duration.ZERO);
 		NativeRecordingEvidence.require(response.isSuccessful(), "Elected response is not successful");
 		var original = Evidence.reference(originalManifest, "acquisition-manifest");
 		var qualification = QualificationEvidence.collect(original, qualificationDirectory, "QUALIFIED",
 				"journal-capture-tck:2.0.0-SNAPSHOT", "");
+		NativeRecordingEvidence.require(qualification.state().equals("QUALIFIED"),
+				"Journal qualification output is incomplete or unsafe: " + qualificationDirectory);
 		JsonNode manifest = RuntimeJson.mapper().readTree(originalManifest.toFile());
 		var retained = new ArrayList<FileRef>();
 		Path events = preparedEvents.toAbsolutePath().normalize();

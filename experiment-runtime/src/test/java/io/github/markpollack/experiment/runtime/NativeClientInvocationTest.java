@@ -40,7 +40,18 @@ class NativeClientInvocationTest {
 		return fixture(name, false);
 	}
 
+	/** How the fixture's turn seals its native generation. */
+	enum Sealing {
+
+		QUALIFYING, UNKNOWN_PROFILE, CHANGED_AFTER_SEALING
+
+	}
+
 	private Fixture fixture(String name, boolean failed) throws Exception {
+		return fixture(name, failed, Sealing.QUALIFYING);
+	}
+
+	private Fixture fixture(String name, boolean failed, Sealing sealing) throws Exception {
 		Path base = Files.createDirectory(root.resolve(name));
 		Path store = base.resolve("journal");
 		Path[] original = { null };
@@ -62,8 +73,13 @@ class NativeClientInvocationTest {
 						try {
 							var captured = source(base, decision);
 							original[0] = captured.manifest();
-							return Optional.of(NativeGeneration.oneShot("claude-code-2.1.316-sdk-stdio-session-file",
-									decision, captured.manifest(), captured.sha256(), true, ""));
+							String profile = sealing == Sealing.UNKNOWN_PROFILE ? "claude-code-0.0.0-unknown-route"
+									: "claude-code-2.1.316-sdk-stdio-session-file";
+							var generation = NativeGeneration.oneShot(profile, decision, captured.manifest(),
+									captured.sha256(), true, "");
+							if (sealing == Sealing.CHANGED_AFTER_SEALING)
+								Files.writeString(captured.manifest(), "\n", StandardOpenOption.APPEND);
+							return Optional.of(generation);
 						}
 						catch (Exception e) {
 							throw new IllegalStateException(e);
@@ -128,7 +144,14 @@ class NativeClientInvocationTest {
 	@Test
 	void nativeArchiveKeepsDistinctIdentitiesOriginalResponseAndStoreRoundTrip() throws Exception {
 		try (var f = fixture("valid")) {
+			assertThat(outcome(f)).isEqualTo(NativeRecording.Outcome.ATTACHED);
 			var i = f.accept();
+			assertThat(i.assemblyState()).isEqualTo("ASSEMBLED");
+			assertThat(i.qualifications()).singleElement().satisfies(q -> {
+				assertThat(q.state()).isEqualTo("QUALIFIED");
+				assertThat(q.manifests()).hasSize(1);
+				assertThat(q.assemblyExpectations()).hasSize(1);
+			});
 			assertThat(i.attempt()).isSameAs(f.started().attempt());
 			assertThat(i.attempt().invocationId()).isNotEqualTo(f.started().execution().executionId());
 			assertThat(i.responseText()).isEqualTo("hello");
@@ -145,6 +168,40 @@ class NativeClientInvocationTest {
 				.isInstanceOf(IOException.class)
 				.hasMessageContaining("invocation mismatch");
 		}
+	}
+
+	@Test
+	void profileWithoutJournalQualifierIsUnqualifiedAndRefused() throws Exception {
+		try (var f = fixture("unqualified", false, Sealing.UNKNOWN_PROFILE)) {
+			assertThat(outcome(f)).isEqualTo(NativeRecording.Outcome.UNQUALIFIED);
+			assertThat(f.qualified()).doesNotExist();
+			assertThatThrownBy(f::accept).isInstanceOf(IOException.class).hasMessageContaining("UNQUALIFIED");
+		}
+	}
+
+	@Test
+	void manifestChangedAfterSealingIsRejectedAndRefused() throws Exception {
+		try (var f = fixture("rejected", false, Sealing.CHANGED_AFTER_SEALING)) {
+			assertThat(outcome(f)).isEqualTo(NativeRecording.Outcome.REJECTED);
+			assertThat(f.qualified()).doesNotExist();
+			assertThatThrownBy(f::accept).isInstanceOf(IOException.class)
+				.hasMessageContaining("REJECTED")
+				.hasMessageContaining("changed after sealing");
+		}
+	}
+
+	@Test
+	void incompleteQualificationOutputIsRefused() throws Exception {
+		try (var f = fixture("incomplete")) {
+			assertThat(outcome(f)).isEqualTo(NativeRecording.Outcome.ATTACHED);
+			Files.delete(f.qualified().resolve("assembly-expectation.json"));
+			assertThatThrownBy(f::accept).isInstanceOf(IOException.class)
+				.hasMessageContaining("qualification output is incomplete");
+		}
+	}
+
+	private static NativeRecording.Outcome outcome(Fixture f) {
+		return f.started().execution().recording().nativeRecording().orElseThrow().outcome();
 	}
 
 	@Test
