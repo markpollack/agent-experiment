@@ -25,7 +25,7 @@ public record RuntimeIdentity(String revision, Map<String, String> artifacts) {
 	 * declaration.
 	 */
 	public static RuntimeIdentity judge() {
-		String revision = System.getProperty("experiment.judge.revision", "released:agent-judge:0.18.0");
+		String revision = System.getProperty("experiment.judge.revision", "snapshot:agent-judge:0.19.0-SNAPSHOT");
 		Map<String, String> artifacts = new LinkedHashMap<>();
 		artifacts.put("agent-judge-core", artifact(io.github.markpollack.judge.verdict.Verdict.class));
 		for (String[] module : new String[][] { { "agent-judge-exec", "io.github.markpollack.judge.exec.CommandJudge" },

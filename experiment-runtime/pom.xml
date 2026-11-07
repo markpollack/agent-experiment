@@ -7,7 +7,7 @@
   <description>Typed Workflow execution, canonical acquisition references and immutable experiment results</description>
   <properties>
     <jackson.version>2.22.4</jackson.version><jackson3.version>3.2.4</jackson3.version>
-    <agent-judge.version>0.18.0</agent-judge.version><agent-workflow.version>0.14.0</agent-workflow.version>
+    <agent-workflow.version>0.14.0</agent-workflow.version>
     <agent-client.version>0.32.1-SNAPSHOT</agent-client.version>
     <claude-code-sdk.version>1.8.0-SNAPSHOT</claude-code-sdk.version>
     <journal.version>2.0.0-SNAPSHOT</journal.version>

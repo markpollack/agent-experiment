@@ -49,7 +49,7 @@
             repository declared below and never from a local `mvn install`, which can
             replace a version in ~/.m2 with different code under the same name.
         -->
-        <agent-judge.version>0.18.0</agent-judge.version>
+        <agent-judge.version>0.19.0-SNAPSHOT</agent-judge.version>
         <claude-code-sdk.version>1.8.0-SNAPSHOT</claude-code-sdk.version>
         <agent-workflow.version>0.14.0</agent-workflow.version>
         <agent-client.version>0.32.1-SNAPSHOT</agent-client.version>
@@ -232,7 +232,7 @@
                         <systemPropertyVariables>
                             <!-- Synthetic test recordings; production writers supply actual source identity. -->
                             <experiment.writer.revision>TEST-ONLY:fixture-source</experiment.writer.revision>
-                            <experiment.judge.revision>released:agent-judge:0.18.0</experiment.judge.revision>
+                            <experiment.judge.revision>snapshot:agent-judge:0.19.0-SNAPSHOT</experiment.judge.revision>
                         </systemPropertyVariables>
                         <environmentVariables>
                             <!-- Prevent Claude CLI "nested session" error when tests
