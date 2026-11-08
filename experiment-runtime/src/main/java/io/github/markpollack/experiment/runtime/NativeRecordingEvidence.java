@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.github.markpollack.experiment.runtime.AgentRecords.*;
 import io.github.markpollack.journal.tck.ocsf.*;
@@ -17,9 +18,43 @@ import io.github.markpollack.journal.tck.ocsf.*;
  */
 final class NativeRecordingEvidence {
 
-	static final String PROFILE = "client-terminal-claude-2.1.316/1";
+	/**
+	 * The CLI route a native recording was captured on. The CLI version is recorded in
+	 * {@code profile_id}, not gated: any version on the route is accepted.
+	 */
+	enum Route {
 
-	static final String CODEX_PROFILE = "client-terminal-codex-0.166.0/1";
+		CLAUDE_SDK(Set.of("client-terminal-claude-2.1.316/1", "client-terminal-claude-sdk/1"),
+				"claude-code/[^/\\s]+/sdk-stdio\\+session-file"),
+
+		CODEX_EXEC(Set.of("client-terminal-codex-0.166.0/1", "client-terminal-codex-exec/1"),
+				"codex-cli/[^/\\s]+/exec-stdio\\+rollout");
+
+		private final Set<String> terminalProfiles;
+
+		private final Pattern profileId;
+
+		Route(Set<String> terminalProfiles, String profileId) {
+			this.terminalProfiles = terminalProfiles;
+			this.profileId = Pattern.compile(profileId);
+		}
+
+		static Route ofTerminal(String terminalProfile) throws IOException {
+			for (Route route : values())
+				if (route.terminalProfiles.contains(terminalProfile))
+					return route;
+			throw new IOException("Unsupported terminal native profile: " + terminalProfile);
+		}
+
+		boolean carries(String profileId) {
+			return profileId != null && this.profileId.matcher(profileId).matches();
+		}
+
+		void requireProfileId(String profileId) throws IOException {
+			require(carries(profileId), "Native profile_id " + profileId + " is not on the " + this + " route");
+		}
+
+	}
 
 	private NativeRecordingEvidence() {
 	}
@@ -78,8 +113,7 @@ final class NativeRecordingEvidence {
 		require(terminal != null, "Missing native terminal binding");
 		JsonNode envelope = RuntimeJson.mapper().readTree(terminal.member("terminalEnvelope").text());
 		String terminalProfile = envelope.path("profile").asText();
-		require(PROFILE.equals(terminalProfile) || CODEX_PROFILE.equals(terminalProfile),
-				"Unsupported terminal native profile");
+		Route route = Route.ofTerminal(terminalProfile);
 		var binding = TerminalBindingReader.read(pkg.declarations);
 		require(binding != null && binding.originalBindingId() == null, "One original one-shot binding required");
 		JsonNode decision = RuntimeJson.mapper().readTree(binding.decision());
@@ -106,11 +140,10 @@ final class NativeRecordingEvidence {
 				"Original qualification copy changed");
 		require(Evidence.sha256(prepared.resolve("sources/acquisition.json")).equals(q.manifests().getFirst().sha256()),
 				"Protected qualified acquisition substitution");
+		String profileId = requiredText(original, "profile_id");
+		equal(qualified, "profile_id", profileId);
 		equal(qualified, "profile_id", c.profileId());
-		String expectedProfile = CODEX_PROFILE.equals(terminalProfile) ? "codex-cli/0.166.0/exec-stdio+rollout"
-				: "claude-code/2.1.316/sdk-stdio+session-file";
-		equal(original, "profile_id", expectedProfile);
-		equal(qualified, "profile_id", expectedProfile);
+		route.requireProfileId(profileId);
 		sourceCopies(original, qualified);
 		require(i.providerSessions().equals(List.of(requiredText(original.path("run"), "session_uid"))),
 				"Native session projection mismatch");
@@ -217,7 +250,7 @@ final class NativeRecordingEvidence {
 	}
 
 	static String processState(JsonNode manifest) throws IOException {
-		if ("codex-cli/0.166.0/exec-stdio+rollout".equals(manifest.path("profile_id").asText())) {
+		if (Route.CODEX_EXEC.carries(manifest.path("profile_id").asText(null))) {
 			JsonNode process = manifest.path("process");
 			require(process.path("sealed").asBoolean(false) && process.path("exit_code").isIntegralNumber()
 					&& process.path("observed_resources_terminated").asBoolean(false),

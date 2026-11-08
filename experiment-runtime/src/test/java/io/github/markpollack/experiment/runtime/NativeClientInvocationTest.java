@@ -171,6 +171,30 @@ class NativeClientInvocationTest {
 	}
 
 	@Test
+	void claudeRecordingUnderTheVersionedTerminalProfileIsAdmitted() throws Exception {
+		try (var f = fixture("versioned")) {
+			assertThat(Files.readString(f.events())).contains("client-terminal-claude-2.1.316/1");
+			var facts = NativeRecordingEvidence.verify(f.accept());
+			assertThat(facts.original().path("profile_id").asText())
+				.isEqualTo("claude-code/2.1.316/sdk-stdio+session-file");
+		}
+	}
+
+	@Test
+	void originalAndQualifiedProfileIdsMustAgree() throws Exception {
+		try (var f = fixture("profile-pair")) {
+			// A qualified manifest naming another version than its original, still on
+			// the route.
+			Path qualified = f.qualified().resolve("acquisition.json");
+			var manifest = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(qualified.toFile());
+			manifest.put("profile_id", "claude-code/2.1.319/sdk-stdio+session-file");
+			json.writeValue(qualified.toFile(), manifest);
+			assertThatThrownBy(f::accept).isInstanceOf(IOException.class)
+				.hasMessageContaining("Protected qualified acquisition substitution");
+		}
+	}
+
+	@Test
 	void profileWithoutJournalQualifierIsUnqualifiedAndRefused() throws Exception {
 		try (var f = fixture("unqualified", false, Sealing.UNKNOWN_PROFILE)) {
 			assertThat(outcome(f)).isEqualTo(NativeRecording.Outcome.UNQUALIFIED);
