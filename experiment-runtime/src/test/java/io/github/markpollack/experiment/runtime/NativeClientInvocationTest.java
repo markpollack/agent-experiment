@@ -52,6 +52,10 @@ class NativeClientInvocationTest {
 	}
 
 	private Fixture fixture(String name, boolean failed, Sealing sealing) throws Exception {
+		return fixture(name, failed, sealing, "2.1.316");
+	}
+
+	private Fixture fixture(String name, boolean failed, Sealing sealing, String cliVersion) throws Exception {
 		Path base = Files.createDirectory(root.resolve(name));
 		Path store = base.resolve("journal");
 		Path[] original = { null };
@@ -71,10 +75,10 @@ class NativeClientInvocationTest {
 
 					public Optional<NativeGeneration> generation(ExecutionDecision decision) {
 						try {
-							var captured = source(base, decision);
+							var captured = source(base, decision, cliVersion);
 							original[0] = captured.manifest();
 							String profile = sealing == Sealing.UNKNOWN_PROFILE ? "claude-code-0.0.0-unknown-route"
-									: "claude-code-2.1.316-sdk-stdio-session-file";
+									: "claude-code-" + cliVersion + "-sdk-stdio-session-file";
 							var generation = NativeGeneration.oneShot(profile, decision, captured.manifest(),
 									captured.sha256(), true, "");
 							if (sealing == Sealing.CHANGED_AFTER_SEALING)
@@ -171,12 +175,29 @@ class NativeClientInvocationTest {
 	}
 
 	@Test
-	void claudeRecordingUnderTheVersionedTerminalProfileIsAdmitted() throws Exception {
-		try (var f = fixture("versioned")) {
-			assertThat(Files.readString(f.events())).contains("client-terminal-claude-2.1.316/1");
+	void claudeRecordingUnderTheNeutralTerminalProfileIsAdmitted() throws Exception {
+		try (var f = fixture("neutral")) {
+			assertThat(Files.readString(f.events())).contains("client-terminal-claude-sdk/1");
 			var facts = NativeRecordingEvidence.verify(f.accept());
 			assertThat(facts.original().path("profile_id").asText())
 				.isEqualTo("claude-code/2.1.316/sdk-stdio+session-file");
+		}
+	}
+
+	@Test
+	void claude2_1_319RecordingUnderTheNeutralTerminalProfileIsAdmitted() throws Exception {
+		try (var f = fixture("v2-1-319", false, Sealing.QUALIFYING, "2.1.319")) {
+			assertThat(outcome(f)).isEqualTo(NativeRecording.Outcome.ATTACHED);
+			assertThat(Files.readString(f.events())).contains("client-terminal-claude-sdk/1")
+				.contains("claude-code/2.1.319/sdk-stdio+session-file")
+				.doesNotContain("claude-code/2.1.316/");
+			var i = f.accept();
+			assertThat(i.assemblyState()).isEqualTo("ASSEMBLED");
+			assertThat(i.qualifications()).singleElement().satisfies(q -> assertThat(q.state()).isEqualTo("QUALIFIED"));
+			var facts = NativeRecordingEvidence.verify(i);
+			assertThat(facts.original().path("profile_id").asText())
+				.isEqualTo("claude-code/2.1.319/sdk-stdio+session-file");
+			assertThat(i.canonical().getFirst().profileId()).isEqualTo("claude-code/2.1.319/sdk-stdio+session-file");
 		}
 	}
 
@@ -282,7 +303,8 @@ class NativeClientInvocationTest {
 		try (var f = fixture("profile")) {
 			String original = Files.readString(f.events());
 			Files.writeString(f.events(),
-					original.replace("client-terminal-claude-2.1.316/1", "client-terminal-unknown/1"));
+					original.replace("client-terminal-claude-sdk/1", "client-terminal-unknown/1"));
+			assertThat(Files.readString(f.events())).isNotEqualTo(original);
 			assertThatThrownBy(f::accept).isInstanceOf(IOException.class);
 		}
 	}
@@ -377,29 +399,32 @@ class NativeClientInvocationTest {
 		assertThat(manifest.path("process").has("status")).isFalse();
 	}
 
-	private ClaudeAcquisition source(Path fixtureRoot, ExecutionDecision decision) throws Exception {
+	private ClaudeAcquisition source(Path fixtureRoot, ExecutionDecision decision, String v) throws Exception {
 		Path raw = Files.createDirectory(fixtureRoot.resolve("raw"));
 		Files.writeString(raw.resolve("stdin.bin"),
 				"{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"hello\"}}\n");
 		Files.writeString(raw.resolve("stdout.bin"),
 				"""
-						{"type":"system","subtype":"init","session_id":"native-1","claude_code_version":"2.1.316"}
+						{"type":"system","subtype":"init","session_id":"native-1","claude_code_version":"@V@"}
 						{"type":"result","subtype":"success","session_id":"native-1","result":"hello","is_error":false,"usage":{"input_tokens":1,"output_tokens":1},"total_cost_usd":0.01}
-						""");
+						"""
+					.replace("@V@", v));
 		Files.writeString(raw.resolve("stderr.bin"), "");
 		Files.writeString(raw.resolve("native.jsonl"),
 				"""
-						{"type":"user","uuid":"u1","sessionId":"native-1","version":"2.1.316","message":{"role":"user","content":"hello"}}
-						""");
+						{"type":"user","uuid":"u1","sessionId":"native-1","version":"@V@","message":{"role":"user","content":"hello"}}
+						"""
+					.replace("@V@", v));
 		var manifest = json.readTree(
 				"""
-						{"kind":"agent-journal/acquired-execution","version":"0.1","profile":"claude-code-2.1.316-sdk-stdio-session-file",
-						"profile_id":"claude-code/2.1.316/sdk-stdio+session-file","complete":true,"capture_errors":[],
+						{"kind":"agent-journal/acquired-execution","version":"0.1","profile":"claude-code-@V@-sdk-stdio-session-file",
+						"profile_id":"claude-code/@V@/sdk-stdio+session-file","complete":true,"capture_errors":[],
 						"run":{"invocation_index":0,"session_uid":"native-1","capture_start":"2026-11-02T00:00:00Z",
-						"cli":{"name":"Claude Code","version":"2.1.316","vendor_name":"Anthropic"},"launch_settings":{"route":"sdk_stdio"}},
+						"cli":{"name":"Claude Code","version":"@V@","vendor_name":"Anthropic"},"launch_settings":{"route":"sdk_stdio"}},
 						"process":{"argv":["claude","--input-format","stream-json","--output-format","stream-json"],"exit_code":null},
 						"turns":[{"start_offsets":{"STDIN":0,"STDOUT":0,"STDERR":0},"end_offsets":{}}],"sources":[]}
-						""");
+						"""
+					.replace("@V@", v));
 		((com.fasterxml.jackson.databind.node.ObjectNode) manifest).put("acquisition_uid", decision.executionId());
 		((com.fasterxml.jackson.databind.node.ObjectNode) manifest.get("run")).put("run_uid", decision.executionId());
 		((com.fasterxml.jackson.databind.node.ObjectNode) manifest.get("process")).put("connection_uid",
