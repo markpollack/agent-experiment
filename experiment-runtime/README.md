@@ -2,7 +2,8 @@
 
 `io.github.markpollack:experiment-runtime` (version declared in its POM) provides Client acquisition,
 Journal final assembly, released Workflow execution and immutable per-item results. It uses
-Workflow 0.14.0 and Judge 0.18.0; Client, SDK and Journal use explicitly versioned development artifacts.
+Workflow 0.14.0 and Judge 0.19.0-SNAPSHOT; Client, SDK and Journal are development snapshots resolved from
+the Central snapshot repository that the root POM declares.
 Use this module alone for the canonical agent path. The older Experiment modules retain their
 historical APIs and dependencies and are not part of this runtime's closure.
 

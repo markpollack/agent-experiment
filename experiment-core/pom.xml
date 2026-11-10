@@ -64,9 +64,6 @@
             <artifactId>agent-judge-exec</artifactId>
         </dependency>
 
-        <!-- Phase capture data types + production RunRecorder (from agent-journal) -->
-        <!-- Journal lifecycle: Journal, Run, JsonFileStorage, StepCostEvent, AttributionMethod -->
-
         <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>

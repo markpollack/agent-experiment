@@ -18,9 +18,11 @@ The current development reactor is `0.10.0-SNAPSHOT`:
 ./mvnw clean verify
 ```
 
-POMs declare released Judge `0.18.0` and Workflow `0.14.0`, plus local development Client, SDK and
-Journal artifacts. Install the exact producer candidates in an isolated Maven repository before
-building this development line. A same-named SNAPSHOT alone does not identify tested bytes.
+The POMs pin Judge `0.19.0-SNAPSHOT`, Client `0.32.1-SNAPSHOT`, Claude Code SDK `1.8.0-SNAPSHOT` and
+Journal `2.0.0-SNAPSHOT`, plus released Workflow `0.14.0`. The root POM declares the Central snapshot
+repository (`https://central.sonatype.com/repository/maven-snapshots/`, `updatePolicy` `always`), so a
+plain build resolves the current snapshots with no local installs. Every push to `main` publishes
+`0.10.0-SNAPSHOT` there; the `main` commit identifies what a snapshot contains.
 Tests use deterministic stubs, retained data and loopback HTTP; live provider tests remain opt-in.
 
 `AgentClientInvoker` accepts `Function<InvocationContext, AgentOptions>` so provider options do not
@@ -39,8 +41,8 @@ See [recording and migration contracts](docs/result-recordings.md),
 
 The legacy direct SDK invoker/configuration and phase-journal writer APIs are retired. Historical
 recordings remain unchanged; current typed readers refuse unsupported formats, and raw readers retain
-exact original bytes. Published pre-1.0 releases have their own dependency/API contracts; this
-unpublished development line does not change an already published artifact.
+exact original bytes. Released versions (latest `0.9.0`) keep their own dependency and API contracts;
+snapshots from `main` never change a released artifact.
 
 ## License
 

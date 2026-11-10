@@ -1,8 +1,10 @@
 # Result recordings and current migration
 
-New `experiment-core` recordings use **Experiment envelope version 3** and released Judge `0.18.0`
-**V6** producer documents. These are different version spaces. The canonical `experiment-runtime`
-retains its separately versioned format described in its README. No historical file is rewritten.
+New `experiment-core` recordings use **Experiment envelope version 3** and Judge **V6** producer
+documents (verdict codec `agent-judge-v6:0.18.0`, the format Judge 0.18.0 introduced; the Judge
+`0.19.0-SNAPSHOT` that `main` builds on writes the same format). These are different version
+spaces. The canonical `experiment-runtime` retains its separately versioned format described in its
+README. No historical file is rewritten.
 
 The former Experiment version 2 writer and Judge portable-v2 interpreter are historical. Current
 Judge deliberately refuses those typed producer versions. `FileSystemResultStore.loadRaw(id)` returns
@@ -26,7 +28,7 @@ opaque observations; Experiment does not implement a replacement Judge interpret
 
 Production writers require `experiment.writer.revision`; callers should also declare exact producer
 source via `experiment.judge.revision`. Loaded binaries are always hashed. The default Judge declaration
-names released `0.18.0`; source declarations are caller assertions, not archive signatures. Maven tests
+is `snapshot:agent-judge:0.19.0-SNAPSHOT`; source declarations are caller assertions, not archive signatures. Maven tests
 supply an explicitly `TEST-ONLY` writer identity for synthetic recordings. A class-directory build is
 labeled separately from a JAR. Provenance validation never equates mutable version names with bytes.
 
