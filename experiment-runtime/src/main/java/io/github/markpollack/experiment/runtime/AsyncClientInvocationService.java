@@ -69,15 +69,51 @@ public final class AsyncClientInvocationService {
 	 */
 	public StartedExecution start(Attempt attempt, Path workspace, String prompt, Duration executionBudget,
 			Optional<String> experimentDefinitionId) throws IOException {
-		Objects.requireNonNull(attempt, "attempt");
-		Objects.requireNonNull(workspace, "workspace");
 		Objects.requireNonNull(executionBudget, "executionBudget");
-		Objects.requireNonNull(experimentDefinitionId, "experimentDefinitionId");
-		requireText(prompt, "prompt");
-		experimentDefinitionId.ifPresent(value -> requireText(value, "experimentDefinitionId"));
 		if (executionBudget.isNegative() || executionBudget.isZero())
 			throw new IllegalArgumentException("Positive executionBudget required");
 		executionBudget.toNanos();
+		return startSelected(attempt, workspace, prompt, executionBudget, experimentDefinitionId);
+	}
+
+	/**
+	 * Starts without a request execution deadline. The caller must configure Client
+	 * without a default timeout and configure its provider for untimed execution. This
+	 * service does not override either caller-owned policy. Result waiting and
+	 * cancellation use the original handle; resource cleanup remains Client-owned.
+	 * @param attempt exact physical Experiment/Workflow attempt
+	 * @param workspace existing subject directory
+	 * @param prompt nonblank submitted goal
+	 * @return original Client handle associated with the original attempt
+	 * @throws IOException if the subject directory cannot be resolved
+	 */
+	public StartedExecution startUntimed(Attempt attempt, Path workspace, String prompt) throws IOException {
+		return startUntimed(attempt, workspace, prompt, Optional.empty());
+	}
+
+	/**
+	 * Starts without a request deadline and with an optional actual definition identity.
+	 * Requires an untimed caller-configured Client/provider, as described by
+	 * {@link #startUntimed(Attempt, Path, String)}.
+	 * @param attempt exact physical Experiment/Workflow attempt
+	 * @param workspace existing subject directory, resolved to its real path
+	 * @param prompt nonblank submitted goal
+	 * @param experimentDefinitionId actual definition identity, or empty
+	 * @return original Client handle associated with the original attempt
+	 * @throws IOException if the subject directory cannot be resolved
+	 */
+	public StartedExecution startUntimed(Attempt attempt, Path workspace, String prompt,
+			Optional<String> experimentDefinitionId) throws IOException {
+		return startSelected(attempt, workspace, prompt, null, experimentDefinitionId);
+	}
+
+	private StartedExecution startSelected(Attempt attempt, Path workspace, String prompt, Duration executionBudget,
+			Optional<String> experimentDefinitionId) throws IOException {
+		Objects.requireNonNull(attempt, "attempt");
+		Objects.requireNonNull(workspace, "workspace");
+		Objects.requireNonNull(experimentDefinitionId, "experimentDefinitionId");
+		requireText(prompt, "prompt");
+		experimentDefinitionId.ifPresent(value -> requireText(value, "experimentDefinitionId"));
 		Path actualWorkspace = workspace.toRealPath();
 		if (!Files.isDirectory(actualWorkspace))
 			throw new IllegalArgumentException("Workspace must be a directory");
@@ -87,11 +123,10 @@ public final class AsyncClientInvocationService {
 				Optional.of(attempt.workflowAttemptId()));
 		if (!selected.add(attempt.invocationId()))
 			throw new IllegalStateException("Experiment invocation already selected: " + attempt.invocationId());
-		AgentExecution execution = client.goal(prompt)
-			.workingDirectory(actualWorkspace)
-			.correlation(correlation)
-			.executionTimeout(executionBudget)
-			.runAsync();
+		var request = client.goal(prompt).workingDirectory(actualWorkspace).correlation(correlation);
+		if (executionBudget != null)
+			request = request.executionTimeout(executionBudget);
+		AgentExecution execution = request.runAsync();
 		StartedExecution started = new StartedExecution(attempt, execution, correlation);
 		started.decision();
 		return started;

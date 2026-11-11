@@ -114,6 +114,57 @@ class AsyncClientInvocationServiceTest {
 	}
 
 	@Test
+	void untimedExecutionKeepsOriginalIdentityAndCanBeCancelledAfterAWaiterTimeout() throws Exception {
+		var provider = new Provider();
+		try (var client = AgentClient.builder(provider).defaultTimeout(null).build()) {
+			var service = new AsyncClientInvocationService(client);
+			var a = attempt("untimed");
+			var started = service.startUntimed(a, workspace, "goal", Optional.of("definition"));
+			var original = started.execution();
+			assertThat(provider.entered.await(2, TimeUnit.SECONDS)).isTrue();
+			assertThatThrownBy(() -> original.result(Duration.ofMillis(75))).isInstanceOf(TimeoutException.class);
+			assertThat(started.decision()).isEmpty();
+			assertThat(started.attempt()).isSameAs(a);
+			assertThat(started.execution()).isSameAs(original);
+			assertThatThrownBy(() -> service.start(a, workspace, "replay", Duration.ofSeconds(1)))
+				.hasMessageContaining("already selected");
+			assertThat(original.cancel(true)).isTrue();
+			assertThatThrownBy(original::result).isInstanceOf(CancellationException.class);
+			var decision = started.decision().orElseThrow();
+			assertThat(decision).isSameAs(original.decision().orElseThrow());
+			assertThat(decision.outcome()).isInstanceOf(ExecutionOutcome.Cancelled.class);
+			assertThat(decision.correlation().experimentId()).contains("definition");
+			assertThat(decision.correlation().experimentInvocationId()).contains(a.invocationId());
+			assertThat(decision.correlation().workflowAttemptId()).contains(a.workflowAttemptId());
+			assertThat(original.awaitTermination(Duration.ofSeconds(2)).cleanupConfirmed()).isTrue();
+		}
+		assertThat(provider.calls).hasValue(1);
+	}
+
+	@Test
+	void untimedValidationPrecedesSelectionAndBoundedOverloadsStillRejectAbsentBudget() throws Exception {
+		var provider = new Provider();
+		provider.release.countDown();
+		try (var client = AgentClient.create(provider)) {
+			var service = new AsyncClientInvocationService(client);
+			var a = attempt("untimed-validation");
+			assertThatThrownBy(() -> service.startUntimed(a, workspace, " "))
+				.isInstanceOf(IllegalArgumentException.class);
+			assertThatThrownBy(() -> service.startUntimed(a, workspace, "p", Optional.of(" ")))
+				.isInstanceOf(IllegalArgumentException.class);
+			assertThatThrownBy(() -> service.startUntimed(a, workspace.resolve("absent"), "p"))
+				.isInstanceOf(java.io.IOException.class);
+			assertThatThrownBy(() -> service.start(a, workspace, "p", null)).isInstanceOf(NullPointerException.class);
+			assertThatThrownBy(() -> service.start(a, workspace, "p", Duration.ofMillis(-1)))
+				.isInstanceOf(IllegalArgumentException.class);
+			assertThat(provider.calls).hasValue(0);
+			assertThat(service.startUntimed(a, workspace, "answer").execution().result().getResult())
+				.isEqualTo("answer");
+		}
+		assertThat(provider.calls).hasValue(1);
+	}
+
+	@Test
 	void concurrentDuplicateSelectionDispatchesOnce() throws Exception {
 		var provider = new Provider();
 		provider.release.countDown();
