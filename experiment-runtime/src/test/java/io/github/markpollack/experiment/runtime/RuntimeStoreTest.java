@@ -61,6 +61,32 @@ class RuntimeStoreTest {
 	}
 
 	@Test
+	void explicitUntimedBudgetDoesNotTurnMissingNullOrNegativeBudgetIntoUntimed() throws Exception {
+		for (String invalid : List.of("missing", "null", "negative")) {
+			Path directory = temp.resolve(invalid);
+			var store = new FileSystemResultStore(directory);
+			store.save(result("budget", List.of(row(identity("budget", 0)))));
+			Path file;
+			try (var paths = Files.walk(directory)) {
+				file = paths.filter(p -> p.getFileName().toString().equals("run.json")).findFirst().orElseThrow();
+			}
+			var json = RuntimeJson.mapper().readTree(file.toFile());
+			var invocation = (com.fasterxml.jackson.databind.node.ObjectNode) json.at("/items/0/invocations/0");
+			assertThat(invocation.path("providerBudgetMs").longValue()).isEqualTo(1000);
+			if (invalid.equals("missing"))
+				invocation.remove("providerBudgetMs");
+			else if (invalid.equals("null"))
+				invocation.putNull("providerBudgetMs");
+			else
+				invocation.put("providerBudgetMs", -1);
+			RuntimeJson.mapper().writeValue(file.toFile(), json);
+			assertThatThrownBy(() -> store.load("budget")).isInstanceOf(java.io.IOException.class);
+			assertThatThrownBy(store::list).isInstanceOf(java.io.IOException.class);
+			assertThatThrownBy(store::mostRecent).isInstanceOf(java.io.IOException.class);
+		}
+	}
+
+	@Test
 	void wrongRunDuplicateRowsAndUnknownVersionsRefuse() throws Exception {
 		assertThatThrownBy(() -> result("one", List.of(row(identity("two", 0)))))
 			.hasMessageContaining("Wrong result run");

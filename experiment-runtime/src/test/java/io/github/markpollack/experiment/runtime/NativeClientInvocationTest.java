@@ -56,6 +56,11 @@ class NativeClientInvocationTest {
 	}
 
 	private Fixture fixture(String name, boolean failed, Sealing sealing, String cliVersion) throws Exception {
+		return fixture(name, failed, sealing, cliVersion, false);
+	}
+
+	private Fixture fixture(String name, boolean failed, Sealing sealing, String cliVersion, boolean untimed)
+			throws Exception {
 		Path base = Files.createDirectory(root.resolve(name));
 		Path store = base.resolve("journal");
 		Path[] original = { null };
@@ -103,8 +108,9 @@ class NativeClientInvocationTest {
 		var identity = Identity.of("run-" + name, "item", "variant", 0);
 		var attempt = new Attempt(identity, "experiment-" + name, "workflow-" + name, "step-" + name,
 				"physical-" + name, 1);
-		var started = new AsyncClientInvocationService(client).start(attempt, base, "hello", Duration.ofSeconds(5),
-				Optional.of("definition"));
+		var service = new AsyncClientInvocationService(client);
+		var started = untimed ? service.startUntimed(attempt, base, "hello", Optional.of("definition"))
+				: service.start(attempt, base, "hello", Duration.ofSeconds(5), Optional.of("definition"));
 		if (failed)
 			assertThatThrownBy(() -> started.execution().result(Duration.ofSeconds(5)))
 				.isInstanceOf(AgentExecutionException.class);
@@ -143,6 +149,25 @@ class NativeClientInvocationTest {
 				List.of(verdict), "RETURNED", "", "RETAINED", List.of());
 		return new Result(AgentRecords.CURRENT_SCHEMA_VERSION, "AGENT_CANONICAL", i.attempt().row().runId(),
 				"native-mapping-fixture", 1, List.of(row), List.of());
+	}
+
+	@Test
+	void untimedNativeInvocationRetainsExplicitZeroThroughTheRealStore() throws Exception {
+		try (var f = fixture("untimed", false, Sealing.QUALIFYING, "2.1.319", true)) {
+			var invocation = NativeClientInvocation.accept(f.started(), f.termination(), f.original(), f.qualified(),
+					f.events(), 0, 1);
+			var saved = result(invocation);
+			Path directory = root.resolve("untimed-results");
+			new FileSystemResultStore(directory).save(saved);
+			var read = new FileSystemResultStore(directory).load(saved.experimentId()).orElseThrow();
+			var retained = read.items().getFirst().invocations().getFirst();
+			assertThat(retained.providerBudgetMs()).isZero();
+			assertThat(retained.elapsedMs()).isEqualTo(1);
+			assertThat(retained.responseState()).isEqualTo("SUCCEEDED");
+			assertThat(retained.attempt()).isEqualTo(f.started().attempt());
+			assertThat(retained.usage()).allMatch(m -> m.state().equals("UNKNOWN") && m.values().isEmpty());
+			NativeRecordingEvidence.verify(retained);
+		}
 	}
 
 	@Test

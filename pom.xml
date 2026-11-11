@@ -51,7 +51,7 @@
         -->
         <agent-judge.version>0.19.0-SNAPSHOT</agent-judge.version>
         <claude-code-sdk.version>1.8.0-SNAPSHOT</claude-code-sdk.version>
-        <agent-workflow.version>0.14.0</agent-workflow.version>
+        <agent-workflow.version>0.14.1-SNAPSHOT</agent-workflow.version>
         <agent-client.version>0.32.1-SNAPSHOT</agent-client.version>
 
         <!-- Third-party dependency versions -->

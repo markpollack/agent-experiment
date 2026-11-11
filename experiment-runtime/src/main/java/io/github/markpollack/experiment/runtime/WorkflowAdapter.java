@@ -34,56 +34,76 @@ public final class WorkflowAdapter {
 		RunSnapshot snapshot = null;
 		Object value = null;
 		boolean drained = false;
+		boolean restoreInterrupt = false;
 		try {
-			snapshot = runtime.start(definition, identity.launchKey(), input);
-			String runId = snapshot.runId();
-			Future<RunSnapshot> future = worker.submit(() -> runtime.resume(runId, definition));
-			long remaining = Math.max(1, Duration.between(java.time.Instant.now(), snapshot.deadline()).toMillis());
 			try {
-				snapshot = future.get(remaining, TimeUnit.MILLISECONDS);
-			}
-			catch (TimeoutException | InterruptedException interrupted) {
-				// Revocation is a database operation, never an interrupt of H2's worker.
-				snapshot = runtime.cancel(runId, "experiment", "Outer workflow bound reached or caller interrupted");
-				requestTermination(terminateProvider);
-				if (interrupted instanceof InterruptedException)
-					Thread.currentThread().interrupt();
-			}
-			catch (ExecutionException failure) {
-				snapshot = runtime.inspect(runId);
-				if (!snapshot.terminal())
+				snapshot = runtime.start(definition, identity.launchKey(), input);
+				String runId = snapshot.runId();
+				Future<RunSnapshot> future = worker.submit(() -> runtime.resume(runId, definition));
+				try {
+					if (snapshot.hasDeadline()) {
+						long remaining = Math.max(1,
+								Duration.between(java.time.Instant.now(), snapshot.deadline()).toMillis());
+						snapshot = future.get(remaining, TimeUnit.MILLISECONDS);
+					}
+					else {
+						// Explicitly untimed execution still has interruptible caller
+						// waiting
+						// and the same finite resource-drain policy.
+						snapshot = future.get();
+					}
+				}
+				catch (TimeoutException | InterruptedException stopped) {
+					restoreInterrupt = stopped instanceof InterruptedException;
+					// Revocation is a database operation, never an interrupt of H2's
+					// worker.
 					snapshot = runtime.cancel(runId, "experiment",
-							"Resume threw: " + failure.getCause().getClass().getName());
-				requestTermination(terminateProvider);
+							"Outer workflow bound reached or caller interrupted");
+					requestTermination(terminateProvider);
+				}
+				catch (ExecutionException failure) {
+					snapshot = runtime.inspect(runId);
+					if (!snapshot.terminal())
+						snapshot = runtime.cancel(runId, "experiment",
+								"Resume threw: " + failure.getCause().getClass().getName());
+					requestTermination(terminateProvider);
+				}
+				if (snapshot.status() == RunSnapshot.Status.SUCCEEDED)
+					value = runtime.result(runId, definition);
 			}
-			if (snapshot.status() == RunSnapshot.Status.SUCCEEDED)
-				value = runtime.result(runId, definition);
+			finally {
+				worker.shutdown();
+				// shutdown() is bounded; uncooperative external effects retain their
+				// workspace and evidence.
+				drained = runtime.shutdown(drainBudget);
+				if (!drained) {
+					requestTermination(terminateProvider);
+					Thread.ofPlatform().daemon().name("experiment-quarantine-drain").start(() -> {
+						try {
+							while (!worker.awaitTermination(1, TimeUnit.SECONDS)) {
+								/* retained owner */ }
+							runtime.shutdown(drainBudget);
+						}
+						catch (InterruptedException e) {
+							Thread.currentThread().interrupt();
+						}
+					});
+				}
+			}
+			// Preserve any cleanup interruption, but finish evidence I/O before restoring
+			// it.
+			restoreInterrupt |= Thread.interrupted();
+			if (snapshot == null)
+				throw new IOException("Workflow admission failed; retained fresh store at " + freshDirectory);
+			Path receipt = freshDirectory.resolve("snapshot.json");
+			Files.write(receipt, RuntimeJson.mapper().writeValueAsBytes(snapshot), StandardOpenOption.CREATE_NEW);
+			return new Execution(identity, snapshot, value, drained ? "DRAINED" : "QUARANTINED",
+					Evidence.reference(receipt, "workflow-snapshot"));
 		}
 		finally {
-			worker.shutdown();
-			// shutdown() is bounded; uncooperative external effects retain their
-			// workspace and evidence.
-			drained = runtime.shutdown(drainBudget);
-			if (!drained) {
-				requestTermination(terminateProvider);
-				Thread.ofPlatform().daemon().name("experiment-quarantine-drain").start(() -> {
-					try {
-						while (!worker.awaitTermination(1, TimeUnit.SECONDS)) {
-							/* retained owner */ }
-						runtime.shutdown(drainBudget);
-					}
-					catch (InterruptedException e) {
-						Thread.currentThread().interrupt();
-					}
-				});
-			}
+			if (restoreInterrupt)
+				Thread.currentThread().interrupt();
 		}
-		if (snapshot == null)
-			throw new IOException("Workflow admission failed; retained fresh store at " + freshDirectory);
-		Path receipt = freshDirectory.resolve("snapshot.json");
-		Files.write(receipt, RuntimeJson.mapper().writeValueAsBytes(snapshot), StandardOpenOption.CREATE_NEW);
-		return new Execution(identity, snapshot, value, drained ? "DRAINED" : "QUARANTINED",
-				Evidence.reference(receipt, "workflow-snapshot"));
 	}
 
 	private static void requestTermination(Runnable terminate) {

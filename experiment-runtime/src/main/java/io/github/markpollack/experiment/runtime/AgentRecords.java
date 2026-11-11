@@ -133,7 +133,9 @@ public final class AgentRecords {
 
 	/**
 	 * Retained before a Workflow commit; late records remain evidence, not accepted
-	 * outputs.
+	 * outputs. {@code providerBudgetMs} is the configured execution allowance: a positive
+	 * value is finite, zero explicitly means untimed. It is not an elapsed measurement or
+	 * an unknown value; {@code elapsedMs} records observed elapsed time.
 	 */
 	public record Invocation(Attempt attempt, String responseState, String processState, List<Integer> exitCodes,
 			String captureState, List<FileRef> acquisitions, List<CanonicalRef> canonical, String assemblyState,
@@ -173,7 +175,7 @@ public final class AgentRecords {
 			require(List.of("ASSEMBLED", "REFUSED", "NOT_ATTEMPTED").contains(assemblyState), "Assembly state");
 			require(acquisitions.size() <= 1 && canonical.size() <= 1 && exitCodes.size() <= 1
 					&& providerSessions.size() <= 1, "Reference cardinality");
-			require(providerBudgetMs > 0 && elapsedMs >= 0, "Invalid timing");
+			require(providerBudgetMs >= 0 && elapsedMs >= 0, "Invalid timing");
 			require(!captureState.equals("COMPLETE") || acquisitions.size() == 1, "Complete capture without receipt");
 			require(canonical.isEmpty() == !assemblyState.equals("ASSEMBLED"), "Assembly/reference mismatch");
 			require(canonical.isEmpty() || captureState.equals("COMPLETE"), "Unsealed assembly");

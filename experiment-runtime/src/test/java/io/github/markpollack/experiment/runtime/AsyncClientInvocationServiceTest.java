@@ -142,6 +142,20 @@ class AsyncClientInvocationServiceTest {
 	}
 
 	@Test
+	void finiteExecutionAllowanceStillElectsTimeout() throws Exception {
+		var provider = new Provider();
+		try (var client = AgentClient.create(provider)) {
+			var started = new AsyncClientInvocationService(client).start(attempt("finite-timeout"), workspace, "goal",
+					Duration.ofMillis(25));
+			assertThatThrownBy(() -> started.execution().result(Duration.ofSeconds(2)))
+				.isInstanceOf(AgentExecutionException.class);
+			var failed = (ExecutionOutcome.Failed) started.decision().orElseThrow().outcome();
+			assertThat(failed.failure().code()).isEqualTo(io.github.markpollack.agents.client.FailureCode.TIMEOUT);
+			assertThat(started.execution().awaitTermination(Duration.ofSeconds(2)).cleanupConfirmed()).isTrue();
+		}
+	}
+
+	@Test
 	void untimedValidationPrecedesSelectionAndBoundedOverloadsStillRejectAbsentBudget() throws Exception {
 		var provider = new Provider();
 		provider.release.countDown();

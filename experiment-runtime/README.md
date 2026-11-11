@@ -58,6 +58,31 @@ JudgeRecording.ItemJuryFactory factory = (prepared, measured) -> {
 after preparation and measurement. The adapter invokes its Jury once and retains complete Judge V6
 JSON, its hash and Judge's conclusion. Workflow success can accompany a valid FAIL domain verdict.
 
+## Explicit untimed execution
+
+For an opt-in untimed invocation, configure the caller-owned Client with
+`defaultTimeout(null)` and its provider without an execution cutoff, then call
+`AsyncClientInvocationService.startUntimed(attempt, workspace, prompt)` (or the overload
+with an actual definition identity). This omits a request timeout; it does not override
+a Client default or provider policy. Use the original handle's interruptible `result()`
+wait and `cancel(...)` operation. Existing positive-Duration `start(...)` overloads are
+unchanged. The legacy `ClaudeInvocationService.Request` remains a finite-budget path.
+
+Author an untimed Workflow with `Workflows.define(...).withoutDeadline()`.
+`WorkflowAdapter.execute(...)` uses interruptible waiting when the resulting snapshot
+has no deadline and retains the finite wait for other definitions. Its `drainBudget`
+must still be positive and finite. Caller interruption revokes the durable run and
+requests provider termination; a racing terminal outcome is retained as observed.
+An unsettled worker is quarantined with its store and partial evidence retained.
+The caller owns signal handling, provider termination and saving any partial capture.
+
+Record an untimed configured allowance as `Invocation.providerBudgetMs() == 0`.
+Positive values remain finite allowances; negatives, omitted fields and nulls are
+invalid. `elapsedMs` remains observed elapsed time, and unknown usage stays unknown.
+The native acceptance adapter accepts this zero allowance but retains all its existing
+success, identity and archive checks. Current schema 4 readers accept this added value;
+older readers may reject it. Existing archives are neither rewritten nor reinterpreted.
+
 ## Results and failure recovery
 
 `Identity` contains run/item/variant/replicate plus a validated length-prefixed row ID. `Attempt`

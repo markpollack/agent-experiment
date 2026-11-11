@@ -35,7 +35,8 @@ public final class NativeClientInvocation {
 	 * @param originalManifest original Client acquisition manifest
 	 * @param qualificationDirectory actual Journal qualifier output
 	 * @param preparedEvents exact events file selected by the actual terminal ACK
-	 * @param providerBudgetMs configured task allowance
+	 * @param providerBudgetMs configured task allowance in milliseconds; zero explicitly
+	 * means untimed, not unknown or a measured duration
 	 * @param elapsedMs observed elapsed time
 	 * @return successful Invocation with unchanged source identities and full retained
 	 * closure
