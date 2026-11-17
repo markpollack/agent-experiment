@@ -18,11 +18,11 @@ The current development reactor is `0.10.0-SNAPSHOT`:
 ./mvnw clean verify
 ```
 
-The POMs pin Judge `0.19.0-SNAPSHOT`, Client `0.32.1-SNAPSHOT`, Claude Code SDK `1.8.0-SNAPSHOT` and
-Journal `2.0.0-SNAPSHOT`, plus released Workflow `0.14.0`. The root POM declares the Central snapshot
-repository (`https://central.sonatype.com/repository/maven-snapshots/`, `updatePolicy` `always`), so a
-plain build resolves the current snapshots with no local installs. Every push to `main` publishes
-`0.10.0-SNAPSHOT` there; the `main` commit identifies what a snapshot contains.
+`main` builds against each AgentWorks dependency's current `main` snapshot: Judge `1.1.0-SNAPSHOT`,
+Workflow `1.1.0-SNAPSHOT`, Client `0.32.1-SNAPSHOT`, Claude Code SDK `1.9.0-SNAPSHOT` and Journal
+`2.0.0-SNAPSHOT`. Not all of them are published, so install each one's `main` locally first
+(`./mvnw install -DskipTests` in its checkout). The root POM also declares the Central snapshot repository
+(`https://central.sonatype.com/repository/maven-snapshots/`, `updatePolicy` `always`) for the ones that are.
 Tests use deterministic stubs, retained data and loopback HTTP; live provider tests remain opt-in.
 
 `AgentClientInvoker` accepts `Function<InvocationContext, AgentOptions>` so provider options do not
