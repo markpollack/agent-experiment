@@ -25,7 +25,7 @@ public record RuntimeIdentity(String revision, Map<String, String> artifacts) {
 	 * declaration.
 	 */
 	public static RuntimeIdentity judge() {
-		String revision = System.getProperty("experiment.judge.revision", "snapshot:agent-judge:1.1.0-SNAPSHOT");
+		String revision = System.getProperty("experiment.judge.revision", loadedJudgeRevision());
 		Map<String, String> artifacts = new LinkedHashMap<>();
 		artifacts.put("agent-judge-core", artifact(io.github.markpollack.judge.verdict.Verdict.class));
 		for (String[] module : new String[][] { { "agent-judge-exec", "io.github.markpollack.judge.exec.CommandJudge" },
@@ -38,6 +38,47 @@ public record RuntimeIdentity(String revision, Map<String, String> artifacts) {
 				/* Optional adapter not on this classpath. */ }
 		}
 		return new RuntimeIdentity(revision, artifacts);
+	}
+
+	/**
+	 * Default Judge source declaration, derived from the {@code agent-judge-core}
+	 * actually loaded: {@code released:agent-judge:<version>} for a release,
+	 * {@code snapshot:agent-judge:<version>} for a snapshot, and
+	 * {@code unknown:agent-judge} when the loaded artifact carries no version.
+	 * @return the declaration recorded when {@code experiment.judge.revision} is not set
+	 */
+	public static String loadedJudgeRevision() {
+		String version = loadedVersion(io.github.markpollack.judge.verdict.Verdict.class, "io.github.markpollack",
+				"agent-judge-core");
+		if (version == null)
+			return "unknown:agent-judge";
+		// Maven's own snapshot test: a snapshot version ends in SNAPSHOT.
+		return (version.endsWith("SNAPSHOT") ? "snapshot" : "released") + ":agent-judge:" + version;
+	}
+
+	/**
+	 * Version from the loading jar's own pom.properties, or null for a class directory.
+	 */
+	static String loadedVersion(Class<?> type, String groupId, String artifactId) {
+		try {
+			Path location = Path.of(type.getProtectionDomain().getCodeSource().getLocation().toURI());
+			if (!Files.isRegularFile(location))
+				return null;
+			try (var jar = new java.util.jar.JarFile(location.toFile())) {
+				var entry = jar.getJarEntry("META-INF/maven/" + groupId + "/" + artifactId + "/pom.properties");
+				if (entry == null)
+					return null;
+				var properties = new java.util.Properties();
+				try (var in = jar.getInputStream(entry)) {
+					properties.load(in);
+				}
+				String version = properties.getProperty("version");
+				return version == null || version.isBlank() ? null : version.trim();
+			}
+		}
+		catch (Exception e) {
+			return null;
+		}
 	}
 
 	/**

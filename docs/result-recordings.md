@@ -28,7 +28,8 @@ opaque observations; Experiment does not implement a replacement Judge interpret
 
 Production writers require `experiment.writer.revision`; callers should also declare exact producer
 source via `experiment.judge.revision`. Loaded binaries are always hashed. The default Judge declaration
-is `snapshot:agent-judge:1.1.0-SNAPSHOT`; source declarations are caller assertions, not archive signatures. Maven tests
+is derived from the loaded `agent-judge-core`: `released:agent-judge:<version>` for a release and
+`snapshot:agent-judge:<version>` for a snapshot; source declarations are caller assertions, not archive signatures. Maven tests
 supply an explicitly `TEST-ONLY` writer identity for synthetic recordings. A class-directory build is
 labeled separately from a JAR. Provenance validation never equates mutable version names with bytes.
 

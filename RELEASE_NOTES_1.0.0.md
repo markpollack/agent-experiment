@@ -76,6 +76,10 @@ Five modules are published, two of them for the first time:
 - **A failed item could be recorded as free.** An item that threw was recorded with a cost
   and token count of `0`. It now keeps the observed values or records them as unknown.
 - **Returned agent evidence is retained when judging fails.**
+- **Recorded identities name what actually ran.** The Journal qualifier and writer identities, the Workflow build
+  identity and the default Judge declaration come from the versions of the loaded artifacts. A released build
+  records released coordinates, for example `journal-ocsf-writer:2.0.0`. Without `-Dexperiment.judge.revision`, the
+  Judge declaration is `released:agent-judge:<version>`, or `snapshot:agent-judge:<version>` for a snapshot.
 
 ## Breaking changes
 
@@ -96,6 +100,10 @@ Five modules are published, two of them for the first time:
 - `ReEvaluationContextFactory.create(...)` returns `Optional<AgentJudgingInput>`.
 - `WorkflowInvoker.buildWorkflow(...)` returns `WorkflowInvoker.Plan`.
 - A run requires a writer identity (`experiment.writer.revision`).
+- Workflow runs are not resumable across Experiment versions. `WorkflowAgentInvoker` identifies its Workflow
+  build by the Experiment version, and Workflow refuses a run recorded by another build as an incompatible
+  deployment. A run recorded under a `0.10.0` snapshot cannot be resumed on 1.0.0; finish or restart it on the build
+  that started it.
 
 ## Correction to an earlier release note
 

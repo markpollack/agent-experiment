@@ -77,6 +77,14 @@ public class WorkflowAgentInvoker extends AbstractTemplateAgentInvoker {
 
 	}
 
+	/**
+	 * Workflow build identity of this invoker: the Experiment build's own version. A
+	 * Workflow run recorded by one Experiment version is refused as an incompatible
+	 * deployment on another, so runs recorded under a {@code 0.10.0} snapshot are not
+	 * resumable on {@code 1.0.0}. Finish or restart them on the build that started them.
+	 */
+	static final String BUILD_ID = io.github.markpollack.experiment.runtime.LoadedArtifacts.experimentVersion();
+
 	@Override
 	protected AgentResult invokeAgent(InvocationContext context) throws Exception {
 		Invoke step = new Invoke(invoker);
@@ -86,7 +94,7 @@ public class WorkflowAgentInvoker extends AbstractTemplateAgentInvoker {
 			.terminate(io.github.markpollack.workflow.flows.compiler.WorkflowModel.Terminal.SUCCEEDED)
 			.build();
 		var plan = new WorkflowInvoker.Plan(definition, StepRegistry.builder().register("client-v1", step).build(),
-				new ExecutionCompatibility("experiment-client", "0.10.0-SNAPSHOT", Map.of()));
+				new ExecutionCompatibility("experiment-client", BUILD_ID, Map.of()));
 		var driver = new WorkflowInvoker<Request>() {
 			protected String workflowName() {
 				return "experiment-client";

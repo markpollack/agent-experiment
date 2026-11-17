@@ -79,7 +79,7 @@ public final class NativeClientInvocation {
 		NativeRecordingEvidence.require(response.isSuccessful(), "Elected response is not successful");
 		var original = Evidence.reference(originalManifest, "acquisition-manifest");
 		var qualification = QualificationEvidence.collect(original, qualificationDirectory, "QUALIFIED",
-				"journal-capture-tck:2.0.0-SNAPSHOT", "");
+				AcquisitionAssembly.qualifierIdentity(), "");
 		NativeRecordingEvidence.require(qualification.state().equals("QUALIFIED"),
 				"Journal qualification output is incomplete or unsafe: " + qualificationDirectory);
 		JsonNode manifest = RuntimeJson.mapper().readTree(originalManifest.toFile());
@@ -90,7 +90,7 @@ public final class NativeClientInvocation {
 				retained.add(Evidence.reference(p, p.equals(events) ? "canonical-events" : "canonical-linked-file"));
 		}
 		var canonical = new CanonicalRef(Evidence.reference(events, "canonical-events"), retained,
-				NativeRecordingEvidence.requiredText(manifest, "profile_id"), "journal-ocsf-writer:2.0.0-SNAPSHOT",
+				NativeRecordingEvidence.requiredText(manifest, "profile_id"), AcquisitionAssembly.writerIdentity(),
 				"COMPLETED", "NOT_SOURCE_VERIFIED");
 		JsonNode exit = manifest.path("process").path("exit_code");
 		NativeRecordingEvidence.require(exit.isNull() || exit.isIntegralNumber(),

@@ -232,7 +232,7 @@
                         <systemPropertyVariables>
                             <!-- Synthetic test recordings; production writers supply actual source identity. -->
                             <experiment.writer.revision>TEST-ONLY:fixture-source</experiment.writer.revision>
-                            <experiment.judge.revision>snapshot:agent-judge:1.1.0-SNAPSHOT</experiment.judge.revision>
+                            <experiment.build.version>${project.version}</experiment.build.version>
                         </systemPropertyVariables>
                         <environmentVariables>
                             <!-- Prevent Claude CLI "nested session" error when tests

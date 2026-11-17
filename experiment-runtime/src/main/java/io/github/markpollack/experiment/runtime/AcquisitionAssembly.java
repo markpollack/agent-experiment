@@ -58,9 +58,9 @@ public final class AcquisitionAssembly {
 		return new AcquisitionAssembly((original, directory) -> {
 			var q = io.github.markpollack.journal.tck.ocsf.inventory.ClaudeAcquisition.qualify(original, directory);
 			return new QualifiedPaths(q.manifest(), q.assemblyExpectation());
-		}, "journal-capture-tck:2.0.0-fresh-v3-qualification-SNAPSHOT", (manifest,
+		}, qualifierIdentity(), (manifest,
 				output) -> io.github.markpollack.journal.ocsf.writer.FinalAssembly.assemble(manifest, output).name(),
-				"journal-ocsf-writer:2.0.0-fresh-v3-qualification-SNAPSHOT");
+				writerIdentity());
 	}
 
 	/**
@@ -69,7 +69,21 @@ public final class AcquisitionAssembly {
 	public static AcquisitionAssembly pinnedJournal() {
 		return new AcquisitionAssembly((manifest,
 				output) -> io.github.markpollack.journal.ocsf.writer.FinalAssembly.assemble(manifest, output).name(),
-				"journal-ocsf-writer:2.0.0-fresh-v3-qualification-SNAPSHOT");
+				writerIdentity());
+	}
+
+	private static final String GROUP = "io.github.markpollack";
+
+	/** Identity of the Journal writer actually loaded. */
+	static String writerIdentity() {
+		return LoadedArtifacts.identity(io.github.markpollack.journal.ocsf.writer.FinalAssembly.class, GROUP,
+				"journal-ocsf-writer");
+	}
+
+	/** Identity of the Journal qualifier actually loaded. */
+	static String qualifierIdentity() {
+		return LoadedArtifacts.identity(io.github.markpollack.journal.tck.ocsf.inventory.ClaudeAcquisition.class, GROUP,
+				"journal-capture-tck");
 	}
 
 	public static Map<String, String> provenance(Attempt attempt) {

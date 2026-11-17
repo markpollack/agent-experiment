@@ -28,4 +28,10 @@
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
     <dependency><groupId>org.assertj</groupId><artifactId>assertj-core</artifactId><scope>test</scope></dependency>
   </dependencies>
+  <build>
+    <resources>
+      <!-- Filters experiment-version.properties, so LoadedArtifacts records this build's own version. -->
+      <resource><directory>src/main/resources</directory><filtering>true</filtering></resource>
+    </resources>
+  </build>
 </project>
