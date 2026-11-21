@@ -52,11 +52,15 @@ public final class ClaudeInvocationService {
 	 * Recovery of immutable evidence only; this does not resume or retry provider work.
 	 */
 	public static Outcome readOutcome(Path attemptDirectory) throws IOException {
-		return RuntimeJson.mapper().readValue(attemptDirectory.resolve("outcome.json").toFile(), Outcome.class);
+		var tree = RuntimeJson.mapper().readTree(attemptDirectory.resolve("outcome.json").toFile());
+		Schema4.upgradeRetainedAttempt(tree.path("invocation").path("attempt"));
+		return RuntimeJson.mapper().treeToValue(tree, Outcome.class);
 	}
 
 	public static Invocation readDelivery(Path attemptDirectory) throws IOException {
-		return RuntimeJson.mapper().readValue(attemptDirectory.resolve("delivery.json").toFile(), Invocation.class);
+		var tree = RuntimeJson.mapper().readTree(attemptDirectory.resolve("delivery.json").toFile());
+		Schema4.upgradeRetainedAttempt(tree.path("attempt"));
+		return RuntimeJson.mapper().treeToValue(tree, Invocation.class);
 	}
 
 	public record Delivery(String responseState, String responseText, List<FileRef> acquisition, boolean complete,
@@ -110,13 +114,37 @@ public final class ClaudeInvocationService {
 			Thread.ofPlatform().daemon().name("experiment-client-stop").start(call::close);
 	}
 
+	/**
+	 * Invokes inside a Workflow Step. The attempt carries the Step's Workflow
+	 * coordinates, and the provider budget is capped by the Step's remaining time less
+	 * the drain.
+	 */
 	public Outcome invoke(Request request, StepContext step) {
 		Attempt attempt = new Attempt(request.prepared().identity(), UUID.randomUUID().toString(), step.runId(),
 				step.invocationId(), step.attemptId(), step.attemptNumber());
-		Path directory = Path.of(request.attemptDirectory()).toAbsolutePath().normalize();
 		long budget = Math.min(request.providerBudgetMs(),
 				Duration.between(Instant.now(), step.deadline()).toMillis() - drain.toMillis());
 		AgentRecords.require(budget > 0, "No eligible provider budget after reserving drain");
+		return run(request, attempt, budget);
+	}
+
+	/**
+	 * Invokes directly, without Workflow. The attempt is a {@code DIRECT} attempt with a
+	 * new acquisition identity and no Workflow coordinates; the provider budget is the
+	 * request's. Capture, qualification, assembly, timeout, quarantine and retained
+	 * outcome are the same as for {@link #invoke(Request, StepContext)}.
+	 * @param request the prepared item, prompt, model, budget and new attempt directory
+	 * @param attemptNumber the caller's 1-based count of this row's physical attempts
+	 * @return the outcome; a {@link QuarantinedInvocationException} carries it when the
+	 * provider drain is unconfirmed
+	 */
+	public Outcome invokeDirect(Request request, int attemptNumber) {
+		Attempt attempt = Attempt.direct(request.prepared().identity(), UUID.randomUUID().toString(), attemptNumber);
+		return run(request, attempt, request.providerBudgetMs());
+	}
+
+	private Outcome run(Request request, Attempt attempt, long budget) {
+		Path directory = Path.of(request.attemptDirectory()).toAbsolutePath().normalize();
 		try {
 			Files.createDirectory(directory);
 		}

@@ -12,7 +12,7 @@ The current development reactor is `0.10.0-SNAPSHOT`:
 | `experiment-agent-client` | Provider-neutral `AgentClientInvoker` with an `AgentOptions` factory |
 | `experiment-claude` | Configured semantic criterion scoring through Agent Client |
 | `experiment-workflow` | Current typed Workflow adapters and template hooks |
-| `experiment-runtime` | Canonical acquisition, Journal assembly, Workflow proofs and immutable runtime results |
+| `experiment-runtime` | Canonical acquisition, Journal assembly, direct or Workflow execution evidence and immutable runtime results |
 
 ```bash
 ./mvnw clean verify

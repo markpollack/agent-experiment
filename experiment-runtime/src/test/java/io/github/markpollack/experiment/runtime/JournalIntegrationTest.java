@@ -21,7 +21,7 @@ class JournalIntegrationTest {
 		var mapper = RuntimeJson.mapper();
 		ObjectNode run = (ObjectNode) mapper.readTree(fixture.resolve("spec.json").toFile());
 		var identity = Identity.of("experiment-run", "item", "simple", 0);
-		var attempt = new Attempt(identity, run.path("run_uid").asText(), "wf", "logical", "physical", 1);
+		var attempt = Attempt.direct(identity, run.path("run_uid").asText(), 1);
 		((ObjectNode) run.path("launch_settings")).set("artifact_provenance",
 				mapper.valueToTree(AcquisitionAssembly.provenance(attempt)));
 		var expected = mapper.readTree(fixture.resolve("native/expected-sources.json").toFile());
@@ -60,8 +60,8 @@ class JournalIntegrationTest {
 		Evidence.verify(canonical);
 		assertThat(PackageReader.open(Path.of(canonical.events().path())).refused()).isFalse();
 		assertThat(PackageReader.open(Path.of(canonical.events().path())).events("tool_call", 1)).hasSize(4);
-		var row = new Row(identity, List.of(assembled), "NOT_STARTED", new Domain(List.of(), List.of()), List.of(),
-				"NOT_ASSESSED", "", "RETAINED", List.of());
+		var row = Row.direct(identity, List.of(assembled), "COMPLETED", new Domain(List.of(), List.of()), List.of(),
+				"NOT_ASSESSED", "", "RETAINED");
 		var store = new FileSystemResultStore(temp.resolve("results"));
 		store.save(RuntimeStoreTest.result(identity.runId(), List.of(row)));
 		var reopened = new FileSystemResultStore(temp.resolve("results"));

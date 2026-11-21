@@ -125,9 +125,16 @@ final class NativeRecordingEvidence {
 		var correlation = decision.path("correlation");
 		equal(correlation, "experimentRunId", attempt.row().runId());
 		equal(correlation, "experimentInvocationId", attempt.invocationId());
-		equal(correlation, "workflowRunId", attempt.workflowRunId());
-		equal(correlation, "workflowInvocationId", attempt.workflowInvocationId());
-		equal(correlation, "workflowAttemptId", attempt.workflowAttemptId());
+		if (attempt.execution() == ExecutionKind.WORKFLOW) {
+			equal(correlation, "workflowRunId", attempt.workflowRunId());
+			equal(correlation, "workflowInvocationId", attempt.workflowInvocationId());
+			equal(correlation, "workflowAttemptId", attempt.workflowAttemptId());
+		}
+		else {
+			for (String key : List.of("workflowRunId", "workflowInvocationId", "workflowAttemptId"))
+				require(correlation.has(key) && correlation.get(key).isNull(),
+						"Direct native recording names a Workflow: " + key);
+		}
 		String execution = requiredText(decision, "executionId");
 		String connection = requiredText(decision, "connectionId");
 		JsonNode original = manifest(Path.of(q.original().path()), execution, connection);

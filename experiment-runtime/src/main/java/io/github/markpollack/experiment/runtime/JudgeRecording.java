@@ -51,16 +51,32 @@ public final class JudgeRecording {
 				"Verdict conclusion mismatch");
 	}
 
+	/**
+	 * The schema 4 form: {@code NOT_STARTED} with no proof, otherwise a Workflow state
+	 * with its proof. For a direct row use {@link DirectExecution#assess}.
+	 */
 	public static Row assess(PreparedItem prepared, List<Invocation> invocations, String workflowState, Domain measured,
 			ItemJuryFactory factory, List<WorkflowProof> proof) {
+		return assess(prepared, invocations,
+				workflowState.equals("NOT_STARTED") ? RowExecution.NOT_STARTED : RowExecution.WORKFLOW, workflowState,
+				measured, factory, proof);
+	}
+
+	/**
+	 * Invokes this item's Jury once and returns the row with its complete verdict, or
+	 * with the Jury's failure. The caller decides whether the execution's output may be
+	 * judged.
+	 */
+	public static Row assess(PreparedItem prepared, List<Invocation> invocations, RowExecution execution,
+			String executionState, Domain measured, ItemJuryFactory factory, List<WorkflowProof> proof) {
 		try {
 			Jury jury = java.util.Objects.requireNonNull(factory.create(prepared, measured));
 			VerdictDocument verdict = capture(java.util.Objects.requireNonNull(jury.vote()));
-			return new Row(prepared.identity(), invocations, workflowState, measured, List.of(verdict), "RETURNED", "",
-					"RETAINED", proof);
+			return new Row(prepared.identity(), invocations, execution, executionState, measured, List.of(verdict),
+					"RETURNED", "", "RETAINED", proof);
 		}
 		catch (Exception e) {
-			return new Row(prepared.identity(), invocations, workflowState, measured, List.of(), "THREW",
+			return new Row(prepared.identity(), invocations, execution, executionState, measured, List.of(), "THREW",
 					e.getClass().getName() + ": " + String.valueOf(e.getMessage()), "RETAINED", proof);
 		}
 	}

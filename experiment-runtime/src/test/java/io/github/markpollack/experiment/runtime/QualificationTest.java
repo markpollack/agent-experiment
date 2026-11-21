@@ -41,14 +41,14 @@ public class QualificationTest {
 	}
 
 	private Invocation input(String directory) throws Exception {
-		var attempt = RuntimeStoreTest.attempt(Identity.of(directory, "item", "simple", 0));
+		var attempt = RuntimeStoreTest.directAttempt(Identity.of(directory, "item", "simple", 0));
 		return AcquisitionTest.invocation(attempt, AcquisitionTest.manifest(temp.resolve(directory), attempt, true, 7));
 	}
 
 	private FileSystemResultStore save(Invocation invocation, String name) throws Exception {
 		var id = invocation.attempt().row();
-		var row = new Row(id, List.of(invocation), "NOT_STARTED", new Domain(List.of(), List.of()), List.of(),
-				"NOT_ASSESSED", "", "RETAINED", List.of());
+		var row = Row.direct(id, List.of(invocation), "COMPLETED", new Domain(List.of(), List.of()), List.of(),
+				"NOT_ASSESSED", "", "RETAINED");
 		var result = RuntimeStoreTest.result(id.runId(), List.of(row));
 		var directory = temp.resolve(name);
 		new FileSystemResultStore(directory).save(result);
@@ -111,7 +111,7 @@ public class QualificationTest {
 				ObjectNode json = (ObjectNode) RuntimeJson.mapper().readTree(paths.manifest().toFile());
 				if (mutation.equals("attempt"))
 					((ObjectNode) json.path("run").path("launch_settings").path("artifact_provenance"))
-						.put("workflow_attempt_id", "wrong");
+						.put("attempt_number", "2");
 				else
 					((ObjectNode) json.path("qualification")).put("original_manifest_sha256", "0".repeat(64));
 				RuntimeJson.mapper().writeValue(paths.manifest().toFile(), json);

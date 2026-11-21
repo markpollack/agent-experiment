@@ -9,7 +9,14 @@ import java.util.Objects;
  */
 public final class AgentRecords {
 
-	public static final int CURRENT_SCHEMA_VERSION = 4;
+	/**
+	 * Schema 5 states how every row and attempt executed: directly or under Workflow.
+	 * Schema 4 recorded Workflow execution only; its records stay readable unchanged.
+	 */
+	public static final int CURRENT_SCHEMA_VERSION = 5;
+
+	/** The previous schema: Workflow execution only. Read, never written. */
+	public static final int SCHEMA_4 = 4;
 
 	private AgentRecords() {
 	}
@@ -37,18 +44,89 @@ public final class AgentRecords {
 	}
 
 	/**
-	 * Provider delivery is distinct from Workflow logical invocation and physical
-	 * attempt.
+	 * How one attempt was executed, stated positively. A {@code DIRECT} attempt was
+	 * started by the Experiment caller itself and carries no Workflow coordinates; a
+	 * {@code WORKFLOW} attempt was a Workflow Step's physical attempt and carries exactly
+	 * Workflow's coordinates. Absent coordinates never imply direct execution.
 	 */
-	public record Attempt(Identity row, String invocationId, String workflowRunId, String workflowInvocationId,
-			String workflowAttemptId, int attemptNumber) {
+	public enum ExecutionKind {
+
+		DIRECT, WORKFLOW
+
+	}
+
+	/** Workflow's own identity for one physical Step attempt. */
+	public record WorkflowCoordinates(String runId, String invocationId, String attemptId) {
+		public WorkflowCoordinates {
+			text(runId);
+			text(invocationId);
+			text(attemptId);
+		}
+	}
+
+	/**
+	 * One physical provider delivery. {@code invocationId} is the Experiment's own
+	 * acquisition identity, independent of how the attempt executed. {@code workflow}
+	 * holds exactly one {@link WorkflowCoordinates} for {@code WORKFLOW} and none for
+	 * {@code DIRECT}; the list is the durable codec's form for an optional value.
+	 * {@code attemptNumber} is the 1-based physical attempt number: Workflow's number for
+	 * a Workflow attempt, the caller's own count for a direct attempt.
+	 */
+	public record Attempt(Identity row, String invocationId, ExecutionKind execution,
+			List<WorkflowCoordinates> workflow, int attemptNumber) {
 		public Attempt {
 			Objects.requireNonNull(row);
 			text(invocationId);
-			text(workflowRunId);
-			text(workflowInvocationId);
-			text(workflowAttemptId);
+			Objects.requireNonNull(execution, "Execution kind required");
+			workflow = List.copyOf(workflow);
+			require(workflow.size() == (execution == ExecutionKind.WORKFLOW ? 1 : 0),
+					execution == ExecutionKind.WORKFLOW ? "Workflow attempt requires its Workflow coordinates"
+							: "Direct attempt carries Workflow coordinates");
 			require(attemptNumber > 0, "Positive attempt number required");
+		}
+
+		/** A Workflow Step attempt; the schema 4 constructor, unchanged in meaning. */
+		public Attempt(Identity row, String invocationId, String workflowRunId, String workflowInvocationId,
+				String workflowAttemptId, int attemptNumber) {
+			this(row, invocationId, ExecutionKind.WORKFLOW,
+					List.of(new WorkflowCoordinates(workflowRunId, workflowInvocationId, workflowAttemptId)),
+					attemptNumber);
+		}
+
+		/** An attempt the Experiment caller started itself, without Workflow. */
+		public static Attempt direct(Identity row, String invocationId, int attemptNumber) {
+			return new Attempt(row, invocationId, ExecutionKind.DIRECT, List.of(), attemptNumber);
+		}
+
+		/**
+		 * @return this attempt's Workflow coordinates
+		 * @throws IllegalStateException for a direct attempt, which has none
+		 */
+		public WorkflowCoordinates workflowCoordinates() {
+			if (execution != ExecutionKind.WORKFLOW)
+				throw new IllegalStateException("Direct attempt has no Workflow coordinates: " + invocationId);
+			return workflow.getFirst();
+		}
+
+		/**
+		 * @throws IllegalStateException for a direct attempt
+		 */
+		public String workflowRunId() {
+			return workflowCoordinates().runId();
+		}
+
+		/**
+		 * @throws IllegalStateException for a direct attempt
+		 */
+		public String workflowInvocationId() {
+			return workflowCoordinates().invocationId();
+		}
+
+		/**
+		 * @throws IllegalStateException for a direct attempt
+		 */
+		public String workflowAttemptId() {
+			return workflowCoordinates().attemptId();
 		}
 	}
 
@@ -226,22 +304,51 @@ public final class AgentRecords {
 			Objects.requireNonNull(snapshot);
 			require(snapshot.subject().equals("workflow-snapshot"), "Wrong Workflow hash subject");
 			attempts = List.copyOf(attempts);
+			attempts.forEach(a -> require(a.execution() == ExecutionKind.WORKFLOW, "Direct attempt in Workflow proof"));
 			attempts.forEach(
 					a -> require(a.row().equals(row) && a.workflowRunId().equals(runId), "Workflow proof association"));
 		}
 	}
 
-	public record Row(Identity identity, List<Invocation> invocations, String workflowState, Domain domain,
-			List<VerdictDocument> verdicts, String judgeState, String error, String workspaceState,
+	/**
+	 * How a row executed. {@code DIRECT}: the Experiment caller invoked the subject
+	 * itself; there is no Workflow claim and no proof. {@code WORKFLOW}: the row ran
+	 * under Workflow and carries exactly one proof. {@code NOT_STARTED}: no execution
+	 * started.
+	 */
+	public enum RowExecution {
+
+		DIRECT, WORKFLOW, NOT_STARTED
+
+	}
+
+	/** Workflow run states, as Workflow's retained snapshot reports them. */
+	static final List<String> WORKFLOW_STATES = List.of("ACTIVE", "SUCCEEDED", "FAILED", "CANCELLED");
+
+	/**
+	 * Direct execution states, as the caller observed them. {@code COMPLETED}: every
+	 * started attempt returned an observed response (success, failure, a throw or a
+	 * timeout). {@code CANCELLED}: the caller cancelled the execution.
+	 * {@code INCOMPLETE}: execution stopped without an observed response, for example
+	 * after an interruption or an unconfirmed drain.
+	 */
+	static final List<String> DIRECT_STATES = List.of("COMPLETED", "CANCELLED", "INCOMPLETE");
+
+	/**
+	 * {@code executionState} is in {@code execution}'s vocabulary: a Workflow state, a
+	 * direct state, or {@code NOT_STARTED}. {@code workflowProof} has exactly one entry
+	 * for {@code WORKFLOW} and none otherwise.
+	 */
+	public record Row(Identity identity, List<Invocation> invocations, RowExecution execution, String executionState,
+			Domain domain, List<VerdictDocument> verdicts, String judgeState, String error, String workspaceState,
 			List<WorkflowProof> workflowProof) {
 		public Row {
 			Objects.requireNonNull(identity);
+			Objects.requireNonNull(execution, "Row execution required");
 			workflowProof = List.copyOf(workflowProof);
 			invocations = List.copyOf(invocations);
 			Objects.requireNonNull(domain);
 			verdicts = List.copyOf(verdicts);
-			require(List.of("ACTIVE", "SUCCEEDED", "FAILED", "CANCELLED", "NOT_STARTED").contains(workflowState),
-					"Workflow state");
 			require(List.of("RETURNED", "THREW", "NOT_ASSESSED").contains(judgeState), "Judge state");
 			require(verdicts.size() == (judgeState.equals("RETURNED") ? 1 : 0), "Judge return cardinality");
 			require(List.of("RETAINED", "QUARANTINED").contains(workspaceState), "Workspace ownership state");
@@ -249,22 +356,74 @@ public final class AgentRecords {
 			invocations.forEach(i -> require(i.attempt().row().equals(identity), "Full row association mismatch"));
 			require(invocations.stream().map(i -> i.attempt().invocationId()).distinct().count() == invocations.size(),
 					"Duplicate acquisition identity");
-
-			require(workflowProof.size() == (workflowState.equals("NOT_STARTED") ? 0 : 1), "Workflow proof missing");
-			for (WorkflowProof proof : workflowProof) {
-				require(proof.row().equals(identity) && proof.state().equals(workflowState),
-						"Workflow proof row/state mismatch");
-				invocations
-					.forEach(i -> require(proof.attempts().contains(i.attempt()), "Wrong persisted Workflow attempt"));
+			switch (execution) {
+				case DIRECT -> {
+					require(DIRECT_STATES.contains(executionState), "Direct execution state");
+					require(workflowProof.isEmpty(), "Direct row carries a Workflow proof");
+					invocations.forEach(i -> require(i.attempt().execution() == ExecutionKind.DIRECT,
+							"Direct row carries a Workflow attempt"));
+					require(!executionState.equals("COMPLETED") || (!invocations.isEmpty()
+							&& invocations.stream().noneMatch(i -> i.responseState().equals("UNKNOWN"))),
+							"Completed direct execution requires observed responses");
+				}
+				case WORKFLOW -> {
+					require(WORKFLOW_STATES.contains(executionState), "Workflow state");
+					require(workflowProof.size() == 1, "Workflow proof missing");
+					WorkflowProof proof = workflowProof.getFirst();
+					require(proof.row().equals(identity) && proof.state().equals(executionState),
+							"Workflow proof row/state mismatch");
+					invocations.forEach(
+							i -> require(proof.attempts().contains(i.attempt()), "Wrong persisted Workflow attempt"));
+				}
+				case NOT_STARTED -> {
+					require("NOT_STARTED".equals(executionState), "Not-started state");
+					require(workflowProof.isEmpty(), "Workflow proof missing");
+					// Schema 4 let a not-started row carry Workflow attempts; Result
+					// refuses any invocation here for schema 5.
+					invocations.forEach(i -> require(i.attempt().execution() == ExecutionKind.WORKFLOW,
+							"Not-started row carries a direct attempt"));
+				}
 			}
+		}
+
+		/**
+		 * The schema 4 constructor, unchanged in meaning: {@code NOT_STARTED} with no
+		 * proof, otherwise a Workflow state with exactly one proof.
+		 */
+		public Row(Identity identity, List<Invocation> invocations, String workflowState, Domain domain,
+				List<VerdictDocument> verdicts, String judgeState, String error, String workspaceState,
+				List<WorkflowProof> workflowProof) {
+			this(identity, invocations, legacyExecution(workflowState), workflowState, domain, verdicts, judgeState,
+					error, workspaceState, workflowProof);
+		}
+
+		/** A row the Experiment caller executed directly, without Workflow. */
+		public static Row direct(Identity identity, List<Invocation> invocations, String directState, Domain domain,
+				List<VerdictDocument> verdicts, String judgeState, String error, String workspaceState) {
+			return new Row(identity, invocations, RowExecution.DIRECT, directState, domain, verdicts, judgeState, error,
+					workspaceState, List.of());
+		}
+
+		/**
+		 * @return the Workflow state, or {@code NOT_STARTED}
+		 * @throws IllegalStateException for a direct row, which has no Workflow state
+		 */
+		public String workflowState() {
+			if (execution == RowExecution.DIRECT)
+				throw new IllegalStateException("Direct row has no Workflow state: " + identity.rowId());
+			return executionState;
+		}
+
+		private static RowExecution legacyExecution(String workflowState) {
+			return "NOT_STARTED".equals(workflowState) ? RowExecution.NOT_STARTED : RowExecution.WORKFLOW;
 		}
 	}
 
 	public record Result(int recordingSchemaVersion, String kind, String experimentId, String experimentName,
 			long createdAtEpochMs, List<Row> items, List<FileRef> runtimeArtifacts) {
 		public Result {
-			require(recordingSchemaVersion == CURRENT_SCHEMA_VERSION && kind.equals("AGENT_CANONICAL"),
-					"Unsupported result version/kind");
+			require((recordingSchemaVersion == CURRENT_SCHEMA_VERSION || recordingSchemaVersion == SCHEMA_4)
+					&& "AGENT_CANONICAL".equals(kind), "Unsupported result version/kind");
 			text(experimentId);
 			text(experimentName);
 			require(createdAtEpochMs >= 0, "Invalid timestamp");
@@ -280,6 +439,12 @@ public final class AgentRecords {
 				.distinct()
 				.count() == count, "Reused acquisition across rows");
 			items.forEach(r -> r.verdicts().forEach(JudgeRecording::validate));
+			if (recordingSchemaVersion == SCHEMA_4)
+				items.forEach(
+						r -> require(r.execution() != RowExecution.DIRECT, "Schema 4 cannot record direct execution"));
+			else
+				items.forEach(r -> require(r.execution() != RowExecution.NOT_STARTED || r.invocations().isEmpty(),
+						"Not-started row carries invocations; record DIRECT or WORKFLOW execution"));
 		}
 	}
 

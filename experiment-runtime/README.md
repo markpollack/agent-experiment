@@ -1,7 +1,7 @@
 # Typed agent experiment runtime
 
 `io.github.markpollack:experiment-runtime` (version declared in its POM) provides Client acquisition,
-Journal final assembly, Workflow execution and immutable per-item results. It uses
+Journal final assembly, direct or Workflow execution and immutable per-item results. It uses
 the current `main` snapshots of Workflow, Judge, Client, SDK and Journal (versions in the root README).
 Use this module alone for the canonical agent path. The older Experiment modules retain their
 historical APIs and dependencies and are not part of this runtime's closure.
@@ -57,6 +57,28 @@ JudgeRecording.ItemJuryFactory factory = (prepared, measured) -> {
 after preparation and measurement. The adapter invokes its Jury once and retains complete Judge V6
 JSON, its hash and Judge's conclusion. Workflow success can accompany a valid FAIL domain verdict.
 
+## Direct execution, without Workflow
+
+Workflow is optional. A subject the application invokes itself, such as a plain Claude call, is recorded as
+direct execution: the row and each attempt say so, and no Workflow is created around the call.
+
+```java
+var outcome = client.invokeDirect(request, 1);     // ClaudeInvocationService; 1 = this row's first attempt
+Row row = DirectExecution.assess(prepared, "COMPLETED", List.of(outcome.invocation()),
+        outcome.workspaceState(), measured, factory);
+```
+
+`invokeDirect` creates an `Attempt.direct(...)` with a new acquisition identity and no Workflow coordinates, and
+otherwise captures, qualifies, assembles, times out and quarantines exactly as `invoke(request, stepContext)` does.
+Its provider budget is the request's. For an async Client execution, pass an `Attempt.direct(...)` to
+`AsyncClientInvocationService.start(...)`: Client then records no Workflow in its correlation.
+
+The direct state is the caller's observation: `COMPLETED` when every started attempt returned an observed
+response (success, failure, a throw or a timeout), `CANCELLED` when the caller cancelled, and `INCOMPLETE` when
+execution stopped without one, for example after an interruption or an unconfirmed drain. `DirectExecution.assess`
+runs the Jury only for `COMPLETED` with a retained workspace; otherwise the row is `NOT_ASSESSED`. A direct row
+can also be built with `Row.direct(...)`.
+
 ## Explicit untimed execution
 
 For an opt-in untimed invocation, configure the caller-owned Client with
@@ -79,20 +101,33 @@ Record an untimed configured allowance as `Invocation.providerBudgetMs() == 0`.
 Positive values remain finite allowances; negatives, omitted fields and nulls are
 invalid. `elapsedMs` remains observed elapsed time, and unknown usage stays unknown.
 The native acceptance adapter accepts this zero allowance but retains all its existing
-success, identity and archive checks. Current schema 4 readers accept this added value;
+success, identity and archive checks. Schema 4 and later readers accept this added value;
 older readers may reject it. Existing archives are neither rewritten nor reinterpreted.
 
 ## Results and failure recovery
 
 `Identity` contains run/item/variant/replicate plus a validated length-prefixed row ID. `Attempt`
-adds distinct acquisition, Workflow run, logical invocation and physical attempt IDs. Durable values
+adds the acquisition ID, the physical attempt number and its `ExecutionKind`: `DIRECT`, with no Workflow
+coordinates, or `WORKFLOW`, with exactly one `WorkflowCoordinates` (Workflow run, logical invocation and physical
+attempt IDs). The schema 4 constructor and the `workflowRunId()`-style accessors remain for Workflow attempts;
+on a direct attempt the accessors throw rather than return a value. Durable values
 are non-null scalars, records and concrete lists: do not use Path, Instant, Map or nullable fields.
 `Measurement.UNKNOWN` carries an empty values list and reason; a measured zero or signed domain
 change remains a measured value. Preserve baseline and final raw artifacts and scoped measurements
 in your domain result rather than replacing them with a derived total.
 
-`Result(AgentRecords.CURRENT_SCHEMA_VERSION, "AGENT_CANONICAL", ...)` (schema 4) is saved once via `FileSystemResultStore`. `load`, `list` and
-`mostRecent` validate current shape and full associations. A result cannot be overwritten. Explicit
+Each `Row` states its `RowExecution`. `DIRECT` rows have a direct state, direct attempts only and no Workflow
+proof. `WORKFLOW` rows have a Workflow state and exactly one `WorkflowProof` that contains every attempt.
+`NOT_STARTED` rows have no proof and, in schema 5, no invocations. A missing proof is never read as direct
+execution, and a direct row that names a Workflow, in its attempts, its proof or its acquisition provenance, is
+refused. The schema 4 `Row` constructor and `workflowState()` remain for Workflow and not-started rows.
+
+`Result(AgentRecords.CURRENT_SCHEMA_VERSION, "AGENT_CANONICAL", ...)` (schema 5) is saved once via
+`FileSystemResultStore`, which writes schema 5 only. `load`, `list` and `mostRecent` validate the shape and full
+associations. A result cannot be overwritten. Schema 4 files are read with their original meaning: each attempt
+is a Workflow attempt with its stored coordinates, each row a Workflow or not-started row with its stored state
+and proof, and the result keeps `recordingSchemaVersion` 4. Nothing is reinterpreted as direct execution, and a
+schema 4 result is never written back. Explicit
 `readHistorical` returns unchanged old JSON and its hash as `LEGACY_UNVERIFIED`, without loading
 retired capture classes or reinterpreting old Judge documents.
 
@@ -125,7 +160,7 @@ For a qualified row, independently run Journal's packaged reader with the canoni
 `--assembly assemblyExpectations().getFirst().path()`. Check its actual result before claiming acceptance.
 `AcquisitionAssembly.pinnedJournal()` is the explicit already-bound replay route. It never runs as a
 fallback after failed fresh qualification. Previous schema3 files remain available through the explicit
-raw historical reader; new writes use schema4. The original Invocation constructor is retained as an
+raw historical reader; new writes use schema 5. The original Invocation constructor is retained as an
 overload with an empty qualifications list.
 
 The V3 consumer authors 30 minutes total for prepare/baseline/invoke/measure, caps the provider by

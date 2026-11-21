@@ -86,13 +86,33 @@ public final class AcquisitionAssembly {
 				"journal-capture-tck");
 	}
 
+	private static final List<String> WORKFLOW_PROVENANCE = List.of("workflow_run_id", "workflow_invocation_id",
+			"workflow_attempt_id", "workflow_attempt_number");
+
+	/**
+	 * The association written into, and checked against, an acquisition manifest. A
+	 * Workflow attempt keeps the schema 4 keys unchanged. A direct attempt states
+	 * {@code execution_kind=DIRECT} and its own {@code attempt_number}, and has no
+	 * Workflow keys.
+	 */
 	public static Map<String, String> provenance(Attempt attempt) {
 		var r = attempt.row();
-		return Map.of("experiment_run_id", r.runId(), "item_id", r.itemId(), "variant", r.variant(), "replicate_index",
-				Integer.toString(r.replicateIndex()), "row_id", r.rowId(), "experiment_invocation_id",
-				attempt.invocationId(), "workflow_run_id", attempt.workflowRunId(), "workflow_invocation_id",
-				attempt.workflowInvocationId(), "workflow_attempt_id", attempt.workflowAttemptId(),
-				"workflow_attempt_number", Integer.toString(attempt.attemptNumber()));
+		var common = Map.of("experiment_run_id", r.runId(), "item_id", r.itemId(), "variant", r.variant(),
+				"replicate_index", Integer.toString(r.replicateIndex()), "row_id", r.rowId(),
+				"experiment_invocation_id", attempt.invocationId());
+		var values = new java.util.TreeMap<>(common);
+		if (attempt.execution() == ExecutionKind.DIRECT) {
+			values.put("execution_kind", "DIRECT");
+			values.put("attempt_number", Integer.toString(attempt.attemptNumber()));
+		}
+		else {
+			var w = attempt.workflowCoordinates();
+			values.put("workflow_run_id", w.runId());
+			values.put("workflow_invocation_id", w.invocationId());
+			values.put("workflow_attempt_id", w.attemptId());
+			values.put("workflow_attempt_number", Integer.toString(attempt.attemptNumber()));
+		}
+		return Map.copyOf(values);
 	}
 
 	public static JsonNode validateManifest(FileRef acquisition, Attempt attempt, boolean requireComplete)
@@ -117,6 +137,14 @@ public final class AcquisitionAssembly {
 					|| !provenance.path(expected.getKey()).textValue().equals(expected.getValue()))
 				throw new IOException("Acquisition association mismatch: " + expected.getKey());
 		}
+		if (attempt.execution() == ExecutionKind.DIRECT) {
+			for (String key : WORKFLOW_PROVENANCE)
+				if (provenance.has(key))
+					throw new IOException("Direct acquisition names a Workflow: " + key);
+		}
+		else if (provenance.has("execution_kind") || provenance.has("attempt_number"))
+			throw new IOException(
+					"Workflow acquisition states another execution: " + provenance.path("execution_kind"));
 		return tree;
 	}
 

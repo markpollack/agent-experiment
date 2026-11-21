@@ -61,6 +61,15 @@ class NativeClientInvocationTest {
 
 	private Fixture fixture(String name, boolean failed, Sealing sealing, String cliVersion, boolean untimed)
 			throws Exception {
+		return fixture(name, failed, sealing, cliVersion, untimed, false);
+	}
+
+	private Fixture direct(String name, boolean untimed) throws Exception {
+		return fixture(name, false, Sealing.QUALIFYING, "2.1.319", untimed, true);
+	}
+
+	private Fixture fixture(String name, boolean failed, Sealing sealing, String cliVersion, boolean untimed,
+			boolean direct) throws Exception {
 		Path base = Files.createDirectory(root.resolve(name));
 		Path store = base.resolve("journal");
 		Path[] original = { null };
@@ -106,8 +115,8 @@ class NativeClientInvocationTest {
 		var recorder = new JournalExecutionRecorder(store, "native-mapping-fixture");
 		var client = AgentClient.builder(provider).executionRecorder(recorder).build();
 		var identity = Identity.of("run-" + name, "item", "variant", 0);
-		var attempt = new Attempt(identity, "experiment-" + name, "workflow-" + name, "step-" + name,
-				"physical-" + name, 1);
+		var attempt = direct ? Attempt.direct(identity, "experiment-" + name, 1) : new Attempt(identity,
+				"experiment-" + name, "workflow-" + name, "step-" + name, "physical-" + name, 1);
 		var service = new AsyncClientInvocationService(client);
 		var started = untimed ? service.startUntimed(attempt, base, "hello", Optional.of("definition"))
 				: service.start(attempt, base, "hello", Duration.ofSeconds(5), Optional.of("definition"));
@@ -145,15 +154,15 @@ class NativeClientInvocationTest {
 			.votingStrategy(new io.github.markpollack.judge.voting.ConsensusStrategy())
 			.build();
 		var verdict = JudgeRecording.capture(jury.vote());
-		var row = new Row(i.attempt().row(), List.of(i), "NOT_STARTED", new Domain(List.of(), List.of()),
-				List.of(verdict), "RETURNED", "", "RETAINED", List.of());
+		var row = Row.direct(i.attempt().row(), List.of(i), "COMPLETED", new Domain(List.of(), List.of()),
+				List.of(verdict), "RETURNED", "", "RETAINED");
 		return new Result(AgentRecords.CURRENT_SCHEMA_VERSION, "AGENT_CANONICAL", i.attempt().row().runId(),
 				"native-mapping-fixture", 1, List.of(row), List.of());
 	}
 
 	@Test
 	void untimedNativeInvocationRetainsExplicitZeroThroughTheRealStore() throws Exception {
-		try (var f = fixture("untimed", false, Sealing.QUALIFYING, "2.1.319", true)) {
+		try (var f = direct("untimed", true)) {
 			var invocation = NativeClientInvocation.accept(f.started(), f.termination(), f.original(), f.qualified(),
 					f.events(), 0, 1);
 			var saved = result(invocation);
@@ -172,7 +181,7 @@ class NativeClientInvocationTest {
 
 	@Test
 	void nativeArchiveKeepsDistinctIdentitiesOriginalResponseAndStoreRoundTrip() throws Exception {
-		try (var f = fixture("valid")) {
+		try (var f = direct("valid", false)) {
 			assertThat(outcome(f)).isEqualTo(NativeRecording.Outcome.ATTACHED);
 			var i = f.accept();
 			assertThat(i.assemblyState()).isEqualTo("ASSEMBLED");
@@ -272,6 +281,33 @@ class NativeClientInvocationTest {
 
 	private static NativeRecording.Outcome outcome(Fixture f) {
 		return f.started().execution().recording().nativeRecording().orElseThrow().outcome();
+	}
+
+	@Test
+	void directArchiveNamesNoWorkflowAndCannotBeReboundAcrossExecutionKinds() throws Exception {
+		try (var direct = direct("direct-kind", false); var workflow = fixture("workflow-kind")) {
+			var d = direct.accept();
+			var correlation = NativeRecordingEvidence.verify(d).decision().path("correlation");
+			assertThat(correlation.path("experimentInvocationId").asText()).isEqualTo(d.attempt().invocationId());
+			for (String key : List.of("workflowRunId", "workflowInvocationId", "workflowAttemptId"))
+				assertThat(correlation.get(key).isNull()).as(key).isTrue();
+			var w = workflow.accept();
+			assertThat(NativeRecordingEvidence.verify(w).decision().path("correlation").path("workflowRunId").asText())
+				.isEqualTo("workflow-workflow-kind");
+			// A Workflow archive cannot be recorded as direct, nor a direct one as
+			// Workflow.
+			var asDirect = Attempt.direct(w.attempt().row(), w.attempt().invocationId(), 1);
+			assertThatThrownBy(
+					() -> NativeRecordingEvidence.verify(rebind(w, asDirect, w.qualifications(), w.canonical())))
+				.isInstanceOf(IOException.class)
+				.hasMessageContaining("Direct native recording names a Workflow: workflowRunId");
+			var asWorkflow = new Attempt(d.attempt().row(), d.attempt().invocationId(), "invented-run",
+					"invented-invocation", "invented-attempt", 1);
+			assertThatThrownBy(
+					() -> NativeRecordingEvidence.verify(rebind(d, asWorkflow, d.qualifications(), d.canonical())))
+				.isInstanceOf(IOException.class)
+				.hasMessageContaining("workflowRunId");
+		}
 	}
 
 	@Test

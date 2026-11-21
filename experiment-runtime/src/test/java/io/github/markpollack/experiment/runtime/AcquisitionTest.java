@@ -47,7 +47,7 @@ class AcquisitionTest {
 
 	@Test
 	void failedExecutionWithCompleteCaptureAssemblesOnceAndStoresSeparateHashes() throws Exception {
-		var a = RuntimeStoreTest.attempt(RuntimeStoreTest.identity("run", 0));
+		var a = RuntimeStoreTest.directAttempt(RuntimeStoreTest.identity("run", 0));
 		var receipt = manifest(temp.resolve("acquired"), a, true, 7);
 		var calls = new AtomicInteger();
 		var assembler = assembly(calls);
@@ -58,8 +58,8 @@ class AcquisitionTest {
 		assertThat(calls).hasValue(1);
 		assertThat(assembled.canonical().getFirst().events().sha256()).isNotEqualTo(receipt.sha256());
 		assertThat(assembled.canonical().getFirst().verificationState()).isEqualTo("NOT_SOURCE_VERIFIED");
-		var row = new Row(a.row(), List.of(assembled), "NOT_STARTED", new Domain(List.of(), List.of()), List.of(),
-				"NOT_ASSESSED", "", "RETAINED", List.of());
+		var row = Row.direct(a.row(), List.of(assembled), "COMPLETED", new Domain(List.of(), List.of()), List.of(),
+				"NOT_ASSESSED", "", "RETAINED");
 		var store = new FileSystemResultStore(temp.resolve("results"));
 		store.save(RuntimeStoreTest.result("run", List.of(row)));
 		assertThat(new FileSystemResultStore(temp.resolve("results")).load("run").orElseThrow().items())

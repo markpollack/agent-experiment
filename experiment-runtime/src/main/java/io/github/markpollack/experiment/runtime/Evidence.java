@@ -48,7 +48,8 @@ public final class Evidence {
 
 	/**
 	 * Call before treating retained references as available evidence; never implied by
-	 * load().
+	 * load(). A Workflow row's proof is checked against its retained snapshot; a direct
+	 * row has no proof, and its acquisitions are checked to name no Workflow.
 	 */
 	public static void verify(Row row) throws IOException {
 		for (Invocation invocation : row.invocations()) {

@@ -8,8 +8,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.github.markpollack.experiment.runtime.AgentRecords.Result;
 
 /**
- * Immutable saves. Every read validates the complete current envelope through record
- * constructors.
+ * Immutable saves. Writes use the current schema only. Every read validates the complete
+ * envelope through record constructors; a schema 4 file is read with its original meaning
+ * and keeps version 4.
  */
 public final class FileSystemResultStore implements ResultStore {
 
@@ -27,6 +28,9 @@ public final class FileSystemResultStore implements ResultStore {
 
 	@Override
 	public void save(Result result) throws IOException {
+		if (result.recordingSchemaVersion() != AgentRecords.CURRENT_SCHEMA_VERSION)
+			throw new IOException("Writes use schema " + AgentRecords.CURRENT_SCHEMA_VERSION + "; schema "
+					+ result.recordingSchemaVersion() + " records are read, never written");
 		// Encode/validate before acquiring the immutable run directory.
 		byte[] bytes = RuntimeJson.mapper().writeValueAsBytes(result);
 		RuntimeJson.mapper().readValue(bytes, Result.class);
@@ -66,9 +70,12 @@ public final class FileSystemResultStore implements ResultStore {
 
 	private Result read(Path path) throws IOException {
 		JsonNode tree = RuntimeJson.mapper().readTree(path.toFile());
-		if (!tree.path("recordingSchemaVersion").isInt()
-				|| tree.path("recordingSchemaVersion").intValue() != AgentRecords.CURRENT_SCHEMA_VERSION
-				|| !tree.path("kind").asText().equals("AGENT_CANONICAL"))
+		JsonNode version = tree.path("recordingSchemaVersion");
+		if (!version.isInt() || !tree.path("kind").asText().equals("AGENT_CANONICAL"))
+			throw new IOException("Unsupported current result; use explicit historical reader for old records");
+		if (version.intValue() == AgentRecords.SCHEMA_4)
+			tree = Schema4.upgradeResult(tree);
+		else if (version.intValue() != AgentRecords.CURRENT_SCHEMA_VERSION)
 			throw new IOException("Unsupported current result; use explicit historical reader for old records");
 		return RuntimeJson.mapper().treeToValue(tree, Result.class);
 	}

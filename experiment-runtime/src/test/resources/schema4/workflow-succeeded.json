@@ -1,0 +1,106 @@
+{
+  "recordingSchemaVersion" : 4,
+  "kind" : "AGENT_CANONICAL",
+  "experimentId" : "example-run",
+  "experimentName" : "fixture-example",
+  "createdAtEpochMs" : 100,
+  "items" : [ {
+    "identity" : {
+      "runId" : "example-run",
+      "itemId" : "example-item",
+      "variant" : "simple",
+      "replicateIndex" : 0,
+      "rowId" : "12:example-item6:simple1:0"
+    },
+    "invocations" : [ {
+      "attempt" : {
+        "row" : {
+          "runId" : "example-run",
+          "itemId" : "example-item",
+          "variant" : "simple",
+          "replicateIndex" : 0,
+          "rowId" : "12:example-item6:simple1:0"
+        },
+        "invocationId" : "fe8bc465-ee2f-4916-8cac-ce19c8773c86",
+        "workflowRunId" : "ebd9b917-5520-4f99-81f6-77891fb0e218",
+        "workflowInvocationId" : "sha256:683daa7b2dd27e7147370e00603350a0f89bdd242e82790018e971c1197da20c",
+        "workflowAttemptId" : "c9a6c3ac-ee68-4b93-85ca-413ee6cc071d",
+        "attemptNumber" : 1
+      },
+      "responseState" : "SUCCEEDED",
+      "processState" : "UNKNOWN",
+      "exitCodes" : [ ],
+      "captureState" : "MISSING",
+      "acquisitions" : [ ],
+      "canonical" : [ ],
+      "assemblyState" : "NOT_ATTEMPTED",
+      "providerSessions" : [ ],
+      "usage" : [ {
+        "name" : "cost",
+        "unit" : "USD",
+        "state" : "UNKNOWN",
+        "values" : [ ],
+        "source" : "fixture has no measured usage",
+        "scope" : "fe8bc465-ee2f-4916-8cac-ce19c8773c86"
+      } ],
+      "responseText" : "fixture response",
+      "error" : "",
+      "providerBudgetMs" : 5000,
+      "elapsedMs" : 1,
+      "qualifications" : [ ]
+    } ],
+    "workflowState" : "SUCCEEDED",
+    "domain" : {
+      "measurements" : [ {
+        "name" : "lineCoverage",
+        "unit" : "percent",
+        "state" : "MEASURED",
+        "values" : [ 40.0 ],
+        "source" : "fixture final",
+        "scope" : "item"
+      } ],
+      "artifacts" : [ ]
+    },
+    "verdicts" : [ {
+      "producerJson" : "{\"schemaVersion\":6,\"judgment\":{\"schemaVersion\":6,\"producerStatus\":\"fail\",\"reasoning\":\"fixture domain fails despite successful orchestration\",\"checks\":[],\"metadata\":{},\"invocations\":[],\"invocationIds\":[]},\"individual\":[{\"schemaVersion\":6,\"producerStatus\":\"fail\",\"reasoning\":\"fixture domain fails despite successful orchestration\",\"checks\":[],\"metadata\":{},\"invocations\":[],\"invocationIds\":[]}],\"individualByName\":{\"fixture\":{\"schemaVersion\":6,\"producerStatus\":\"fail\",\"reasoning\":\"fixture domain fails despite successful orchestration\",\"checks\":[],\"metadata\":{},\"invocations\":[],\"invocationIds\":[]}},\"seats\":[{\"position\":0,\"verdictKey\":\"fixture\",\"keySource\":\"DECLARED\",\"execution\":\"RETURNED\",\"participation\":\"IDENTITY\"}],\"provenance\":{\"kind\":\"own\"},\"compositeAttempts\":[],\"declaredCardinality\":1,\"roster\":[],\"invocations\":[]}",
+      "sha256" : "8765261ee398a0911b9f204683b0e53190aba9e6ca1d15e58dca0c3866819f0e",
+      "conclusion" : "FAIL",
+      "codec" : "agent-judge-v6:0.18.0"
+    } ],
+    "judgeState" : "RETURNED",
+    "error" : "",
+    "workspaceState" : "RETAINED",
+    "workflowProof" : [ {
+      "row" : {
+        "runId" : "example-run",
+        "itemId" : "example-item",
+        "variant" : "simple",
+        "replicateIndex" : 0,
+        "rowId" : "12:example-item6:simple1:0"
+      },
+      "runId" : "ebd9b917-5520-4f99-81f6-77891fb0e218",
+      "state" : "SUCCEEDED",
+      "lifecycle" : "DRAINED",
+      "snapshot" : {
+        "path" : "/tmp/junit-11527406948328237593/workflow/snapshot.json",
+        "sha256" : "e811ac2b4ffd565b0f82ed8828c4b5ee7477bf343f393e8065af5f6cd247f9ae",
+        "subject" : "workflow-snapshot"
+      },
+      "attempts" : [ {
+        "row" : {
+          "runId" : "example-run",
+          "itemId" : "example-item",
+          "variant" : "simple",
+          "replicateIndex" : 0,
+          "rowId" : "12:example-item6:simple1:0"
+        },
+        "invocationId" : "fe8bc465-ee2f-4916-8cac-ce19c8773c86",
+        "workflowRunId" : "ebd9b917-5520-4f99-81f6-77891fb0e218",
+        "workflowInvocationId" : "sha256:683daa7b2dd27e7147370e00603350a0f89bdd242e82790018e971c1197da20c",
+        "workflowAttemptId" : "c9a6c3ac-ee68-4b93-85ca-413ee6cc071d",
+        "attemptNumber" : 1
+      } ]
+    } ]
+  } ],
+  "runtimeArtifacts" : [ ]
+}

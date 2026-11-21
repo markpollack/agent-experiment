@@ -146,6 +146,8 @@ public class ThreeStageConsumerExampleTest {
 		assertThat(row.verdicts().getFirst().conclusion()).isEqualTo("FAIL");
 		assertThat(row.invocations().getFirst().captureState()).isEqualTo("MISSING");
 		assertThat(row.workflowProof().getFirst().attempts()).containsExactly(row.invocations().getFirst().attempt());
+		assertThat(row.execution()).isEqualTo(RowExecution.WORKFLOW);
+		assertThat(row.invocations().getFirst().attempt().execution()).isEqualTo(ExecutionKind.WORKFLOW);
 		Files.createDirectories(Path.of("target/example"));
 		RuntimeJson.mapper()
 			.writerWithDefaultPrettyPrinter()
@@ -153,8 +155,8 @@ public class ThreeStageConsumerExampleTest {
 		// Mutation keeps the acquisition identity and row unchanged; the independent
 		// Workflow proof catches it.
 		var changed = RuntimeJson.mapper().valueToTree(result);
-		((com.fasterxml.jackson.databind.node.ObjectNode) changed.at("/items/0/invocations/0/attempt"))
-			.put("workflowAttemptId", "wrong");
+		((com.fasterxml.jackson.databind.node.ObjectNode) changed.at("/items/0/invocations/0/attempt/workflow/0"))
+			.put("attemptId", "wrong");
 		assertThatThrownBy(() -> RuntimeJson.mapper().treeToValue(changed, Result.class))
 			.hasMessageContaining("Wrong persisted Workflow attempt");
 		Path saved;

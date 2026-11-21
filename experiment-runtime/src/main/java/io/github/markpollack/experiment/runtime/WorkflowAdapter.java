@@ -115,6 +115,8 @@ public final class WorkflowAdapter {
 	 * snapshot.
 	 */
 	public static void validateAttempt(Execution execution, Attempt attempt, boolean requireCommitted) {
+		AgentRecords.require(attempt.execution() == ExecutionKind.WORKFLOW,
+				"Direct attempt cannot be a Workflow attempt");
 		AgentRecords.require(execution.identity().equals(attempt.row()), "Wrong full Workflow row");
 		AgentRecords.require(execution.snapshot().runId().equals(attempt.workflowRunId()), "Wrong Workflow run");
 		var logical = execution.snapshot()

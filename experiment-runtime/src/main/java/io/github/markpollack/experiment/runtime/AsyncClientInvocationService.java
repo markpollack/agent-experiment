@@ -16,9 +16,11 @@ import io.github.markpollack.agents.client.ExecutionDecision;
 import io.github.markpollack.experiment.runtime.AgentRecords.Attempt;
 
 /**
- * Starts an actual Client async execution with an exact Experiment/Workflow association.
- * The caller owns the configured Client and its lifetime. This service creates no
- * provider, executor, timeout, retry or alternative blocking execution path.
+ * Starts an actual Client async execution with an exact Experiment association. A
+ * Workflow attempt also passes its Workflow coordinates; a direct attempt passes none, so
+ * Client records no Workflow for it. The caller owns the configured Client and its
+ * lifetime. This service creates no provider, executor, timeout, retry or alternative
+ * blocking execution path.
  *
  * <p>
  * Invocation selection is atomic within this service instance only. A selected ID is
@@ -42,7 +44,7 @@ public final class AsyncClientInvocationService {
 
 	/**
 	 * Starts one execution without inventing an experiment-definition identity.
-	 * @param attempt exact physical Experiment/Workflow attempt
+	 * @param attempt exact physical attempt, direct or Workflow
 	 * @param workspace existing subject directory
 	 * @param prompt nonblank submitted goal
 	 * @param executionBudget positive Client execution allowance, not a waiter timeout
@@ -57,7 +59,7 @@ public final class AsyncClientInvocationService {
 	/**
 	 * Starts one execution with an optional actual experiment-definition identity. All
 	 * argument validation precedes invocation reservation and any Client call.
-	 * @param attempt exact physical Experiment/Workflow attempt
+	 * @param attempt exact physical attempt, direct or Workflow
 	 * @param workspace existing subject directory, resolved to its real path
 	 * @param prompt nonblank submitted goal
 	 * @param executionBudget positive Client execution allowance representable in
@@ -81,7 +83,7 @@ public final class AsyncClientInvocationService {
 	 * without a default timeout and configure its provider for untimed execution. This
 	 * service does not override either caller-owned policy. Result waiting and
 	 * cancellation use the original handle; resource cleanup remains Client-owned.
-	 * @param attempt exact physical Experiment/Workflow attempt
+	 * @param attempt exact physical attempt, direct or Workflow
 	 * @param workspace existing subject directory
 	 * @param prompt nonblank submitted goal
 	 * @return original Client handle associated with the original attempt
@@ -95,7 +97,7 @@ public final class AsyncClientInvocationService {
 	 * Starts without a request deadline and with an optional actual definition identity.
 	 * Requires an untimed caller-configured Client/provider, as described by
 	 * {@link #startUntimed(Attempt, Path, String)}.
-	 * @param attempt exact physical Experiment/Workflow attempt
+	 * @param attempt exact physical attempt, direct or Workflow
 	 * @param workspace existing subject directory, resolved to its real path
 	 * @param prompt nonblank submitted goal
 	 * @param experimentDefinitionId actual definition identity, or empty
@@ -117,10 +119,12 @@ public final class AsyncClientInvocationService {
 		Path actualWorkspace = workspace.toRealPath();
 		if (!Files.isDirectory(actualWorkspace))
 			throw new IllegalArgumentException("Workspace must be a directory");
+		Optional<AgentRecords.WorkflowCoordinates> workflow = attempt.workflow().stream().findFirst();
 		ApplicationCorrelation correlation = new ApplicationCorrelation(experimentDefinitionId,
 				Optional.of(attempt.row().runId()), Optional.of(attempt.invocationId()),
-				Optional.of(attempt.workflowRunId()), Optional.of(attempt.workflowInvocationId()),
-				Optional.of(attempt.workflowAttemptId()));
+				workflow.map(AgentRecords.WorkflowCoordinates::runId),
+				workflow.map(AgentRecords.WorkflowCoordinates::invocationId),
+				workflow.map(AgentRecords.WorkflowCoordinates::attemptId));
 		if (!selected.add(attempt.invocationId()))
 			throw new IllegalStateException("Experiment invocation already selected: " + attempt.invocationId());
 		var request = client.goal(prompt).workingDirectory(actualWorkspace).correlation(correlation);

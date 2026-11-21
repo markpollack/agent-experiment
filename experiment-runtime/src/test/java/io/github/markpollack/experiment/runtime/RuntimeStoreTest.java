@@ -18,19 +18,25 @@ class RuntimeStoreTest {
 		return Identity.of(run, "item", "simple", replicate);
 	}
 
+	/** A Workflow attempt, for checks of Workflow coordinates. */
 	static Attempt attempt(Identity id) {
 		return new Attempt(id, "inv-" + id.runId() + "-" + id.replicateIndex(), "wf", "logical", "physical", 1);
 	}
 
+	/** A direct attempt: none of these store fixtures runs under Workflow. */
+	static Attempt directAttempt(Identity id) {
+		return Attempt.direct(id, "inv-" + id.runId() + "-" + id.replicateIndex(), 1);
+	}
+
 	static Invocation missing(Identity id) {
-		return new Invocation(attempt(id), "SUCCEEDED", "UNKNOWN", List.of(), "MISSING", List.of(), List.of(),
+		return new Invocation(directAttempt(id), "SUCCEEDED", "UNKNOWN", List.of(), "MISSING", List.of(), List.of(),
 				"NOT_ATTEMPTED", List.of(), List.of(Measurement.unknown("cost", "USD", "not reported", "invocation")),
 				"answer", "", 1000, 5);
 	}
 
 	static Row row(Identity id) {
-		return new Row(id, List.of(missing(id)), "NOT_STARTED", new Domain(List.of(), List.of()), List.of(),
-				"NOT_ASSESSED", "", "RETAINED", List.of());
+		return Row.direct(id, List.of(missing(id)), "COMPLETED", new Domain(List.of(), List.of()), List.of(),
+				"NOT_ASSESSED", "", "RETAINED");
 	}
 
 	static Result result(String run, List<Row> rows) {
@@ -130,11 +136,11 @@ class RuntimeStoreTest {
 				List.of(Measurement.unknown("coverage", "percent", "build failed", "item"),
 						Measurement.measured("coverageDelta", "percentage-point", -5, "fixture regression", "item")),
 				List.of());
-		var failedDomain = JudgeRecording.assess(prepared, List.of(missing(id)), "NOT_STARTED", domain,
-				(p, d) -> () -> Verdict.single("build", Judgment.fail("actual failing domain outcome")), List.of());
-		var thrown = JudgeRecording.assess(prepared, List.of(missing(id)), "NOT_STARTED", domain, (p, d) -> {
+		var failedDomain = DirectExecution.assess(prepared, "COMPLETED", List.of(missing(id)), "RETAINED", domain,
+				(p, d) -> () -> Verdict.single("build", Judgment.fail("actual failing domain outcome")));
+		var thrown = DirectExecution.assess(prepared, "COMPLETED", List.of(missing(id)), "RETAINED", domain, (p, d) -> {
 			throw new IllegalStateException("judge failed after capture");
-		}, List.of());
+		});
 		assertThat(failedDomain.verdicts().getFirst().conclusion()).isEqualTo("FAIL");
 		assertThat(thrown.judgeState()).isEqualTo("THREW");
 		assertThat(thrown.invocations()).containsExactly(missing(id));
