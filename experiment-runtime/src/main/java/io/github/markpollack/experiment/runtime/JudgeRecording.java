@@ -65,10 +65,15 @@ public final class JudgeRecording {
 	/**
 	 * Invokes this item's Jury once and returns the row with its complete verdict, or
 	 * with the Jury's failure. The caller decides whether the execution's output may be
-	 * judged.
+	 * judged. The row's own rules are checked first: an invalid row is refused before any
+	 * Jury is created, so no judge call is spent on a row that cannot be recorded.
 	 */
 	public static Row assess(PreparedItem prepared, List<Invocation> invocations, RowExecution execution,
 			String executionState, Domain measured, ItemJuryFactory factory, List<WorkflowProof> proof) {
+		// Throws for an invalid row. Row rules do not depend on the judge state beyond
+		// verdict cardinality, so the judged row below cannot fail where this passes.
+		new Row(prepared.identity(), invocations, execution, executionState, measured, List.of(), "NOT_ASSESSED", "",
+				"RETAINED", proof);
 		try {
 			Jury jury = java.util.Objects.requireNonNull(factory.create(prepared, measured));
 			VerdictDocument verdict = capture(java.util.Objects.requireNonNull(jury.vote()));

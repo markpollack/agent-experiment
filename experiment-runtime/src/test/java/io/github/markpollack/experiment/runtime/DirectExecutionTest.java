@@ -268,6 +268,21 @@ class DirectExecutionTest {
 				MEASURED, counting))
 			.hasMessageContaining("Duplicate direct attempt number");
 		assertThat(created).hasValue(0);
+		// The public JudgeRecording overload checks the row first too, for any state.
+		var invalid = new LinkedHashMap<String, java.util.function.Supplier<Row>>();
+		invalid.put("Completed direct execution requires observed responses", () -> JudgeRecording.assess(prepared,
+				List.of(), RowExecution.DIRECT, "COMPLETED", MEASURED, counting, List.of()));
+		invalid.put("Completed direct execution requires observed responses ", () -> JudgeRecording.assess(prepared,
+				List.of(unobserved), RowExecution.DIRECT, "COMPLETED", MEASURED, counting, List.of()));
+		invalid.put("Duplicate direct attempt number", () -> JudgeRecording.assess(prepared, List.of(first, sameNumber),
+				RowExecution.DIRECT, "COMPLETED", MEASURED, counting, List.of()));
+		invalid.put("Direct execution state", () -> JudgeRecording.assess(prepared, List.of(first), RowExecution.DIRECT,
+				"BOGUS", MEASURED, counting, List.of()));
+		invalid.put("Workflow proof missing", () -> JudgeRecording.assess(prepared, List.of(), RowExecution.WORKFLOW,
+				"SUCCEEDED", MEASURED, counting, List.of()));
+		for (var call : invalid.entrySet())
+			assertThatThrownBy(call.getValue()::get).as(call.getKey()).hasMessageContaining(call.getKey().strip());
+		assertThat(created).hasValue(0);
 		// The valid row is judged exactly once.
 		DirectExecution.assess(prepared, "COMPLETED", List.of(first), "RETAINED", MEASURED, counting);
 		assertThat(created).hasValue(1);
