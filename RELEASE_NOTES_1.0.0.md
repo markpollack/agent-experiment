@@ -68,6 +68,18 @@ Five modules are published, two of them for the first time:
     `client-terminal-claude-sdk/1`, and any Codex CLI version on the exec route under `client-terminal-codex-exec/1`.
     The earlier versioned profile names are still accepted when reading.
 
+- **Direct execution, without Agent Workflow (`experiment-runtime`).** Workflow is optional. A subject the
+  application invokes itself, such as a plain Claude call, is recorded as direct execution, with no Workflow created
+  around it and no Workflow proof.
+  - Each `Attempt` states its `ExecutionKind`: `DIRECT`, with no Workflow coordinates, or `WORKFLOW`, with exactly one
+    `WorkflowCoordinates`.
+  - Each `Row` states its `RowExecution`: `DIRECT`, `WORKFLOW` (exactly one Workflow proof) or `NOT_STARTED`.
+  - A missing proof is never read as direct execution, and a direct record that names a Workflow is refused.
+  - New entry points: `Attempt.direct(...)`, `Row.direct(...)`, `ClaudeInvocationService.invokeDirect(request,
+    attemptNumber)` and `DirectExecution.assess(...)`, which runs the Jury only for a completed execution with its
+    workspace retained.
+  - `FileSystemResultStore.read(Path)` reads one stored result file with full validation.
+
 ## What this fixes
 
 - **Judge-as-subject runs could resolve and invoke the wrong judge.** A run of 2 items × 3 replicates resolved 12
@@ -100,6 +112,18 @@ Five modules are published, two of them for the first time:
 - `ReEvaluationContextFactory.create(...)` returns `Optional<AgentJudgingInput>`.
 - `WorkflowInvoker.buildWorkflow(...)` returns `WorkflowInvoker.Plan`.
 - A run requires a writer identity (`experiment.writer.revision`).
+- `experiment-runtime` writes runtime schema 5 only, and `AgentRecords.CURRENT_SCHEMA_VERSION` is now 5. These
+  are refused:
+  - saving `new Result(4, ...)`;
+  - in a schema 5 result, a `NOT_STARTED` row that carries invocations.
+
+  Record such rows as `DIRECT` or `WORKFLOW` instead.
+- The schema 4 `Attempt` and `Row` constructors and the `workflowRunId()`, `workflowInvocationId()`,
+  `workflowAttemptId()` and `workflowState()` accessors remain for Workflow records. They throw on direct records.
+- In stored runtime JSON, an attempt's Workflow coordinates move from top-level `workflowRunId`,
+  `workflowInvocationId` and `workflowAttemptId` to `attempt.workflow[0].runId`, `.invocationId` and `.attemptId`.
+  A row's `workflowState` becomes `execution` plus `executionState`. Code that reads these fields from raw JSON must
+  move, or read through `FileSystemResultStore`.
 - Workflow runs are not resumable across Experiment versions. `WorkflowAgentInvoker` identifies its Workflow
   build by the Experiment version, and Workflow refuses a run recorded by another build as an incompatible
   deployment. A run recorded under a `0.10.0` snapshot cannot be resumed on 1.0.0; finish or restart it on the build
@@ -115,6 +139,9 @@ results recorded with any of them are suspect. 0.7.2 was the first release on a 
 ## Compatibility
 
 Requires Java 21. New results are written as Experiment recording version 3, with Judge V6 verdict documents.
+`experiment-runtime` writes runtime schema 5. Its schema 4 results still read through `FileSystemResultStore`
+with their original meaning: as Workflow or not-started records, never as direct execution. They keep version 4
+and are never rewritten.
 No stored result is rewritten. `FileSystemResultStore.loadRaw(id)` returns any stored result's original text and
 its SHA-256. Typed reads check the recording version; `docs/result-recordings.md` gives the rules for results
 written by earlier releases. The normal build needs no credentials. Live provider
