@@ -392,6 +392,7 @@ class DirectExecutionTest {
 			JsonNode raw = RuntimeJson.mapper().readTree(file.toFile());
 			String id = raw.path("experimentId").asText();
 			Result read = new FileSystemResultStore(store).load(id).orElseThrow();
+			assertThat(FileSystemResultStore.read(file)).isEqualTo(read);
 			assertThat(read.recordingSchemaVersion()).isEqualTo(4);
 			Row row = read.items().getFirst();
 			JsonNode rawRow = raw.path("items").get(0);

@@ -68,7 +68,15 @@ public final class FileSystemResultStore implements ResultStore {
 		return Optional.of(result);
 	}
 
-	private Result read(Path path) throws IOException {
+	/**
+	 * Reads one stored result file with the same validation as {@link #load}: schema 5,
+	 * or schema 4 with its original meaning. Use this rather than a bare Jackson read,
+	 * which would not read schema 4.
+	 * @param path a stored {@code run.json}
+	 * @return the validated result
+	 * @throws IOException if the file is unreadable, unsupported or invalid
+	 */
+	public static Result read(Path path) throws IOException {
 		JsonNode tree = RuntimeJson.mapper().readTree(path.toFile());
 		JsonNode version = tree.path("recordingSchemaVersion");
 		if (!version.isInt() || !tree.path("kind").asText().equals("AGENT_CANONICAL"))
