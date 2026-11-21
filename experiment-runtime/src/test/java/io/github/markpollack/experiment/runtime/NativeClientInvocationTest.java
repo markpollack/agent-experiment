@@ -284,6 +284,36 @@ class NativeClientInvocationTest {
 	}
 
 	@Test
+	void workflowAttemptNativeRecordingSurvivesTheStoreWithItsProof() throws Exception {
+		try (var f = fixture("workflow-store")) {
+			var i = f.accept();
+			var attempt = i.attempt();
+			assertThat(attempt.execution()).isEqualTo(ExecutionKind.WORKFLOW);
+			// Synthetic snapshot naming this attempt, standing in for Workflow's retained
+			// receipt: this test covers the store path, not Workflow execution.
+			Path snapshot = root.resolve("workflow-store-snapshot.json");
+			json.writeValue(snapshot.toFile(),
+					java.util.Map.of("runId", attempt.workflowRunId(), "status", "SUCCEEDED", "invocations",
+							List.of(java.util.Map.of("invocationId", attempt.workflowInvocationId(), "attempts",
+									List.of(java.util.Map.of("attemptId", attempt.workflowAttemptId(), "number",
+											attempt.attemptNumber(), "disposition", "COMMITTED"))))));
+			var proof = new WorkflowProof(attempt.row(), attempt.workflowRunId(), "SUCCEEDED", "DRAINED",
+					Evidence.reference(snapshot, "workflow-snapshot"), List.of(attempt));
+			var row = new Row(attempt.row(), List.of(i), "SUCCEEDED", new Domain(List.of(), List.of()), List.of(),
+					"NOT_ASSESSED", "", "RETAINED", List.of(proof));
+			var saved = new Result(AgentRecords.CURRENT_SCHEMA_VERSION, "AGENT_CANONICAL", attempt.row().runId(),
+					"native-workflow-fixture", 1, List.of(row), List.of());
+			Path directory = root.resolve("workflow-store-results");
+			new FileSystemResultStore(directory).save(saved);
+			var read = new FileSystemResultStore(directory).load(saved.experimentId()).orElseThrow();
+			assertThat(read).isEqualTo(saved);
+			assertThat(read.items().getFirst().execution()).isEqualTo(RowExecution.WORKFLOW);
+			Evidence.verify(read.items().getFirst());
+			NativeRecordingEvidence.verify(read.items().getFirst().invocations().getFirst());
+		}
+	}
+
+	@Test
 	void directArchiveNamesNoWorkflowAndCannotBeReboundAcrossExecutionKinds() throws Exception {
 		try (var direct = direct("direct-kind", false); var workflow = fixture("workflow-kind")) {
 			var d = direct.accept();

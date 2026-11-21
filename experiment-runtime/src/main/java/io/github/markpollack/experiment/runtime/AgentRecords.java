@@ -362,6 +362,8 @@ public final class AgentRecords {
 					require(workflowProof.isEmpty(), "Direct row carries a Workflow proof");
 					invocations.forEach(i -> require(i.attempt().execution() == ExecutionKind.DIRECT,
 							"Direct row carries a Workflow attempt"));
+					require(invocations.stream().map(i -> i.attempt().attemptNumber()).distinct().count() == invocations
+						.size(), "Duplicate direct attempt number");
 					require(!executionState.equals("COMPLETED") || (!invocations.isEmpty()
 							&& invocations.stream().noneMatch(i -> i.responseState().equals("UNKNOWN"))),
 							"Completed direct execution requires observed responses");

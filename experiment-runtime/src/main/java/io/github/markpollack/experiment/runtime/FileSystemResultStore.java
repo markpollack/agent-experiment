@@ -69,9 +69,10 @@ public final class FileSystemResultStore implements ResultStore {
 	}
 
 	/**
-	 * Reads one stored result file with the same validation as {@link #load}: schema 5,
-	 * or schema 4 with its original meaning. Use this rather than a bare Jackson read,
-	 * which would not read schema 4.
+	 * Reads one stored result file and validates its envelope and records: schema 5, or
+	 * schema 4 with its original meaning. Use this rather than a bare Jackson read, which
+	 * would not read schema 4. Unlike {@link #load}, it does not check that the file's
+	 * run ID matches a store directory; the caller owns that association.
 	 * @param path a stored {@code run.json}
 	 * @return the validated result
 	 * @throws IOException if the file is unreadable, unsupported or invalid

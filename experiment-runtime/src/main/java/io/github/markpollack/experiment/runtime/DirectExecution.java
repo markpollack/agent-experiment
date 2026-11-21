@@ -35,9 +35,12 @@ public final class DirectExecution {
 			AgentRecords.require(invocation.attempt().execution() == ExecutionKind.DIRECT,
 					"Workflow attempt in a direct row");
 		}
+		// Build the unjudged row first: every row rule is checked before any Jury is
+		// created, so an invalid row never spends a judge call it cannot record.
+		Row unjudged = Row.direct(prepared.identity(), invocations, state, measured, List.of(), "NOT_ASSESSED",
+				"Direct execution did not complete with its workspace retained", workspaceState);
 		if (!state.equals("COMPLETED") || !workspaceState.equals("RETAINED"))
-			return Row.direct(prepared.identity(), invocations, state, measured, List.of(), "NOT_ASSESSED",
-					"Direct execution did not complete with its workspace retained", workspaceState);
+			return unjudged;
 		return JudgeRecording.assess(prepared, invocations, RowExecution.DIRECT, state, measured, factory, List.of());
 	}
 

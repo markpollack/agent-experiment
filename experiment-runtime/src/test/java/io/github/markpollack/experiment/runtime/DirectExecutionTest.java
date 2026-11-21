@@ -243,6 +243,36 @@ class DirectExecutionTest {
 			.executionState()).isEqualTo("INCOMPLETE");
 	}
 
+	@Test
+	void anInvalidDirectRowIsRefusedBeforeAnyJuryIsCreated() throws Exception {
+		var identity = Identity.of("direct-run", "item-2", "plain", 0);
+		var prepared = prepared(identity);
+		var created = new java.util.concurrent.atomic.AtomicInteger();
+		JudgeRecording.ItemJuryFactory counting = (p, d) -> {
+			created.incrementAndGet();
+			return () -> Verdict.single("x", Judgment.pass("x"));
+		};
+		var unobserved = new Invocation(Attempt.direct(identity, "interrupted", 1), "UNKNOWN", "UNKNOWN", List.of(),
+				"MISSING", List.of(), List.of(), "NOT_ATTEMPTED", List.of(),
+				List.of(Measurement.unknown("cost", "USD", "interrupted", "interrupted")), "", "Caller interrupted",
+				5000, 10);
+		var first = claude().invokeDirect(request(prepared, "first"), 1).invocation();
+		var sameNumber = claude().invokeDirect(request(prepared, "same-number"), 1).invocation();
+		assertThatThrownBy(
+				() -> DirectExecution.assess(prepared, "COMPLETED", List.of(), "RETAINED", MEASURED, counting))
+			.hasMessageContaining("Completed direct execution requires observed responses");
+		assertThatThrownBy(() -> DirectExecution.assess(prepared, "COMPLETED", List.of(unobserved), "RETAINED",
+				MEASURED, counting))
+			.hasMessageContaining("Completed direct execution requires observed responses");
+		assertThatThrownBy(() -> DirectExecution.assess(prepared, "COMPLETED", List.of(first, sameNumber), "RETAINED",
+				MEASURED, counting))
+			.hasMessageContaining("Duplicate direct attempt number");
+		assertThat(created).hasValue(0);
+		// The valid row is judged exactly once.
+		DirectExecution.assess(prepared, "COMPLETED", List.of(first), "RETAINED", MEASURED, counting);
+		assertThat(created).hasValue(1);
+	}
+
 	/** A real Workflow run of the three-stage example, assessed by WorkflowAdapter. */
 	private Row workflowRow(Identity identity) throws Exception {
 		Path attempts = Files.createDirectories(temp.resolve("workflow-attempts"));
@@ -482,6 +512,12 @@ class DirectExecutionTest {
 		mutations.put("Missing creator property 'execution'",
 				json -> ((ObjectNode) json.at("/items/0/invocations/0/attempt")).remove("execution"));
 		mutations.put("RowExecution", json -> ((ObjectNode) json.at("/items/0")).put("execution", "UNKNOWN"));
+		mutations.put("Duplicate direct attempt number", json -> {
+			var invocations = (ArrayNode) json.at("/items/0/invocations");
+			var copy = (ObjectNode) invocations.get(0).deepCopy();
+			((ObjectNode) copy.path("attempt")).put("invocationId", "second-invocation-same-number");
+			invocations.add(copy);
+		});
 		mutations.put("Direct execution state",
 				json -> ((ObjectNode) json.at("/items/0")).put("executionState", "SUCCEEDED"));
 		mutations.put("Malformed schema 4 row", json -> json.put("recordingSchemaVersion", 4));
